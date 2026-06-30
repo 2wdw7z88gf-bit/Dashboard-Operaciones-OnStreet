@@ -1629,9 +1629,16 @@ function getKamMovilesKeys(){
 function renderHistorico(){
   const h=allData.historico;let rutas=h.rutas||[];
   const kamKeys=getKamMovilesKeys();if(kamKeys) rutas=rutas.filter(r=>kamKeys.has((r.cliente+'|'+r.movil).toLowerCase()));
-  const conteoPorDia={},conteoPorCliente={};
-  rutas.forEach(r=>{conteoPorDia[r.fecha]=(conteoPorDia[r.fecha]||0)+1;if(r.cliente)conteoPorCliente[r.cliente]=(conteoPorCliente[r.cliente]||0)+1;});
-  const total=rutas.length,dias=Object.keys(conteoPorDia).length,clientes=Object.keys(conteoPorCliente).length,prom=dias>0?Math.round(total/dias):0;
+  let conteoPorDia,conteoPorCliente,total;
+  if(!kamKeys){
+    // Usar agregados del servidor (calculados sobre la ventana completa de 30 días, no sobre la lista truncada de rutas)
+    conteoPorDia=h.conteoPorDia||{};conteoPorCliente=h.conteoPorCliente||{};total=h.totalRutas||rutas.length;
+  } else {
+    conteoPorDia={};conteoPorCliente={};
+    rutas.forEach(r=>{conteoPorDia[r.fecha]=(conteoPorDia[r.fecha]||0)+1;if(r.cliente)conteoPorCliente[r.cliente]=(conteoPorCliente[r.cliente]||0)+1;});
+    total=rutas.length;
+  }
+  const dias=Object.keys(conteoPorDia).length,clientes=Object.keys(conteoPorCliente).length,prom=dias>0?Math.round(total/dias):0;
   document.getElementById('hiTotal').textContent=total;document.getElementById('hiPromedio').textContent=prom;
   document.getElementById('hiClientes').textContent=clientes;document.getElementById('hiDias').textContent=dias;
   const fechaBase=(allData&&allData.unificador&&allData.unificador.fecha)?parseDDMM_(allData.unificador.fecha):new Date();
