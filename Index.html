@@ -1384,7 +1384,7 @@ function renderOperacion(){
     Object.entries(byCliente).sort((a,b)=>b[1]-a[1]).map(([c,n])=>'<div style="display:flex;justify-content:space-between;gap:16px;padding:2px 0;border-bottom:0.5px solid var(--border);font-size:12px"><span>'+escapeHtml(c)+'</span><strong>'+n+'</strong></div>').join('');
   const sinIniMoviles=moviles.filter(m=>m.inicio===0);
   kpiTooltipContent['op-inicio']=sinIniMoviles.length>0
-    ? tipList(sinIniMoviles.length+' sin inicio hoy',sinIniMoviles.map(m=>tipRow(m.nombre,m.cliente)),'')
+    ? tipList(sinIniMoviles.length+' sin inicio hoy',sinIniMoviles.map(m=>tipRow(m.cliente+' '+m.movil,'')),'')
     : '<strong>Inicio</strong><br><span style="color:var(--ok-fg);font-size:12px">✓ Toda la flota tiene inicio</span>';
   const pendTerm=moviles.filter(function(m){return (m.cantInicios||0)>(m.cantTerminos||0);});
   kpiTooltipContent['op-termino']=pendTerm.length>0
@@ -1437,7 +1437,7 @@ function renderOperacion(){
   })();
   const topAtenc=[...moviles].filter(m=>(m.actividadTotal||m.atenciones||0)>0).sort((a,b)=>(b.actividadTotal||b.atenciones||0)-(a.actividadTotal||a.atenciones||0));
   kpiTooltipContent['op-atenc']='<strong style="display:block;margin-bottom:4px">Top atenciones — '+totalAtenc+' total</strong>'+
-    topAtenc.slice(0,10).map(m=>'<div style="display:flex;justify-content:space-between;gap:12px;padding:2px 0;border-bottom:0.5px solid var(--border);font-size:12px"><span>'+escapeHtml(m.nombre)+'</span><strong>'+(m.actividadTotal||m.atenciones||0)+'</strong></div>').join('');
+    topAtenc.slice(0,10).map(m=>'<div style="display:flex;justify-content:space-between;gap:12px;padding:2px 0;border-bottom:0.5px solid var(--border);font-size:12px"><span>'+escapeHtml(m.cliente+' '+m.movil)+'</span><strong>'+(m.actividadTotal||m.atenciones||0)+'</strong></div>').join('');
 
   populateSelect('opFiltCliente',[...new Set(moviles.map(m=>m.cliente))].sort(),'Todos los clientes');
   populateSelect('opFiltJefe',[...new Set(moviles.map(m=>m.jefeOperaciones).filter(Boolean))].sort(),'Todos los jefes');
@@ -1687,11 +1687,23 @@ function renderGPS(){
   initGPSMap();
   const rutas=allData.gps&&allData.gps.rutas?allData.gps.rutas:[];
   const rutasKam=applyKamFilter(rutas);
-  const stats={total:rutasKam.length,conAtraso:rutasKam.filter(r=>r.tipoAlerta==='Atraso').length,enHorario:rutasKam.filter(r=>r.tipoAlerta==='En horario').length,sinMovimiento:rutasKam.filter(r=>r.sinMovimiento).length,alejandose:rutasKam.filter(r=>r.alejandose).length};
-  document.getElementById('gpsTotal').textContent=stats.total||0;document.getElementById('gpsHorario').textContent=stats.enHorario||0;
-  document.getElementById('gpsHorarioSub').textContent=stats.total?Math.round((stats.enHorario||0)/stats.total*100)+'% del total':'—';
-  document.getElementById('gpsAtraso').textContent=stats.conAtraso||0;document.getElementById('gpsCritico').textContent=(stats.sinMovimiento||0)+(stats.alejandose||0);
   const allMovs=allData.unificador&&allData.unificador.moviles?allData.unificador.moviles:[];
+  // Calcular stats usando el mismo matching de la tabla (findGPS_ + puntoPlanificado)
+  const gpsMapLocal={};
+  rutas.forEach(function(r){ if(r.nombre) gpsMapLocal[r.nombre]=r; });
+  const movsKam=applyKamFilter(allMovs);
+  const movsConRuta=movsKam.filter(function(m){ const g=findGPS_(m,gpsMapLocal); return g&&g.puntoPlanificado; });
+  const stats={
+    total:rutasKam.length,
+    totalConRuta:movsConRuta.length,
+    enHorario:movsConRuta.filter(function(m){ const g=findGPS_(m,gpsMapLocal); return g&&g.tipoAlerta==='En horario'; }).length,
+    conAtraso:movsConRuta.filter(function(m){ const g=findGPS_(m,gpsMapLocal); return g&&g.tipoAlerta==='Atraso'; }).length,
+    sinMovimiento:movsConRuta.filter(function(m){ const g=findGPS_(m,gpsMapLocal); return g&&g.sinMovimiento; }).length,
+    alejandose:movsConRuta.filter(function(m){ const g=findGPS_(m,gpsMapLocal); return g&&g.alejandose; }).length
+  };
+  document.getElementById('gpsTotal').textContent=stats.total||0;document.getElementById('gpsHorario').textContent=stats.enHorario||0;
+  document.getElementById('gpsHorarioSub').textContent=stats.totalConRuta?Math.round((stats.enHorario||0)/stats.totalConRuta*100)+'% c/ruta planif.':'—';
+  document.getElementById('gpsAtraso').textContent=stats.conAtraso||0;document.getElementById('gpsCritico').textContent=(stats.sinMovimiento||0)+(stats.alejandose||0);
   populateSelect('gpsFiltCliente',[...new Set(allMovs.map(m=>m.cliente).filter(Boolean))].sort(),'Todos los clientes');
   populateSelect('gpsFiltJefe',[...new Set(allMovs.map(m=>m.kam).filter(Boolean))].sort(),'Todos los KAM');
   renderGPSMap();
@@ -2406,7 +2418,7 @@ function populateKamSelector(){
 // ─── KPI Tooltip ──────────────────────────────────────────────────────────
 (function(){
   var tip=document.getElementById('kpiTip');
-  if(!tip){tip=document.createElement('div');tip.id='kpiTip';tip.className='tooltip';tip.style.cssText='position:fixed;max-width:300px;line-height:1.6;font-size:12px;display:none;z-index:99';document.body.appendChild(tip);}
+  if(!tip){tip=document.createElement('div');tip.id='kpiTip';tip.className='tooltip';tip.style.cssText='position:fixed;max-width:300px;line-height:1.6;font-size:12px;display:none;z-index:10000';document.body.appendChild(tip);}
   tip.style.maxHeight='70vh';tip.style.overflowY='auto';tip.style.pointerEvents='auto';
   var _tipTarget=null;
   document.addEventListener('mouseover',function(e){
