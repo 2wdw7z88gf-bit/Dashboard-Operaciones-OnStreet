@@ -21,6 +21,7 @@ const CACHE_GPS_SECONDS = 60;
 const CACHE_MAX_BYTES = 95000;
 const BITACORA_MONTHS_BACK = 12;
 const FINALIZADOS_DAYS_BACK = 30;
+const TENDENCIAS_DAYS_BACK = 60;
 const KM_DAYS_BACK = 31;
 
 function doGet(e) {
@@ -923,17 +924,24 @@ function readFinalizados(fechaFinParam) {
   const idx = {};
   headers.forEach((h, i) => { idx[String(h).trim()] = i; });
 
-  // Ventana: 30 días terminados en fechaFinParam (o en hoy si no viene).
   const fechaFin = fechaFinParam ? parseFlexibleDate(fechaFinParam) : new Date();
   if (!fechaFin || isNaN(fechaFin.getTime())) throw new Error('Fecha inválida en readFinalizados: ' + fechaFinParam);
   fechaFin.setHours(23, 59, 59, 999);
-  const cutoff = new Date(fechaFin);
-  cutoff.setDate(cutoff.getDate() - FINALIZADOS_DAYS_BACK);
-  cutoff.setHours(0, 0, 0, 0);
+
+  // Ventana principal (30 días): para listado de rutas, Histórico y Tendencias actuales.
+  const cutoff30 = new Date(fechaFin);
+  cutoff30.setDate(cutoff30.getDate() - FINALIZADOS_DAYS_BACK);
+  cutoff30.setHours(0, 0, 0, 0);
+
+  // Ventana extendida (60 días): solo para conteos diarios, habilita comparación mensual en Tendencias.
+  const cutoff60 = new Date(fechaFin);
+  cutoff60.setDate(cutoff60.getDate() - TENDENCIAS_DAYS_BACK);
+  cutoff60.setHours(0, 0, 0, 0);
 
   const rutas = [];
   const conteoPorDia = {};
   const conteoPorCliente = {};
+  const conteoPorDia60 = {}; // conteos diarios para la ventana extendida de 60 días
 
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
@@ -941,27 +949,41 @@ function readFinalizados(fechaFinParam) {
     if (!fechaRaw) continue;
     const fecha = parseFlexibleDate(fechaRaw);
     if (!fecha || isNaN(fecha.getTime())) continue;
-    if (fecha < cutoff || fecha > fechaFin) continue;
+    if (fecha < cutoff60 || fecha > fechaFin) continue;
 
     const fechaISO = formatDateISO(fecha);
-    const cliente = String(row[idx['Cliente']] || '').trim();
-    const movil = String(row[idx['Notacion']] || '').trim();
+    // Conteo extendido (60 días) — siempre si llegamos acá
+    conteoPorDia60[fechaISO] = (conteoPorDia60[fechaISO] || 0) + 1;
 
-    rutas.push({
-      id: String(row[idx['ID']] || '').slice(0, 12),
-      fecha: fechaISO, cliente: cliente, movil: movil,
-      conductor: String(row[idx['Conductor']] || '').trim().slice(0, 60),
-      region: String(row[idx['Region']] || '').trim(),
-      comuna: String(row[idx['Comuna']] || '').trim(),
-      lugar: String(row[idx['Lugar de Atencion']] || '').trim().slice(0, 80),
-      horaInicio: formatTime(row[idx['Hora Inicio']]),
-      horaTermino: formatTime(row[idx['Hora Termino']])
-    });
-    conteoPorDia[fechaISO] = (conteoPorDia[fechaISO] || 0) + 1;
-    if (cliente) conteoPorCliente[cliente] = (conteoPorCliente[cliente] || 0) + 1;
+    // Ventana principal (30 días): listado + agregados para Histórico
+    if (fecha >= cutoff30) {
+      const cliente = String(row[idx['Cliente']] || '').trim();
+      const movil = String(row[idx['Notacion']] || '').trim();
+      rutas.push({
+        id: String(row[idx['ID']] || '').slice(0, 12),
+        fecha: fechaISO, cliente: cliente, movil: movil,
+        conductor: String(row[idx['Conductor']] || '').trim().slice(0, 60),
+        region: String(row[idx['Region']] || '').trim(),
+        comuna: String(row[idx['Comuna']] || '').trim(),
+        lugar: String(row[idx['Lugar de Atencion']] || '').trim().slice(0, 80),
+        horaInicio: formatTime(row[idx['Hora Inicio']]),
+        horaTermino: formatTime(row[idx['Hora Termino']])
+      });
+      conteoPorDia[fechaISO] = (conteoPorDia[fechaISO] || 0) + 1;
+      if (cliente) conteoPorCliente[cliente] = (conteoPorCliente[cliente] || 0) + 1;
+    }
   }
   rutas.sort((a, b) => b.fecha.localeCompare(a.fecha));
-  return { rutas: rutas.slice(0, 500), conteoPorDia: conteoPorDia, conteoPorCliente: conteoPorCliente, totalRutas: rutas.length, ventanaDias: FINALIZADOS_DAYS_BACK, desde: formatDateISO(cutoff), hasta: formatDateISO(fechaFin) };
+  return {
+    rutas: rutas.slice(0, 2000),
+    conteoPorDia: conteoPorDia,
+    conteoPorCliente: conteoPorCliente,
+    conteoPorDia60: conteoPorDia60,
+    totalRutas: rutas.length,
+    ventanaDias: FINALIZADOS_DAYS_BACK,
+    desde: formatDateISO(cutoff30),
+    hasta: formatDateISO(fechaFin)
+  };
 }
 
 // ============================================================================

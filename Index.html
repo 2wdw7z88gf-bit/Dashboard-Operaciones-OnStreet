@@ -2235,22 +2235,26 @@ function deltaPct(actual,previo){if(previo===0)return actual>0?100:0;return Math
 function formatDelta(d){if(Math.abs(d)<0.5)return{txt:'≈',cls:'flat'};const arrow=d>0?'↑':'↓';return{txt:arrow+Math.abs(d)+'%',cls:d>0?'up':'down'};}
 function parseHoraToInt_(s){if(!s) return null;const m=String(s).match(/^(\d{1,2}):/);if(!m) return null;const h=parseInt(m[1],10);return(h>=0&&h<=23)?h:null;}
 
+function sumarDia60_(c60,desdeISO,hastaISO){let n=0;for(const d in c60){if(d>=desdeISO&&d<=hastaISO)n+=c60[d];}return n;}
 function renderTendencias(){
   if(!allData||!allData.historico) return;
   let rutas=(allData.historico.rutas||[]).slice();
   const kamKeys=getKamMovilesKeys();if(kamKeys) rutas=rutas.filter(r=>kamKeys.has((r.cliente+'|'+r.movil).toLowerCase()));
+  const c60=(!kamKeys&&allData.historico.conteoPorDia60)||null;
   const fechaRef=(allData.unificador&&allData.unificador.fecha)?parseDDMM_(allData.unificador.fecha):new Date();
   fechaRef.setHours(0,0,0,0);const hoyISO=isoOffset(fechaRef,0);
   const sem1Desde=isoOffset(fechaRef,-6),sem1Hasta=hoyISO,sem2Desde=isoOffset(fechaRef,-13),sem2Hasta=isoOffset(fechaRef,-7);
-  const semActual=getRutasEnRango(rutas,sem1Desde,sem1Hasta).length,semPrev=getRutasEnRango(rutas,sem2Desde,sem2Hasta).length;
+  const semActual=c60?sumarDia60_(c60,sem1Desde,sem1Hasta):getRutasEnRango(rutas,sem1Desde,sem1Hasta).length;
+  const semPrev=c60?sumarDia60_(c60,sem2Desde,sem2Hasta):getRutasEnRango(rutas,sem2Desde,sem2Hasta).length;
   const deltaSem=deltaPct(semActual,semPrev),fmtSem=formatDelta(deltaSem);
   document.getElementById('tendSemActual').textContent=semActual;
   const dsEl=document.getElementById('tendSemDelta');dsEl.textContent=fmtSem.txt;dsEl.className='kpi-delta '+fmtSem.cls;
   document.getElementById('tendSemSub').textContent='vs '+semPrev+' (7 días previos)';
-  const mesActual=getRutasEnRango(rutas,isoOffset(fechaRef,-27),hoyISO).length,mesPrev=getRutasEnRango(rutas,isoOffset(fechaRef,-55),isoOffset(fechaRef,-28)).length;
+  const mesActual=c60?sumarDia60_(c60,isoOffset(fechaRef,-27),hoyISO):getRutasEnRango(rutas,isoOffset(fechaRef,-27),hoyISO).length;
+  const mesPrev=c60?sumarDia60_(c60,isoOffset(fechaRef,-55),isoOffset(fechaRef,-28)):getRutasEnRango(rutas,isoOffset(fechaRef,-55),isoOffset(fechaRef,-28)).length;
   document.getElementById('tendMesActual').textContent=mesActual;
   const dmEl=document.getElementById('tendMesDelta');
-  if(mesPrev===0){dmEl.textContent='sin datos';dmEl.className='kpi-delta flat';document.getElementById('tendMesSub').textContent='históricos limitados a 30 días';}
+  if(mesPrev===0){dmEl.textContent='sin datos';dmEl.className='kpi-delta flat';document.getElementById('tendMesSub').textContent='sin datos para el período anterior';}
   else{const deltaMes=deltaPct(mesActual,mesPrev),fmtMes=formatDelta(deltaMes);dmEl.textContent=fmtMes.txt;dmEl.className='kpi-delta '+fmtMes.cls;document.getElementById('tendMesSub').textContent='vs '+mesPrev+' (28 días previos)';}
   document.getElementById('tendPromDiario').textContent=Math.round(semActual/7);
   const byHour=new Array(24).fill(0);rutas.forEach(r=>{const h=parseHoraToInt_(r.horaInicio);if(h!==null)byHour[h]++;});
