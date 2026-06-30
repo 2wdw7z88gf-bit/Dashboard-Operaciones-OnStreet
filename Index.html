@@ -560,7 +560,7 @@ tr:hover td{background:var(--surface-2)}
           <div id="opRankingList" style="margin-top:6px"></div>
         </div>
         <div class="panel">
-          <h2>⚠ Observaciones del día</h2>
+          <h2>⚠ Términos de ruta</h2>
           <div class="obs-filters">
             <button class="obs-btn active" data-obs="all" type="button">Todas</button>
             <button class="obs-btn" data-obs="inc" type="button">Incidencias</button>
@@ -1478,21 +1478,29 @@ function renderOpRanking(moviles){
 
 function renderOpObs(moviles){
   const cont=document.getElementById('opObsList');if(!cont) return;
-  const conObs=moviles.filter(m=>m._tipoObs==='inc'||m._tipoObs==='op');
-  const filtrados=opObsFiltro==='all'?conObs:conObs.filter(m=>m._tipoObs===opObsFiltro);
-  if(filtrados.length===0){cont.innerHTML='<div class="empty">Sin observaciones para este filtro</div>';return;}
-  filtrados.sort((a,b)=>{if(a._tipoObs!==b._tipoObs)return a._tipoObs==='inc'?-1:1;return(a.nombre||'').localeCompare(b.nombre||'');});
-  cont.innerHTML=filtrados.map(m=>{
-    const esInc=m._tipoObs==='inc';
-    const borderC=esInc?'#E24B4A':'#BA7517';
-    const bgC=esInc?'rgba(226,75,74,0.07)':'rgba(186,117,23,0.07)';
-    const tagBg=esInc?'var(--danger-bg)':'var(--warn-bg)';
-    const tagFg=esInc?'var(--danger-fg)':'var(--warn-fg)';
-    const clColor=clientColors[m.cliente]||'#888780';
-    const texto=(m.comentarioTermino||m.comentarioInicio||'').trim();
-    const kamShort=(m.jefeOperaciones||'').split(' ')[0];
+  // Solo móviles con término de ruta
+  const conTermino=moviles.filter(m=>(m.cantTerminos||0)>0||m.termino===1);
+  // Clasificar basado solo en comentarioTermino
+  conTermino.forEach(function(m){
+    var txt=(m.comentarioTermino||'').toLowerCase().trim();
+    if(!txt){m._tipoObs='op';return;}
+    for(var i=0;i<INC_KEYWORDS.length;i++){if(txt.indexOf(INC_KEYWORDS[i])>=0){m._tipoObs='inc';return;}}
+    m._tipoObs='op';
+  });
+  const filtrados=opObsFiltro==='all'?conTermino:conTermino.filter(m=>m._tipoObs===opObsFiltro);
+  if(filtrados.length===0){cont.innerHTML='<div class="empty">Sin términos de ruta para este filtro</div>';return;}
+  filtrados.sort((a,b)=>{if(a._tipoObs!==b._tipoObs)return a._tipoObs==='inc'?-1:1;return(a.cliente||'').localeCompare(b.cliente||'');});
+  cont.innerHTML=filtrados.map(function(m){
+    var esInc=m._tipoObs==='inc';
+    var borderC=esInc?'#E24B4A':'#1D9E75';
+    var bgC=esInc?'rgba(226,75,74,0.07)':'rgba(29,158,117,0.06)';
+    var tagBg=esInc?'var(--danger-bg)':'var(--ok-bg)';
+    var tagFg=esInc?'var(--danger-fg)':'var(--ok-fg)';
+    var clColor=clientColors[m.cliente]||'#888780';
+    var texto=(m.comentarioTermino||'Sin observaciones').trim();
+    var kamShort=(m.jefeOperaciones||'').split(' ')[0];
     return '<div class="obs-card" style="background:'+bgC+';border-left-color:'+borderC+'">'+
-      '<div class="obs-head"><div><span class="obs-mv">'+escapeHtml(m.cliente)+'</span> <span class="obs-cl" style="color:'+clColor+'">· '+escapeHtml(m.nombre||m.movil||'')+'</span></div>'+
+      '<div class="obs-head"><div><span class="obs-mv">'+escapeHtml(m.cliente)+'</span> <span class="obs-cl" style="color:'+clColor+'">· '+escapeHtml(m.movil||m.nombre||'')+'</span></div>'+
       '<div><span class="obs-tag" style="background:'+tagBg+';color:'+tagFg+'">'+(esInc?'Incidencia':'Operativa')+'</span></div></div>'+
       '<p class="obs-txt">'+escapeHtml(texto)+'</p>'+
       '<p class="obs-foot">'+(m.conductor?'Conductor: '+escapeHtml(m.conductor):'')+(kamShort?(m.conductor?' · ':'')+'KAM: '+escapeHtml(kamShort):'')+(m.hora?' · '+m.hora:'')+'</p></div>';
@@ -2203,7 +2211,7 @@ function renderBannerDormidos(){
   const dormidos=getMovilesDormidos(14);
   const filtrados=kamGlobal?dormidos.filter(d=>d.movil.jefeOperaciones&&d.movil.jefeOperaciones.toLowerCase()===kamGlobal.toLowerCase()):dormidos;
   if(filtrados.length===0){banner.style.display='none';document.getElementById('dormidosDetalle').style.display='none';return;}
-  banner.style.display='flex';txt.textContent=filtrados.length+(filtrados.length===1?' móvil':' móviles')+' sin actividad hace más de 14 días';
+  banner.style.display='none'; // banner de inactividad desactivado
   const list=document.getElementById('dormidosList');
   list.innerHTML=filtrados.slice(0,30).map(d=>{
     const dotColor=clientColors[d.movil.cliente]||'#888',ultimoTxt=d.ultimo?formatDate(d.ultimo):'nunca registrado',diasTxt=d.diasSin>=999?'sin registros':'hace '+d.diasSin+' días';

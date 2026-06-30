@@ -8,12 +8,14 @@ const SHEETS = {
   supervisiones:        '1Ox_gLRbPqVxxuFt2b5lJ5lvPtrXhIy7RNSworQd8Kog',
   bitacora:             '1juemCEa5J9oHyKEWbH0dui2OO6x3sk7qZINqOVedoic',
   finalizados:          '1wNm1No20TkwfZKcC1JtpMdnJ-hA5raWT78C9-hc9C0Y',
+  dashboardApi:         '1sr4hSF3GJwdvoOqCSL8lDOUhvt2uPHjiB8vA16VncXw',
   gpsRealTime:          '1r5r9p2byBh15ovWwpgL75FTLUxD6Zlb-HmFtCqPhu3k',
   informesGPS:          '1sbkeem-7PiPpfYsZByzosdrcacsdKQqSYbiQRKuRakY',
   transformCalendarios: '1vtTdj3RSdTNhYPVlpuzQ5bY7_D3aMRFyTiQWlb2oMRI'
 };
 
 const SUPERVISIONES_TAB = 'Resumen Supervisiones 2026';
+const FINALIZADOS_TAB = 'Finalizados Dashboard'; // pestaña interna en Unificador
 const CACHE_DURATION_SECONDS = 300;
 const CACHE_GPS_SECONDS = 60;
 const CACHE_MAX_BYTES = 95000;
@@ -911,6 +913,7 @@ function detectClienteFromMovil(nombreCompleto) {
 function readFinalizados(fechaFinParam) {
   const ss = SpreadsheetApp.openById(SHEETS.finalizados);
   const sheet = ss.getSheetByName('Finalizados') || ss.getSheets()[0];
+  if (!sheet) return { rutas: [], conteoPorDia: {}, conteoPorCliente: {}, totalRutas: 0, ventanaDias: FINALIZADOS_DAYS_BACK };
   const lastRow = sheet.getLastRow();
   const lastCol = sheet.getLastColumn();
   if (lastRow < 2) return { rutas: [], conteoPorDia: {}, conteoPorCliente: {}, totalRutas: 0, ventanaDias: FINALIZADOS_DAYS_BACK };
@@ -1565,7 +1568,7 @@ function clearCache() {
     dateSuffixes.push(formatDateISO(dt));
   }
 
-  const versions = ['v8','v9','v10','v11','v12','v13','v14','v15','v16','v17'];
+  const versions = ['v8','v9','v10','v11','v12','v13','v14','v15','v16','v17','v18'];
   const baseKeys = ['gps','supervisiones','flota','jefes'];
   const dateKeys = ['unificador','historico','bitacora'];
 
@@ -1579,6 +1582,26 @@ function clearCache() {
 
   cache.removeAll(keys);
   Logger.log('Cache limpiado: ' + keys.length + ' keys');
+}
+
+function debugFinalizados() {
+  const ss = SpreadsheetApp.openById(SHEETS.finalizados);
+  const sheet = ss.getSheetByName('Finalizados') || ss.getSheets()[0];
+  if (!sheet) { Logger.log('ERROR: no se encontró la hoja'); return; }
+  Logger.log('Hoja encontrada: ' + sheet.getName());
+  const lastRow = sheet.getLastRow();
+  Logger.log('Filas totales: ' + lastRow);
+  if (lastRow < 1) { Logger.log('Hoja vacía'); return; }
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  Logger.log('Headers: ' + JSON.stringify(headers));
+  if (lastRow >= 2) {
+    const row2 = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0];
+    Logger.log('Fila 2 (primer dato): ' + JSON.stringify(row2));
+  }
+  if (lastRow >= 3) {
+    const rowLast = sheet.getRange(lastRow, 1, 1, sheet.getLastColumn()).getValues()[0];
+    Logger.log('Última fila: ' + JSON.stringify(rowLast));
+  }
 }
 
 function debugSupervisiones() {
@@ -1600,4 +1623,114 @@ function debugSupervisiones() {
   Logger.log('Filas totales del sheet: ' + values.length);
   Logger.log('Primera fila (headers): ' + JSON.stringify(values[0]));
   if (values.length > 1) Logger.log('Segunda fila (datos): ' + JSON.stringify(values[1]));
+}
+
+// ============================================================================
+// ARCHIVO DIARIO DE FINALIZADOS
+// Guarda los términos de ruta del día anterior en la hoja "Finalizados"
+// para que el histórico de 30 días se mantenga actualizado.
+//
+// SETUP (una sola vez):
+//   1. Abrí el editor de Apps Script
+//   2. Seleccioná la función "crearTriggerArchivar"
+//   3. Hacé click en ▶ Ejecutar
+//   Eso activa el trigger diario automático a la 1 AM.
+// ============================================================================
+
+function archivarFinalizados() {
+  const ss = SpreadsheetApp.openById(SHEETS.unificador);
+  const finSS = SpreadsheetApp.openById(SHEETS.finalizados);
+  var finSheet = finSS.getSheetByName('Finalizados') || finSS.getSheets()[0];
+  if (!finSheet) {
+    finSheet = finSS.insertSheet('Finalizados');
+    finSheet.appendRow(['ID','Fecha','Cliente','Notacion','Conductor','Region','Comuna','Lugar de Atencion','Hora Inicio','Hora Termino']);
+    finSheet.getRange(1, 1, 1, 10).setFontWeight('bold');
+    Logger.log('archivarFinalizados: pestaña "' + FINALIZADOS_TAB + '" creada.');
+  }
+
+  // Día a archivar: ayer
+  const ayer = new Date();
+  ayer.setDate(ayer.getDate() - 1);
+  ayer.setHours(0, 0, 0, 0);
+  const fechaISO = formatDateISO(ayer);
+
+  // Leer headers de Finalizados para saber el orden de columnas
+  const finData = finSheet.getDataRange().getValues();
+  if (finData.length === 0) { Logger.log('archivarFinalizados: hoja Finalizados sin headers'); return; }
+  const finHeaders = finData[0].map(function(h){ return String(h || '').trim(); });
+
+  // Evitar duplicados: salir si ya existe esa fecha
+  const fechaColIdx = finHeaders.indexOf('Fecha');
+  if (fechaColIdx >= 0) {
+    for (var r = 1; r < finData.length; r++) {
+      var fraw = finData[r][fechaColIdx];
+      if (!fraw) continue;
+      var fd = parseFlexibleDate(String(fraw));
+      if (fd && formatDateISO(fd) === fechaISO) {
+        Logger.log('archivarFinalizados: ' + fechaISO + ' ya existe, omitiendo.');
+        return;
+      }
+    }
+  }
+
+  // Leer términos del día anterior
+  const terminos = readRouteEvents(ss, 'Termino de Ruta', ayer, {
+    fecha: 'Fecha', cliente: 'Cliente', movil: 'Móvil',
+    conductor: 'Nombre Conductor', hora: 'Hora',
+    comentario: 'Comentario', indicadores: 'Indicadores',
+    comuna: 'Comuna', region: 'Región'
+  });
+  if (terminos.length === 0) {
+    Logger.log('archivarFinalizados: sin términos para ' + fechaISO);
+    return;
+  }
+
+  // Leer inicios del día anterior para hora inicio y lugar
+  const inicios = readRouteEvents(ss, 'Inicio de Ruta', ayer, {
+    fecha: 'Fecha', cliente: 'Cliente', movil: 'Móvil',
+    conductor: 'Nombre Conductor', hora: 'Hora',
+    comuna: 'Comuna', lugar: 'Lugar de Atención',
+    idItem: 'Id Item', region: 'Región'
+  });
+  const iniMap = {};
+  inicios.forEach(function(ini) {
+    var k = normalize_(ini.cliente) + '|' + normalize_(ini.movil);
+    if (!iniMap[k]) iniMap[k] = ini; // primer inicio del día
+  });
+
+  // Construir filas en el orden de columnas de Finalizados
+  const newRows = terminos.map(function(ter) {
+    var k = normalize_(ter.cliente) + '|' + normalize_(ter.movil);
+    var ini = iniMap[k] || {};
+    var data = {
+      'ID':               ini.idItem || '',
+      'Fecha':            fechaISO,
+      'Cliente':          ter.cliente || '',
+      'Notacion':         ter.movil || '',
+      'Conductor':        ter.conductor || ini.conductor || '',
+      'Region':           ter.region || ini.region || '',
+      'Comuna':           ter.comuna || ini.comuna || '',
+      'Lugar de Atencion': ini.lugar || '',
+      'Hora Inicio':      ini.hora || '',
+      'Hora Termino':     ter.hora || ''
+    };
+    return finHeaders.map(function(h) { return h in data ? data[h] : ''; });
+  });
+
+  finSheet.getRange(finSheet.getLastRow() + 1, 1, newRows.length, finHeaders.length).setValues(newRows);
+  Logger.log('archivarFinalizados: guardadas ' + newRows.length + ' rutas para ' + fechaISO);
+}
+
+function crearTriggerArchivar() {
+  // Eliminar triggers previos para evitar duplicados
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'archivarFinalizados') ScriptApp.deleteTrigger(t);
+  });
+  // Trigger diario a la 1 AM
+  ScriptApp.newTrigger('archivarFinalizados')
+    .timeBased()
+    .everyDays(1)
+    .atHour(1)
+    .create();
+  Logger.log('Trigger creado: archivarFinalizados correrá cada día a la 1 AM.');
 }
