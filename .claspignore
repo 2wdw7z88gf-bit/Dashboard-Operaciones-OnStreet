@@ -1,0 +1,15 @@
+**/.git/**
+**/node_modules/**
+public/**
+vercel.json
+**/.next/**
+app/**
+lib/**
+next.config.mjs
+package.json
+package-lock.json
+jsconfig.json
+.env
+.env.*
+.env.local
+.env.example

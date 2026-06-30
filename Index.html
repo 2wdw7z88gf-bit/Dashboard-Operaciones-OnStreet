@@ -1,0 +1,2538 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<!-- PWA / Add to Home Screen -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Dashboard OS">
+<meta name="theme-color" content="#185FA5">
+<link rel="manifest" href="?source=manifest">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='114' fill='%23185FA5'/%3E%3Ctext x='256' y='338' font-family='system-ui%2C-apple-system%2Csans-serif' font-size='224' font-weight='700' fill='white' text-anchor='middle'%3EOS%3C/text%3E%3C/svg%3E">
+<title>Dashboard On Street</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f7f6f2;--surface:#fff;--surface-2:#f1efe8;
+  --text:#1a1a1a;--text-2:#5f5e5a;--text-3:#888780;
+  --border:rgba(0,0,0,0.1);--border-2:rgba(0,0,0,0.18);
+  --ok-bg:#E1F5EE;--ok-fg:#0F6E56;
+  --warn-bg:#FAEEDA;--warn-fg:#854F0B;
+  --danger-bg:#FCEBEB;--danger-fg:#A32D2D;
+  --info-bg:#E6F1FB;--info-fg:#185FA5;
+  --purple-bg:#EEEDFE;--purple-fg:#3C3489;
+  --teal-bg:#E1F5EE;--teal-fg:#0F6E56;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);padding:20px;line-height:1.5;font-size:15px}
+.container{max-width:1320px;margin:0 auto}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:14px;border-bottom:0.5px solid var(--border);flex-wrap:wrap;gap:12px}
+.topbar h1{font-size:22px;font-weight:500}
+.topbar .meta{font-size:13px;color:var(--text-2)}
+.status{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2)}
+.status-dot{width:8px;height:8px;border-radius:50%;background:#1D9E75;animation:pulse 2s infinite}
+.status-dot.error{background:#E24B4A;animation:none}
+.status-dot.loading{background:#EF9F27;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.btn-refresh{font-size:13px;padding:6px 14px;border-radius:6px;border:0.5px solid var(--border-2);background:var(--surface);color:var(--text);cursor:pointer;font-family:inherit}
+.btn-refresh:hover{background:var(--surface-2)}
+.btn-toggle{font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border-2);background:var(--surface);color:var(--text-2);cursor:pointer;font-family:inherit;transition:background 0.15s,color 0.15s}
+.btn-toggle:hover{background:var(--surface-2)}
+.btn-toggle.active{background:var(--info-bg);color:var(--info-fg);border-color:var(--info-fg);font-weight:500}
+.tabs{display:flex;gap:2px;margin-bottom:18px;border-bottom:0.5px solid var(--border);overflow-x:auto}
+.tab{padding:10px 18px;font-size:14px;color:var(--text-2);cursor:pointer;background:none;border:none;border-bottom:2px solid transparent;font-family:inherit;white-space:nowrap}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--info-fg);border-bottom-color:var(--info-fg);font-weight:500}
+.subtabs{display:flex;gap:2px;margin-bottom:14px}
+.subtab{padding:7px 14px;font-size:13px;color:var(--text-2);cursor:pointer;background:var(--surface-2);border:0.5px solid var(--border);border-radius:6px;font-family:inherit}
+.subtab:hover{color:var(--text)}
+.subtab.active{background:var(--info-bg);color:var(--info-fg);border-color:var(--info-fg);font-weight:500}
+.tab-content{display:none}.tab-content.active{display:block}
+.subtab-content{display:none}.subtab-content.active{display:block}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:16px 18px}
+.kpi-label{font-size:12px;color:var(--text-2);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.3px}
+.kpi-val{font-size:30px;font-weight:500}
+.kpi-sub{font-size:13px;color:var(--text-3);margin-top:4px}
+.kpi.ok .kpi-val{color:var(--ok-fg)}.kpi.warn .kpi-val{color:var(--warn-fg)}
+.kpi.danger .kpi-val{color:var(--danger-fg)}.kpi.info .kpi-val{color:var(--info-fg)}
+.kpi.teal .kpi-val{color:var(--teal-fg)}
+.kpi-split{display:flex;padding:0;overflow:hidden}
+.kpi-split-half{flex:1;padding:16px 18px;display:flex;flex-direction:column;cursor:help;transition:background 0.12s}
+.kpi-split-half:hover{background:rgba(0,0,0,0.03)}
+.kpi-split-div{width:1px;background:var(--border);margin:8px 0;flex-shrink:0}
+.val-ok{color:var(--ok-fg)}.val-teal{color:var(--teal-fg)}
+/* ─── DETALLE OPERACIÓN ─────────────────────────── */
+.det-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;background:var(--surface);border:0.5px solid var(--border);border-radius:10px}
+.det-toggle{display:flex;border:0.5px solid var(--border);border-radius:8px;overflow:hidden;flex-shrink:0}
+.det-toggle-btn{padding:5px 14px;font-size:13px;background:transparent;border:none;cursor:pointer;color:var(--text-2);transition:background 0.1s}
+.det-toggle-btn.active{background:var(--info-bg);color:var(--info-fg);font-weight:500}
+.det-count{font-size:13px;color:var(--text-2);white-space:nowrap}
+.det-table{width:100%;border-collapse:collapse}
+.det-table th{font-size:11px;font-weight:600;letter-spacing:0.5px;color:var(--text-2);text-transform:uppercase;padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+.det-table td{padding:9px 12px;border-bottom:0.5px solid var(--border);font-size:13px;vertical-align:middle}
+.det-table tr:hover td{background:var(--surface-2)}
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:12px;font-weight:500}
+.badge-ok{background:var(--ok-bg);color:var(--ok-fg)}
+.badge-encurso{background:var(--info-bg);color:var(--info-fg)}
+.badge-sinic{background:var(--surface-2);color:var(--text-3);border:0.5px solid var(--border)}
+.badge-teal{background:var(--teal-bg);color:var(--teal-fg)}
+.badge-reemplazo{background:#FFF3E0;color:#E65100}
+.badge-doble{background:#FCE4EC;color:#C62828}
+.row-reemplazo-movil td{background:color-mix(in srgb,#FFF3E0 30%,transparent)}
+.rutas-chip{font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ruta-up{color:var(--ok-fg);font-weight:500}.ruta-down{color:var(--teal-fg);font-weight:500}
+.det-edit-btn{padding:4px 10px;background:transparent;border:0.5px solid var(--border);border-radius:6px;font-size:12px;color:var(--text-2);cursor:pointer}
+.det-edit-btn:hover{background:var(--surface-2)}
+.det-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;margin-top:4px}
+.det-card{background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:7px}
+.det-card-title{font-size:14px;font-weight:600}
+.det-card-badges{display:flex;gap:6px;flex-wrap:wrap}
+.det-card-info{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--text-2)}
+.det-card-replace{font-size:12px;background:var(--warn-bg);color:var(--warn-fg);border-radius:6px;padding:4px 8px}
+.det-card-edit{width:100%;margin-top:4px;padding:7px;background:transparent;border:0.5px dashed var(--border);border-radius:8px;font-size:13px;color:var(--text-2);cursor:pointer;transition:background 0.12s;text-align:center}
+.det-card-edit:hover{background:var(--surface-2)}
+/* Modal editar ruta */
+.det-modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9100;align-items:center;justify-content:center}
+.det-modal-ov.open{display:flex}
+.det-modal{background:var(--surface);border-radius:14px;padding:24px;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,0.18)}
+.det-modal h3{font-size:15px;font-weight:600;margin:0 0 18px}
+.det-f{margin-bottom:13px}
+.det-f label{display:block;font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:5px}
+.det-f input{width:100%;padding:9px 12px;border:0.5px solid var(--border);border-radius:8px;font-size:14px;background:var(--surface);color:var(--text-1);box-sizing:border-box}
+.det-f-check{display:flex;align-items:flex-start;gap:9px;font-size:13px}
+.det-f-check input[type=checkbox]{margin-top:2px;width:16px;height:16px;cursor:pointer;flex-shrink:0}
+.det-f-hint{font-size:12px;color:var(--text-2);margin-top:5px}
+.det-modal-btns{display:flex;gap:10px;margin-top:20px}
+.det-modal-btns button{flex:1;padding:10px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;border:none}
+.det-btn-save{background:var(--info-fg);color:#fff}.det-btn-save:hover{filter:brightness(1.1)}
+.det-btn-cancel{background:var(--surface-2);color:var(--text-1)}
+.body-grid{display:grid;grid-template-columns:1fr 320px;gap:14px;margin-bottom:14px}
+.panel{background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:16px 18px}
+.panel h2{font-size:15px;font-weight:500;margin-bottom:12px}
+.filter-row{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.filter-row select,.filter-row input{font-size:13px;padding:6px 10px;border-radius:6px;border:0.5px solid var(--border-2);background:var(--surface);color:var(--text);cursor:pointer;font-family:inherit}
+.filter-row input{cursor:text;flex:1;min-width:140px}
+.legend{display:flex;gap:14px;margin-bottom:8px;flex-wrap:wrap;font-size:12px;color:var(--text-2)}
+.legend .leg{display:flex;align-items:center;gap:5px}
+.legend .leg-dot{width:10px;height:10px;border-radius:50%}
+.legend .sw{width:14px;height:14px;border-radius:3px}
+.leaflet-marker-icon{transition:transform 0.15s}
+.leaflet-marker-icon:hover{transform:scale(1.4)}
+.movil-marker{border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.4);cursor:pointer}
+.leaflet-popup-content-wrapper{border-radius:8px;font-family:inherit}
+.leaflet-popup-content{margin:10px 14px;font-size:12px;line-height:1.5}
+.leaflet-popup-content strong{display:block;margin-bottom:4px;font-size:13px;font-weight:500}
+.leaflet-popup-content .pop-line{margin-top:3px;color:var(--text-2);font-size:11.5px}
+.leaflet-popup-content .badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:6px;font-weight:500;margin-bottom:4px}
+.leaflet-container{font-family:inherit;background:var(--surface-2)}
+.custom-tooltip{background:rgba(255,255,255,0.98)!important;border:0.5px solid var(--border-2)!important;border-radius:6px!important;box-shadow:0 2px 8px rgba(0,0,0,0.12)!important;padding:8px 10px!important;font-family:inherit!important;color:var(--text)!important;line-height:1.4}
+.custom-tooltip:before{display:none!important}
+.alert{padding:12px 16px;border-radius:8px;margin-bottom:14px;font-size:13px;line-height:1.5;border-left:3px solid}
+.alert-danger{background:var(--danger-bg);color:var(--danger-fg);border-color:var(--danger-fg)}
+.alert-warn{background:var(--warn-bg);color:var(--warn-fg);border-color:var(--warn-fg)}
+.alert-ok{background:var(--ok-bg);color:var(--ok-fg);border-color:var(--ok-fg)}
+.alert strong{font-weight:500}
+.pct-meta{font-weight:500;font-size:13px}
+.pct-meta.ok{color:var(--ok-fg)}.pct-meta.warn{color:var(--warn-fg)}.pct-meta.danger{color:var(--danger-fg)}
+.faltantes-list{margin:0;padding:0;list-style:none;font-size:11.5px;color:var(--text-2);line-height:1.6}
+.faltantes-list li{padding:1px 0}
+.faltantes-list li .pct-low{color:var(--danger-fg);font-weight:500}
+.no-recommend{color:var(--text-3);font-size:12px;font-style:italic}
+.row-sup-alerta td{background:color-mix(in srgb,var(--warn-bg) 25%,transparent)}
+.kpi[data-kpi]{cursor:help;transition:box-shadow 0.15s}.kpi[data-kpi]:hover{box-shadow:0 2px 10px rgba(0,0,0,0.1)}
+table tfoot td{font-weight:500;background:var(--surface-2);border-top:1px solid var(--border-2);padding:10px 6px}
+.client-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--border);font-size:14px}
+.client-row:last-child{border-bottom:none}
+.client-name{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
+.client-name .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.client-name .tx{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.client-count{font-weight:500;font-size:14px;display:flex;align-items:center;gap:6px}
+.badge{display:inline-block;font-size:12px;padding:3px 8px;border-radius:6px;font-weight:500}
+.badge-ok{background:var(--ok-bg);color:var(--ok-fg)}
+.badge-warn{background:var(--warn-bg);color:var(--warn-fg)}
+.badge-pend{background:var(--danger-bg);color:var(--danger-fg)}
+.badge-info{background:var(--info-bg);color:var(--info-fg)}
+.badge-purple{background:var(--purple-bg);color:var(--purple-fg)}
+.badge-teal{background:var(--teal-bg);color:var(--teal-fg)}
+.tooltip{position:fixed;background:var(--surface);border:0.5px solid var(--border-2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--text);pointer-events:none;display:none;z-index:99;max-width:260px;box-shadow:0 4px 16px rgba(0,0,0,0.08)}
+.mob-list{margin-top:6px;max-height:380px;overflow-y:auto;padding-right:4px}
+.mob-list::-webkit-scrollbar{width:6px}.mob-list::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:3px}
+.mob-item{padding:10px 0;border-bottom:0.5px solid var(--border);font-size:14px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.mob-item:last-child{border-bottom:none}
+.mob-name{font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:190px}
+.mob-detail{color:var(--text-3);font-size:12px;margin-top:2px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:9px 6px;font-weight:500;color:var(--text-2);border-bottom:0.5px solid var(--border-2);font-size:12px;text-transform:uppercase;letter-spacing:0.3px;background:var(--surface-2);position:sticky;top:0}
+th.center,td.center{text-align:center}th.right,td.right{text-align:right}
+td{padding:9px 6px;border-bottom:0.5px solid var(--border);color:var(--text);vertical-align:top}
+tr:hover td{background:var(--surface-2)}
+.movil-name{font-weight:500;font-size:13px}
+.movil-sub{font-size:11px;color:var(--text-3);margin-top:1px}
+.cell-mes{display:inline-block;width:22px;height:22px;border-radius:4px;font-size:11px;line-height:22px;text-align:center;font-weight:500}
+.mes-0{background:var(--surface-2);color:var(--text-3)}.mes-1{background:var(--info-bg);color:var(--info-fg)}
+.mes-2{background:var(--ok-bg);color:var(--ok-fg)}.mes-3{background:var(--purple-bg);color:var(--purple-fg)}
+.bar{display:inline-block;width:60px;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden;vertical-align:middle;margin-right:6px}
+.bar-fill{display:block;height:100%;background:var(--ok-fg);border-radius:3px}
+.bar-fill.warn{background:var(--warn-fg)}.bar-fill.danger{background:var(--danger-fg)}.bar-fill.teal{background:var(--teal-fg)}
+.pct{font-size:12px;font-weight:500}
+.tabla-wrap{max-height:560px;overflow-y:auto}
+.tabla-wrap::-webkit-scrollbar{width:6px}.tabla-wrap::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:3px}
+.chart-bars{display:flex;align-items:flex-end;justify-content:space-between;height:160px;padding:8px 0;gap:6px}
+.chart-bar{flex:1;background:var(--info-bg);border-radius:4px 4px 0 0;position:relative;min-height:2px;cursor:pointer;transition:all 0.2s}
+.chart-bar:hover{background:var(--info-fg)}.chart-bar:hover .bar-tip{display:block}
+.chart-bar.teal-bar{background:var(--teal-bg)}.chart-bar.teal-bar:hover{background:var(--teal-fg)}
+.bar-tip{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;font-size:11px;padding:3px 8px;border-radius:4px;white-space:nowrap;margin-bottom:4px;z-index:5}
+.chart-labels{display:flex;justify-content:space-between;gap:6px;margin-top:6px}
+.chart-label{flex:1;text-align:center;font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.3px}
+.evento-item{padding:12px 0;border-bottom:0.5px solid var(--border);font-size:14px}
+.evento-item:last-child{border-bottom:none}
+.evento-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px}
+.evento-fecha{font-size:12px;color:var(--text-3);font-weight:500}
+.evento-cliente{font-size:12px;color:var(--text-2)}
+.evento-detalle{font-size:13px;color:var(--text);line-height:1.5;margin-top:3px}
+.eventos-list{max-height:600px;overflow-y:auto;padding-right:4px}
+.eventos-list::-webkit-scrollbar{width:6px}.eventos-list::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:3px}
+.empty{text-align:center;padding:30px 20px;color:var(--text-3);font-size:13px}
+.footer{margin-top:20px;padding-top:14px;border-top:0.5px solid var(--border);font-size:11px;color:var(--text-3);text-align:center}
+.filtros-globales{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;padding:10px 14px;margin-bottom:14px;background:var(--surface);border:0.5px solid var(--border);border-radius:10px}
+.fg-grupo{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fg-label{font-size:12px;color:var(--text-3);text-transform:uppercase;letter-spacing:.3px;font-weight:500;margin-right:2px}
+.fg-input{font-size:14px;padding:7px 11px;border-radius:6px;border:0.5px solid var(--border-2);background:var(--surface);color:var(--text);cursor:pointer;font-family:inherit;min-width:160px}
+.banner-alert{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;margin-bottom:14px;background:var(--warn-bg);color:var(--warn-fg);border:0.5px solid var(--warn-fg);border-radius:8px;font-size:14px}
+.banner-msg{display:flex;align-items:center;gap:8px}
+.banner-icon{font-size:16px;line-height:1}
+.banner-alert .btn-refresh{background:var(--surface);color:var(--warn-fg);border-color:var(--warn-fg);font-weight:500}
+.dormido-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 0;border-bottom:0.5px solid var(--border);font-size:14px}
+.dormido-item:last-child{border-bottom:none}
+.dormido-meta{font-size:12px;color:var(--text-3)}
+.heatmap-wrap{margin:6px 0}
+.hm-grid{display:grid;grid-template-columns:46px repeat(24,1fr);gap:2px;font-size:11px}
+.hm-cell{aspect-ratio:1;border-radius:3px;min-height:14px;cursor:default}
+.hm-cell:hover{outline:1.5px solid var(--text);outline-offset:1px}
+.hm-day-label{color:var(--text-2);display:flex;align-items:center;padding-right:6px;font-size:11px;justify-content:flex-end}
+.hm-hour-label{color:var(--text-3);text-align:center;padding-bottom:3px;font-size:9.5px;line-height:1.2}
+.hm-legend{display:flex;align-items:center;gap:5px;margin-top:12px;font-size:10.5px;color:var(--text-3)}
+.hm-leg-cell{width:12px;height:12px;border-radius:3px;display:inline-block}
+.kpi-delta{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:500;margin-left:6px;padding:1px 6px;border-radius:5px}
+.kpi-delta.up{background:var(--ok-bg);color:var(--ok-fg)}
+.kpi-delta.down{background:var(--danger-bg);color:var(--danger-fg)}
+.kpi-delta.flat{background:var(--surface-2);color:var(--text-3)}
+.tend-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.day-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+.rank-item{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:0.5px solid var(--border);font-size:14px}
+.rank-item:last-child{border-bottom:none}
+.rank-pos{width:22px;text-align:center;font-size:15px;flex-shrink:0}
+.rank-pos.num{font-size:12px;color:var(--text-3);font-weight:500}
+.rank-body{flex:1;min-width:0}
+.rank-name{font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rank-meta{font-size:12px;color:var(--text-3);margin-top:2px}
+.rank-bar-wrap{height:5px;background:var(--surface-2);border-radius:3px;margin-top:3px;overflow:hidden}
+.rank-bar-fill{height:100%;border-radius:3px;transition:width .5s ease}
+.rank-num{font-weight:500;font-size:16px;flex-shrink:0;font-variant-numeric:tabular-nums}
+.obs-card{border-radius:8px;padding:12px 14px;border-left:3px solid;margin-bottom:8px;font-size:13px}
+.obs-card .obs-head{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-bottom:5px}
+.obs-card .obs-mv{font-weight:500;font-size:14px}
+.obs-card .obs-cl{font-size:12px;color:var(--text-3)}
+.obs-card .obs-tag{font-size:12px;padding:2px 8px;border-radius:5px;font-weight:500;white-space:nowrap}
+.obs-card .obs-txt{margin:0;font-size:13px;color:var(--text);line-height:1.5}
+.obs-card .obs-foot{margin:4px 0 0;font-size:12px;color:var(--text-3)}
+.obs-filters{display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap}
+.obs-btn{font-size:13px;padding:5px 12px;border:0.5px solid var(--border-2);border-radius:6px;background:var(--surface);color:var(--text);cursor:pointer;font-family:inherit}
+.obs-btn.active{background:var(--surface-2);color:var(--text);font-weight:500}
+.kam-row{padding:9px 0;border-bottom:0.5px solid var(--border)}
+.kam-row:last-child{border-bottom:none}
+.kam-head{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px;font-size:14px}
+.kam-name{font-weight:500}.kam-meta{font-size:12px;color:var(--text-3)}
+.kam-bar{height:4px;background:var(--surface-2);border-radius:2px;overflow:hidden}
+.kam-bar-fill{height:100%;border-radius:2px}
+/* ─── KILÓMETROS ─────────────────────────────────────── */
+.km-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px}
+.km-kpi{background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px 18px;position:relative;overflow:hidden}
+.km-kpi-accent{position:absolute;top:0;left:0;right:0;height:3px;border-radius:12px 12px 0 0}
+.km-kpi-label{font-size:12px;color:var(--text-2);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.3px;margin-top:6px}
+.km-kpi-val{font-size:30px;font-weight:500;color:var(--teal-fg);font-variant-numeric:tabular-nums}
+.km-kpi-sub{font-size:13px;color:var(--text-3);margin-top:4px}
+.km-sin-asignar{background:var(--warn-bg);border:0.5px solid var(--warn-fg);border-radius:8px;padding:12px 16px;font-size:14px;color:var(--warn-fg);margin-bottom:14px}
+.km-rank-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--border);font-size:14px}
+.km-rank-item:last-child{border-bottom:none}
+.km-rank-pos{width:22px;text-align:center;font-size:15px;flex-shrink:0}
+.km-rank-pos.num{font-size:12px;color:var(--text-3);font-weight:500}
+.km-rank-body{flex:1;min-width:0}
+.km-rank-name{font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.km-rank-meta{font-size:12px;color:var(--text-3);margin-top:2px}
+.km-rank-bar-wrap{width:80px;height:5px;background:var(--surface-2);border-radius:3px;overflow:hidden;flex-shrink:0}
+.km-rank-bar-fill{height:100%;border-radius:3px;background:var(--teal-fg)}
+.km-rank-num{font-weight:500;font-size:15px;flex-shrink:0;font-variant-numeric:tabular-nums;min-width:60px;text-align:right;color:var(--teal-fg)}
+.km-diagnostico{background:var(--surface-2);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--text-2);margin-top:10px}
+.km-diagnostico summary{cursor:pointer;font-weight:500;color:var(--text-3)}
+@media (max-width:900px){.body-grid{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(2,1fr)}.tend-grid{grid-template-columns:1fr}.filtros-globales{padding:8px 10px;gap:10px}}
+@media (max-width:1100px){.day-grid{grid-template-columns:1fr 1fr}}
+@media (max-width:760px){.day-grid{grid-template-columns:1fr}}
+
+/* ─── TABLET ──────────────────────────────────────────────────────── */
+@media (max-width:768px){
+  body{padding:12px 10px}
+
+  /* topbar apilado */
+  .topbar{flex-direction:column;align-items:flex-start;gap:8px;margin-bottom:12px}
+  .topbar h1{font-size:18px}
+  .topbar .meta{font-size:11px}
+  .status{width:100%;justify-content:space-between}
+
+  /* filtros globales: fila compacta */
+  .filtros-globales{flex-direction:row;gap:8px;padding:8px 10px;align-items:center;flex-wrap:nowrap}
+  .fg-grupo{width:auto;flex:1 1 0;min-width:0;flex-wrap:nowrap}
+  .fg-label{display:none}
+  .fg-input{flex:1;min-width:0;width:auto !important;font-size:13px;padding:6px 8px}
+
+  /* KPI: 2 columnas en tablets/pantallas medianas */
+  .kpi-grid{grid-template-columns:repeat(2,1fr) !important;gap:8px;margin-bottom:12px}
+  .km-kpi-grid{grid-template-columns:repeat(2,1fr) !important;gap:8px;margin-bottom:12px}
+  .kpi{padding:10px 12px;border-radius:8px}
+  .kpi-val{font-size:28px}
+  .kpi-sub{display:none}
+  .km-kpi-val{font-size:28px}
+  .km-kpi-sub{display:none}
+
+  /* layouts de 2 columnas → 1 columna */
+  .body-grid{grid-template-columns:1fr !important;gap:10px}
+  .day-grid{grid-template-columns:1fr !important;gap:10px}
+  .tend-grid{grid-template-columns:1fr !important;gap:10px}
+
+  /* mapas: altura reducida */
+  #mapLeaflet,#gpsMapLeaflet{height:200px !important}
+
+  /* paneles */
+  .panel{padding:12px}
+  .panel h2{font-size:13px}
+
+  /* banner */
+  .banner-alert{flex-direction:column;align-items:flex-start;gap:8px}
+
+  /* tabs */
+  .tabs{-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{padding:10px 14px;font-size:13px}
+
+  /* filtros dentro de paneles */
+  .filter-row{flex-direction:column;gap:6px}
+  .filter-row select,.filter-row input{width:100% !important;min-width:0 !important;font-size:14px;padding:8px 10px}
+
+  /* heatmap: scroll horizontal */
+  .heatmap-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .hm-grid{min-width:640px}
+
+  /* tablas: scroll horizontal */
+  .tabla-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{min-width:500px}
+
+  /* botones más fáciles de tocar */
+  .btn-refresh{padding:8px 14px;min-height:36px}
+  .subtab{padding:7px 12px;font-size:12px}
+
+  /* listas */
+  .mob-list{max-height:280px}
+  .mob-name{max-width:160px}
+  .eventos-list{max-height:400px}
+
+  /* obs */
+  .obs-filters{gap:4px}
+  .obs-btn{padding:5px 8px;font-size:11px}
+
+  .footer{font-size:10px}
+  .tabs{display:none}
+  .container{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px))}
+  .topbar{position:sticky;top:0;z-index:50;background:var(--bg)}
+  #bottom-nav{display:flex}
+}
+
+/* ─── PANTALLAS MUY PEQUEÑAS (< 430px: iPhone SE, 16 Pro, etc.) ──── */
+@media (max-width:430px){
+  /* KPI: 1 columna para que los números se vean grandes */
+  .kpi-grid{grid-template-columns:1fr !important;gap:8px}
+  .km-kpi-grid{grid-template-columns:1fr !important;gap:8px}
+  .kpi{padding:14px 16px !important}
+  .kpi-val{font-size:36px !important;font-weight:600 !important}
+  .km-kpi-val{font-size:36px !important;font-weight:600 !important}
+  .kpi-label{font-size:12px !important}
+}
+
+/* ─── MODO STANDALONE (instalada como app) ────────────────────── */
+@media (display-mode: standalone){
+  body{padding-top:env(safe-area-inset-top,0px)}
+  .tabs{display:none}
+  .container{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px))}
+  .topbar{position:sticky;top:0;z-index:50;background:var(--bg)}
+  #bottom-nav{display:flex}
+}
+#pwa-banner{display:none;align-items:center;gap:10px;padding:12px 14px;margin-bottom:14px;background:var(--info-bg);color:var(--info-fg);border:0.5px solid var(--info-fg);border-radius:10px;font-size:14px;line-height:1.4}
+#pwa-banner b{font-weight:600}
+#pwa-banner .pwa-close{margin-left:auto;background:none;border:none;font-size:20px;color:var(--info-fg);cursor:pointer;padding:0 4px;line-height:1;font-family:inherit}
+#offline-banner{display:none;align-items:center;gap:10px;padding:12px 14px;margin-bottom:14px;background:var(--danger-bg);color:var(--danger-fg);border:0.5px solid var(--danger-fg);border-radius:10px;font-size:14px}
+
+/* ─── CLASE is-mobile (JS la agrega) — resiste modo escritorio ─── */
+.is-mobile body{padding:12px 10px !important}
+.is-mobile .topbar{flex-direction:column !important;align-items:flex-start !important;gap:8px !important;margin-bottom:12px !important}
+.is-mobile .topbar h1{font-size:18px !important}
+.is-mobile .topbar .meta{font-size:11px !important}
+.is-mobile .status{width:100% !important;justify-content:space-between !important}
+.is-mobile .filtros-globales{flex-direction:row !important;gap:8px !important;padding:8px 10px !important;align-items:center !important;flex-wrap:nowrap !important}
+.is-mobile .fg-grupo{width:auto !important;flex:1 1 0 !important;min-width:0 !important;flex-wrap:nowrap !important}
+.is-mobile .fg-label{display:none !important}
+.is-mobile .fg-input{flex:1 !important;min-width:0 !important;width:auto !important;font-size:13px !important;padding:6px 8px !important;box-sizing:border-box !important}
+.is-mobile .kpi-grid{grid-template-columns:1fr !important;gap:8px !important;margin-bottom:12px !important}
+.is-mobile .km-kpi-grid{grid-template-columns:1fr !important;gap:8px !important;margin-bottom:12px !important}
+.is-mobile .kpi{padding:14px 16px !important;border-radius:8px !important}
+.is-mobile .kpi-label{font-size:12px !important}
+.is-mobile .kpi-val{font-size:36px !important;font-weight:600 !important}
+.is-mobile .kpi-sub{display:none !important}
+.is-mobile .km-kpi-val{font-size:36px !important;font-weight:600 !important}
+.is-mobile .km-kpi-sub{display:none !important}
+.is-mobile .body-grid{grid-template-columns:1fr !important;gap:10px !important}
+.is-mobile .day-grid{grid-template-columns:1fr !important;gap:10px !important}
+.is-mobile .tend-grid{grid-template-columns:1fr !important;gap:10px !important}
+.is-mobile #mapLeaflet,.is-mobile #gpsMapLeaflet{height:200px !important}
+.is-mobile .panel{padding:12px !important}
+.is-mobile .panel h2{font-size:13px !important}
+.is-mobile .banner-alert{flex-direction:column !important;align-items:flex-start !important;gap:8px !important}
+.is-mobile .tabs{-webkit-overflow-scrolling:touch;scrollbar-width:none !important}
+.is-mobile .tabs::-webkit-scrollbar{display:none}
+.is-mobile .tab{padding:10px 14px !important;font-size:13px !important}
+.is-mobile .filter-row{flex-direction:column !important;gap:6px !important}
+.is-mobile .filter-row select,.is-mobile .filter-row input{width:100% !important;min-width:0 !important;font-size:14px !important;padding:8px 10px !important;box-sizing:border-box !important}
+.is-mobile .heatmap-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.is-mobile .hm-grid{min-width:640px}
+.is-mobile .tabla-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.is-mobile table{min-width:500px}
+.is-mobile .btn-refresh{padding:8px 14px !important;min-height:36px !important}
+.is-mobile .subtab{padding:7px 12px !important;font-size:12px !important}
+.is-mobile .mob-list{max-height:280px !important}
+.is-mobile .mob-name{max-width:160px !important}
+.is-mobile .eventos-list{max-height:400px !important}
+.is-mobile .obs-filters{gap:4px !important}
+.is-mobile .obs-btn{padding:5px 8px !important;font-size:11px !important}
+.is-mobile .footer{font-size:10px !important}
+.is-mobile .tabs{display:none !important}
+.is-mobile .container{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px)) !important}
+.is-mobile .topbar{position:sticky !important;top:0 !important;z-index:50 !important;background:var(--bg) !important}
+.is-mobile #bottom-nav{display:flex !important}
+/* ─── BOTTOM NAV ─────────────────────────────────────────────────────── */
+#bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:0.5px solid var(--border-2);padding-bottom:env(safe-area-inset-bottom,0px);z-index:100;box-shadow:0 -2px 12px rgba(0,0,0,0.06)}
+.bnav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:10px 4px;background:none;border:none;cursor:pointer;color:var(--text-3);font-family:inherit;font-size:13px;font-weight:500;line-height:1.2;min-height:72px;transition:color 0.15s;-webkit-tap-highlight-color:transparent}
+.bnav-btn.active{color:var(--info-fg)}
+.bnav-btn svg{width:26px;height:26px;flex-shrink:0}
+</style>
+<script>
+(function(){
+  var ua = navigator.userAgent;
+  var isPhone = /iPhone|iPod|Android|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+  var sw = Math.min(window.screen.width, window.screen.height);
+  var hasTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  if(isPhone || sw < 768 || (hasTouch && sw < 1024)) {
+    document.documentElement.classList.add('is-mobile');
+  }
+})();
+</script>
+</head>
+<body>
+<div class="container">
+  <div class="topbar">
+    <div>
+      <h1>Dashboard On Street</h1>
+      <div class="meta">Operación · Bitácora · Supervisiones · Kilómetros — datos en vivo desde Google Sheets</div>
+    </div>
+    <div class="status">
+      <div class="status-dot loading" id="statusDot"></div>
+      <span id="statusText">Cargando...</span>
+      <button class="btn-refresh" onclick="loadData()">Actualizar ahora</button>
+    </div>
+  </div>
+
+  <!-- BANNER PWA -->
+  <div id="pwa-banner">
+    <span>📱</span>
+    <span id="pwa-banner-txt"></span>
+    <button class="pwa-close" onclick="document.getElementById('pwa-banner').style.display='none';localStorage.setItem('pwaDismissed','1')">×</button>
+  </div>
+
+  <!-- BANNER OFFLINE -->
+  <div id="offline-banner">
+    <span>📵</span>
+    <span>Sin conexión — los datos pueden estar desactualizados.</span>
+  </div>
+
+  <!-- FILTROS GLOBALES -->
+  <div class="filtros-globales">
+    <div class="fg-grupo">
+      <label class="fg-label" for="fechaGlobal">Fecha del dashboard</label>
+      <input type="date" id="fechaGlobal" class="fg-input">
+      <button class="btn-refresh" id="fgBtnHoy" type="button" style="font-size:11px">Hoy</button>
+      <span id="fgBadgeHistorico" style="display:none;font-size:11px;padding:3px 8px;border-radius:5px;background:var(--info-bg);color:var(--info-fg);align-self:center">Viendo fecha histórica</span>
+    </div>
+    <div class="fg-grupo">
+      <label class="fg-label" for="kamGlobal">KAM</label>
+      <select id="kamGlobal" class="fg-input"><option value="">Todos los KAM</option></select>
+      <span id="fgBadgeKam" style="display:none;font-size:11px;padding:3px 8px;border-radius:5px;background:var(--purple-bg);color:var(--purple-fg);align-self:center"></span>
+    </div>
+  </div>
+
+  <!-- BANNER DORMIDOS -->
+  <div id="bannerDormidos" class="banner-alert" style="display:none">
+    <div class="banner-msg">
+      <span class="banner-icon">⚠</span>
+      <span><b id="bannerDormidosTxt">—</b> · pueden estar dados de baja o sin operación reciente</span>
+    </div>
+    <button class="btn-refresh" id="bannerDormidosBtn" type="button" style="font-size:12px">Ver detalle</button>
+  </div>
+  <div id="dormidosDetalle" style="display:none">
+    <div class="panel" style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <h2 style="margin:0">Móviles sin actividad reciente (últimos 14 días)</h2>
+        <button class="btn-refresh" onclick="document.getElementById('dormidosDetalle').style.display='none'" type="button" style="font-size:11px">Cerrar</button>
+      </div>
+      <div id="dormidosList"></div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab(event,'operacion')">Operación</button>
+    <button class="tab" onclick="switchTab(event,'gps')">GPS / Alertas</button>
+    <button class="tab" onclick="switchTab(event,'bitacora')">Bitácora</button>
+    <button class="tab" onclick="switchTab(event,'supervisiones')">Supervisiones</button>
+    <button class="tab" onclick="switchTab(event,'kilometros')">Kilómetros</button>
+    <button class="tab" onclick="switchTab(event,'tendencias')">Tendencias</button>
+  </div>
+
+  <!-- ============= TAB: OPERACIÓN ============= -->
+  <div class="tab-content active" id="tab-operacion">
+    <div class="subtabs">
+      <button class="subtab active" onclick="switchSubtab(event,'op-hoy')">Hoy</button>
+      <button class="subtab" onclick="switchSubtab(event,'op-historico')">Histórico 30 días</button>
+      <button class="subtab" onclick="switchSubtab(event,'op-detalle')">Detalle</button>
+    </div>
+    <div class="subtab-content active" id="sub-op-hoy">
+      <div class="kpi-grid">
+        <div class="kpi info" data-kpi="op-flota"><div class="kpi-label">Flota total</div><div class="kpi-val" id="opTotal">—</div><div class="kpi-sub" id="opTotalSub">en operación</div></div>
+        <div class="kpi kpi-split">
+          <div class="kpi-split-half" data-kpi="op-inicio">
+            <div class="kpi-label" style="color:var(--ok-fg)">Inicio</div>
+            <div class="kpi-val val-ok" id="opIni">—</div>
+            <div class="kpi-sub" id="opIniSub">—</div>
+          </div>
+          <div class="kpi-split-div"></div>
+          <div class="kpi-split-half" data-kpi="op-termino">
+            <div class="kpi-label">Término</div>
+            <div class="kpi-val val-teal" id="opTermino">—</div>
+            <div class="kpi-sub" id="opTerminoSub">—</div>
+          </div>
+        </div>
+        <div class="kpi info" data-kpi="op-encurso"><div class="kpi-label">En curso</div><div class="kpi-val" id="opEnCurso">—</div><div class="kpi-sub" id="opEnCursoSub">rutas activas</div></div>
+        <div class="kpi warn" data-kpi="op-reemplazo"><div class="kpi-label">Reemplazo conductores</div><div class="kpi-val" id="opReemplazo">—</div><div class="kpi-sub" id="opReemplazoSub">—</div></div>
+        <div class="kpi ok" data-kpi="op-doble" id="kpiDobleCard"><div class="kpi-label">Doble inicio s/término</div><div class="kpi-val" id="opDoble">—</div><div class="kpi-sub" id="opDobleSub">—</div></div>
+        <div class="kpi teal" data-kpi="op-atenc"><div class="kpi-label">Atenciones totales</div><div class="kpi-val" id="opAtenc">—</div><div class="kpi-sub" id="opAtencSub">—</div></div>
+      </div>
+      <div class="body-grid">
+        <div class="panel">
+          <h2>Distribución geográfica</h2>
+          <div class="filter-row">
+            <select id="opFiltCliente"></select>
+            <select id="opFiltJefe"><option value="">Todos los jefes</option></select>
+            <select id="opFiltEstado">
+              <option value="">Todos los estados</option>
+              <option value="ok">Completos (inicio + término)</option>
+              <option value="termino">Pend. término</option>
+              <option value="inicio">Sin inicio</option>
+            </select>
+            <input id="opFiltTexto" placeholder="Buscar móvil, comuna, conductor..." />
+          </div>
+          <div class="legend">
+            <div class="leg"><div class="leg-dot" style="background:#1D9E75"></div> Completo</div>
+            <div class="leg"><div class="leg-dot" style="background:#EF9F27"></div> Pend. término</div>
+            <div class="leg"><div class="leg-dot" style="background:#E24B4A"></div> Sin inicio</div>
+          </div>
+          <div id="mapLeaflet" style="width:100%;height:540px;border-radius:8px;overflow:hidden"></div>
+        </div>
+        <div>
+          <div class="panel" style="margin-bottom:14px"><h2>Resumen por cliente</h2><div id="opClientList"></div></div>
+          <div class="panel"><h2>Móviles con pendientes</h2><div class="mob-list" id="opMobList"></div></div>
+        </div>
+      </div>
+      <div class="day-grid">
+        <div class="panel">
+          <h2>🏆 Ranking del día — top atenciones</h2>
+          <div id="opRankingList" style="margin-top:6px"></div>
+        </div>
+        <div class="panel">
+          <h2>⚠ Observaciones del día</h2>
+          <div class="obs-filters">
+            <button class="obs-btn active" data-obs="all" type="button">Todas</button>
+            <button class="obs-btn" data-obs="inc" type="button">Incidencias</button>
+            <button class="obs-btn" data-obs="op" type="button">Operativas</button>
+          </div>
+          <div id="opObsList" style="max-height:360px;overflow-y:auto;padding-right:4px"></div>
+        </div>
+        <div class="panel">
+          <h2>Resumen por KAM</h2>
+          <div id="opKamList" style="margin-top:6px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="subtab-content" id="sub-op-historico">
+      <div class="kpi-grid">
+        <div class="kpi info"><div class="kpi-label">Rutas totales 30 días</div><div class="kpi-val" id="hiTotal">—</div><div class="kpi-sub">finalizadas</div></div>
+        <div class="kpi ok"><div class="kpi-label">Promedio diario</div><div class="kpi-val" id="hiPromedio">—</div><div class="kpi-sub">rutas/día</div></div>
+        <div class="kpi info"><div class="kpi-label">Clientes activos</div><div class="kpi-val" id="hiClientes">—</div><div class="kpi-sub">en el período</div></div>
+        <div class="kpi info"><div class="kpi-label">Días con operación</div><div class="kpi-val" id="hiDias">—</div><div class="kpi-sub">de los últimos 30</div></div>
+      </div>
+      <div class="body-grid">
+        <div class="panel">
+          <h2>Rutas por día (últimos 30 días)</h2>
+          <div class="chart-bars" id="hiChart"></div>
+          <div class="chart-labels" id="hiChartLabels"></div>
+        </div>
+        <div class="panel"><h2>Por cliente</h2><div id="hiClientList"></div></div>
+      </div>
+      <div class="panel">
+        <h2>Detalle de rutas finalizadas</h2>
+        <div class="filter-row">
+          <select id="hiFiltCliente"></select>
+          <input id="hiFiltTexto" placeholder="Buscar conductor, comuna, lugar..." />
+        </div>
+        <div class="tabla-wrap">
+          <table>
+            <thead><tr><th>Fecha</th><th>Cliente / Móvil</th><th>Conductor</th><th>Comuna</th><th>Lugar</th><th class="center">Inicio</th><th class="center">Término</th></tr></thead>
+            <tbody id="hiTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <!-- ---- SUBTAB: DETALLE ---- -->
+    <div class="subtab-content" id="sub-op-detalle">
+      <div class="det-toolbar">
+        <span class="fg-label">BUSCAR</span>
+        <input id="detBuscar" class="fg-input" placeholder="Móvil, cliente, conductor..." />
+        <span class="fg-label">ESTADO</span>
+        <select id="detEstado">
+          <option value="">Todos</option>
+          <option value="encurso">En curso</option>
+          <option value="terminado">Terminado</option>
+          <option value="sinInicio">Sin inicio</option>
+          <option value="doble">Doble inicio</option>
+          <option value="reemplazo">Reemplazo</option>
+        </select>
+        <span class="fg-label">KAM</span>
+        <select id="detKam"><option value="">Todos</option></select>
+        <div style="flex:1"></div>
+        <span id="detCount" class="det-count"></span>
+        <div class="det-toggle">
+          <button id="btnDetTabla" class="det-toggle-btn active" onclick="setDetView('tabla')">Tabla</button>
+          <button id="btnDetTarjetas" class="det-toggle-btn" onclick="setDetView('tarjetas')">Tarjetas</button>
+        </div>
+      </div>
+      <div id="detTablaView" class="tabla-wrap">
+        <table class="det-table">
+          <thead><tr>
+            <th>MÓVIL</th><th>CONDUCTOR</th><th>INICIO</th>
+            <th>ESTADO</th><th>RUTAS</th><th>ATENCIONES</th>
+            <th>KAM</th><th>COMUNA</th><th></th>
+          </tr></thead>
+          <tbody id="detTbody"></tbody>
+        </table>
+      </div>
+      <div id="detTarjetasView" style="display:none">
+        <div class="det-cards" id="detCardsGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============= TAB: GPS ============= -->
+  <div class="tab-content" id="tab-gps">
+    <div class="kpi-grid">
+      <div class="kpi info"><div class="kpi-label">Móviles con GPS hoy</div><div class="kpi-val" id="gpsTotal">—</div><div class="kpi-sub">tiempo real</div></div>
+      <div class="kpi ok"><div class="kpi-label">En horario</div><div class="kpi-val" id="gpsHorario">—</div><div class="kpi-sub" id="gpsHorarioSub">—</div></div>
+      <div class="kpi warn"><div class="kpi-label">Con atraso</div><div class="kpi-val" id="gpsAtraso">—</div><div class="kpi-sub">requiere atención</div></div>
+      <div class="kpi danger"><div class="kpi-label">Sin movimiento / Alejándose</div><div class="kpi-val" id="gpsCritico">—</div><div class="kpi-sub">alertas críticas</div></div>
+    </div>
+    <div class="body-grid">
+      <div class="panel">
+        <h2>Mapa de móviles en tiempo real</h2>
+        <div class="filter-row">
+          <select id="gpsFiltCliente"><option value="">Todos los clientes</option></select>
+          <select id="gpsFiltJefe"><option value="">Todos los jefes</option></select>
+          <select id="gpsFiltAlerta">
+            <option value="">Todas las alertas</option>
+            <option value="atraso">Solo con atraso</option>
+            <option value="horario">En horario</option>
+            <option value="sinmov">Sin movimiento</option>
+            <option value="alejandose">Alejándose del punto</option>
+            <option value="lejos">A más de 200m del punto</option>
+          </select>
+          <input id="gpsFiltTexto" placeholder="Buscar móvil..." />
+        </div>
+        <div class="legend">
+          <div class="leg"><div class="leg-dot" style="background:#1D9E75"></div> En horario</div>
+          <div class="leg"><div class="leg-dot" style="background:#EF9F27"></div> Atraso</div>
+          <div class="leg"><div class="leg-dot" style="background:#E24B4A"></div> Sin movimiento / Alejándose</div>
+          <div class="leg"><div class="leg-dot" style="background:#B0AFA9;opacity:0.55"></div> Sin GPS (posición aprox.)</div>
+        </div>
+        <div id="gpsMapLeaflet" style="width:100%;height:540px;border-radius:8px;overflow:hidden"></div>
+      </div>
+      <div>
+        <div class="panel"><h2>Alertas activas</h2><div class="mob-list" id="gpsAlertasList"></div></div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px;flex-wrap:wrap">
+        <h2 style="margin:0">Todos los móviles</h2>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="gpsVehicleCount" style="font-size:12px;color:var(--text-2)">—</span>
+          <button id="btnGpsRutaFijada" class="btn-toggle" onclick="toggleGpsRutaFijada()">Solo con ruta fijada</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Móvil</th><th>Estado</th><th>GPS</th><th>KAM</th><th class="right">Dist. punto</th></tr></thead>
+          <tbody id="gpsVehicleTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============= TAB: BITÁCORA ============= -->
+  <div class="tab-content" id="tab-bitacora">
+    <div class="kpi-grid">
+      <div class="kpi info"><div class="kpi-label">Eventos en ventana</div><div class="kpi-val" id="biTotal">—</div><div class="kpi-sub" id="biTotalSub">últimos 12 meses</div></div>
+      <div class="kpi ok"><div class="kpi-label">Este mes</div><div class="kpi-val" id="biMes">—</div><div class="kpi-sub" id="biMesSub">—</div></div>
+      <div class="kpi warn"><div class="kpi-label">Atrasos / Contingencias</div><div class="kpi-val" id="biCrit">—</div><div class="kpi-sub">en ventana</div></div>
+      <div class="kpi danger"><div class="kpi-label">Reclamos</div><div class="kpi-val" id="biRec">—</div><div class="kpi-sub">en ventana</div></div>
+    </div>
+    <div class="body-grid">
+      <div class="panel">
+        <h2>Eventos recientes</h2>
+        <div class="filter-row">
+          <select id="biFiltCliente"></select>
+          <select id="biFiltTipo"></select>
+          <input id="biFiltTexto" placeholder="Buscar conductor, sucursal o detalle..." />
+        </div>
+        <div class="eventos-list" id="biEventosList"></div>
+      </div>
+      <div>
+        <div class="panel" style="margin-bottom:14px"><h2>Por tipo</h2><div id="biTipoList"></div></div>
+        <div class="panel"><h2>Por cliente</h2><div id="biClientList"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============= TAB: SUPERVISIONES ============= -->
+  <div class="tab-content" id="tab-supervisiones">
+    <div class="subtabs">
+      <button class="subtab active" onclick="switchSubtab(event,'su-kpi')">KPI del mes</button>
+      <button class="subtab" onclick="switchSubtab(event,'su-anual')">Vista anual</button>
+    </div>
+    <div class="subtab-content active" id="sub-su-kpi">
+      <div id="suAlertBox"></div>
+      <div class="kpi-grid">
+        <div class="kpi info"><div class="kpi-label">Total móviles</div><div class="kpi-val" id="suKpiTotal">—</div><div class="kpi-sub">en operación</div></div>
+        <div class="kpi ok"><div class="kpi-label">Supervisados (mes en curso)</div><div class="kpi-val" id="suKpiSup">—</div><div class="kpi-sub" id="suKpiSupSub">—</div></div>
+        <div class="kpi warn"><div class="kpi-label">Faltantes para meta</div><div class="kpi-val" id="suKpiFalta">—</div><div class="kpi-sub" id="suKpiFaltaSub">meta global 50%</div></div>
+        <div class="kpi danger"><div class="kpi-label">% Cumplimiento global</div><div class="kpi-val" id="suKpiPct">—</div><div class="kpi-sub" id="suKpiPctSub">vs meta 50%</div></div>
+      </div>
+      <div class="panel">
+        <h2 id="suKpiTitle">Resumen KPI mensual por cliente</h2>
+        <div class="filter-row" style="margin-bottom:10px">
+          <label style="font-size:12px;color:var(--text-2);align-self:center">Mes a analizar:</label>
+          <select id="suKpiFiltMes" style="min-width:140px"></select>
+          <button class="btn-refresh" id="suKpiBtnMesActual" type="button" style="font-size:11px">Mes actual</button>
+          <span id="suKpiBadgePasado" style="display:none;font-size:11px;padding:3px 8px;border-radius:5px;background:var(--info-bg);color:var(--info-fg);align-self:center">Viendo mes histórico</span>
+        </div>
+        <div class="tabla-wrap" style="max-height:none">
+          <table>
+            <thead><tr><th>Cliente</th><th class="center">Total móviles</th><th class="center">Supervisados</th><th class="center">% Meta</th><th class="center">Faltantes</th><th>Recomendaciones</th></tr></thead>
+            <tbody id="suKpiTableBody"></tbody>
+            <tfoot id="suKpiTableFoot"></tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="subtab-content" id="sub-su-anual">
+      <div class="kpi-grid">
+        <div class="kpi info"><div class="kpi-label">Móviles supervisados (año)</div><div class="kpi-val" id="suTotal">—</div><div class="kpi-sub" id="suSub">al menos 1 vez</div></div>
+        <div class="kpi ok"><div class="kpi-label">Supervisados este mes</div><div class="kpi-val" id="suSup">—</div><div class="kpi-sub" id="suSupSub">—</div></div>
+        <div class="kpi warn"><div class="kpi-label">Sin supervisión (año)</div><div class="kpi-val" id="suSinSup">—</div><div class="kpi-sub">requiere atención</div></div>
+        <div class="kpi danger"><div class="kpi-label">Cumplimiento promedio</div><div class="kpi-val" id="suCumpl">—</div><div class="kpi-sub">vs meta anual</div></div>
+      </div>
+      <div class="body-grid">
+        <div class="panel"><h2>Supervisiones por mes</h2><div class="chart-bars" id="suChart"></div><div class="chart-labels" id="suChartLabels"></div></div>
+        <div class="panel"><h2>Por cliente</h2><div id="suClientList"></div></div>
+      </div>
+      <div class="panel">
+        <h2>Detalle por móvil</h2>
+        <div class="filter-row">
+          <select id="suFiltCliente"></select>
+          <select id="suFiltEstado"><option value="">Todos</option><option value="sin">Sin supervisión</option><option value="bajo">Cumplimiento &lt;30%</option><option value="medio">Cumplimiento 30-70%</option><option value="alto">Cumplimiento &gt;70%</option></select>
+          <input id="suFiltTexto" placeholder="Buscar móvil..." />
+          <select id="suOrden"><option value="cumpl-desc">Mayor cumplimiento</option><option value="cumpl-asc">Menor cumplimiento</option><option value="total-desc">Más supervisiones</option><option value="cliente">Por cliente</option></select>
+        </div>
+        <div class="legend">
+          <div class="leg"><span class="sw mes-0"></span> Sin sup.</div><div class="leg"><span class="sw mes-1"></span> 1</div>
+          <div class="leg"><span class="sw mes-2"></span> 2</div><div class="leg"><span class="sw mes-3"></span> 3+</div>
+        </div>
+        <div class="tabla-wrap">
+          <table>
+            <thead><tr><th>Móvil</th><th class="center">E</th><th class="center">F</th><th class="center">M</th><th class="center">A</th><th class="center">M</th><th class="center">J</th><th class="center">J</th><th class="center">A</th><th class="center">S</th><th class="center">O</th><th class="center">N</th><th class="center">D</th><th class="right">Total</th><th class="right">Meta</th><th>Cumpl.</th></tr></thead>
+            <tbody id="suTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============= TAB: KILÓMETROS ============= -->
+  <div class="tab-content" id="tab-kilometros">
+    <div class="subtabs">
+      <button class="subtab active" onclick="switchSubtab(event,'km-hoy')">Hoy</button>
+      <button class="subtab" onclick="switchSubtab(event,'km-mes')">Este mes</button>
+    </div>
+
+    <!-- SUB: HOY -->
+    <div class="subtab-content active" id="sub-km-hoy">
+      <div class="km-kpi-grid">
+        <div class="km-kpi">
+          <div class="km-kpi-accent" style="background:var(--teal-fg)"></div>
+          <div class="km-kpi-label">Km totales hoy</div>
+          <div class="km-kpi-val" id="kmHoyTotal">—</div>
+          <div class="km-kpi-sub" id="kmHoyTotalSub">—</div>
+        </div>
+        <div class="km-kpi">
+          <div class="km-kpi-accent" style="background:var(--info-fg)"></div>
+          <div class="km-kpi-label">Móviles con km registrados</div>
+          <div class="km-kpi-val" style="color:var(--info-fg)" id="kmHoyMoviles">—</div>
+          <div class="km-kpi-sub" id="kmHoyMovilesSub">—</div>
+        </div>
+        <div class="km-kpi">
+          <div class="km-kpi-accent" style="background:var(--ok-fg)"></div>
+          <div class="km-kpi-label">Promedio por móvil</div>
+          <div class="km-kpi-val" style="color:var(--ok-fg)" id="kmHoyProm">—</div>
+          <div class="km-kpi-sub">km por móvil activo hoy</div>
+        </div>
+        <div class="km-kpi">
+          <div class="km-kpi-accent" style="background:var(--warn-fg)"></div>
+          <div class="km-kpi-label">Km sin asignar a flota</div>
+          <div class="km-kpi-val" style="color:var(--warn-fg)" id="kmHoySinAsignar">—</div>
+          <div class="km-kpi-sub" id="kmHoySinAsignarSub">vehículos no identificados</div>
+        </div>
+      </div>
+
+      <div id="kmSinAsignarAlert" style="display:none" class="km-sin-asignar"></div>
+
+      <div class="body-grid">
+        <div class="panel">
+          <h2>Ranking de km hoy — top móviles</h2>
+          <div class="filter-row">
+            <select id="kmFiltCliente"><option value="">Todos los clientes</option></select>
+            <select id="kmFiltJefe"><option value="">Todos los KAM</option></select>
+            <input id="kmFiltTexto" placeholder="Buscar móvil..." />
+          </div>
+          <div id="kmRankingHoy" style="margin-top:6px"></div>
+        </div>
+        <div>
+          <div class="panel" style="margin-bottom:14px">
+            <h2>Por cliente — km hoy</h2>
+            <div id="kmClienteHoy"></div>
+          </div>
+          <div class="panel">
+            <h2>Por KAM — km hoy</h2>
+            <div id="kmKamHoy"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUB: ESTE MES -->
+    <div class="subtab-content" id="sub-km-mes">
+      <div class="km-kpi-grid">
+        <div class="km-kpi">
+          <div class="km-kpi-accent" style="background:var(--teal-fg)"></div>
+          <div class="km-kpi-label">Km totales del mes</div>
+          <div class="km-kpi-val" id="kmMesTotal">—</div>
+          <div class="km-kpi-sub" id="kmMesTotalSub">—</div>
+        </div>
+        <div class="km-kpi">
+          <div class="km-kpi-accent" style="background:var(--info-fg)"></div>
+          <div class="km-kpi-label">Km esta semana</div>
+          <div class="km-kpi-val" style="color:var(--info-fg)" id="kmSemanaTotal">—</div>
+          <div class="km-kpi-sub">últimos 7 días</div>
+        </div>
+        <div class="km-kpi">
+          <div class="km-kpi-accent" style="background:var(--ok-fg)"></div>
+          <div class="km-kpi-label">Promedio diario</div>
+          <div class="km-kpi-val" style="color:var(--ok-fg)" id="kmMesProm">—</div>
+          <div class="km-kpi-sub">km/día promedio de la flota</div>
+        </div>
+        <div class="km-kpi">
+          <div class="km-kpi-accent" style="background:var(--purple-fg)"></div>
+          <div class="km-kpi-label">Móviles activos (mes)</div>
+          <div class="km-kpi-val" style="color:var(--purple-fg)" id="kmMesMoviles">—</div>
+          <div class="km-kpi-sub">con al menos 1 día registrado</div>
+        </div>
+      </div>
+
+      <div class="body-grid">
+        <div class="panel">
+          <h2>Ranking km del mes — top móviles</h2>
+          <div class="filter-row">
+            <select id="kmMesFiltCliente"><option value="">Todos los clientes</option></select>
+            <input id="kmMesFiltTexto" placeholder="Buscar móvil..." />
+          </div>
+          <div id="kmRankingMes" style="margin-top:6px"></div>
+        </div>
+        <div>
+          <div class="panel" style="margin-bottom:14px">
+            <h2>Por cliente — km del mes</h2>
+            <div id="kmClienteMes"></div>
+          </div>
+          <div class="panel">
+            <h2>Detalle: sin registros GPS</h2>
+            <div style="font-size:11.5px;color:var(--text-2);margin-bottom:8px">Móviles de la flota sin km registrados este mes. Puede indicar ausencia de operación o falta de cobertura GPS.</div>
+            <div id="kmSinRegistros" class="mob-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Diagnóstico de matching GPS</h2>
+        <div style="font-size:12px;color:var(--text-2);margin-bottom:12px">Muestra qué agrupaciones del sheet de Informes GPS no pudieron asignarse a un móvil de la flota. Si hay muchos km sin asignar, revisá los aliases en el Apps Script.</div>
+        <div id="kmDiagnostico"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============= TAB: TENDENCIAS ============= -->
+  <div class="tab-content" id="tab-tendencias">
+    <div class="kpi-grid">
+      <div class="kpi info">
+        <div class="kpi-label">Rutas última semana</div>
+        <div class="kpi-val"><span id="tendSemActual">—</span><span class="kpi-delta flat" id="tendSemDelta">—</span></div>
+        <div class="kpi-sub" id="tendSemSub">vs 7 días previos</div>
+      </div>
+      <div class="kpi info">
+        <div class="kpi-label">Rutas últimas 4 sem.</div>
+        <div class="kpi-val"><span id="tendMesActual">—</span><span class="kpi-delta flat" id="tendMesDelta">—</span></div>
+        <div class="kpi-sub" id="tendMesSub">vs 4 sem. previas</div>
+      </div>
+      <div class="kpi ok"><div class="kpi-label">Promedio diario (sem.)</div><div class="kpi-val" id="tendPromDiario">—</div><div class="kpi-sub">rutas por día</div></div>
+      <div class="kpi warn"><div class="kpi-label">Hora punta</div><div class="kpi-val" id="tendHoraPico">—</div><div class="kpi-sub" id="tendHoraPicoSub">—</div></div>
+    </div>
+    <div class="panel" style="margin-bottom:14px">
+      <h2>Cuándo opera la flota — heatmap día × hora (últimos 30 días)</h2>
+      <div style="font-size:12px;color:var(--text-2);margin-bottom:12px">Cada celda es una hora-día. El color indica la cantidad acumulada de rutas iniciadas en esa franja.</div>
+      <div class="heatmap-wrap">
+        <div class="hm-grid" id="hmHeader"></div>
+        <div class="hm-grid" id="hmBody"></div>
+        <div class="hm-legend">
+          <span>Menos rutas</span>
+          <span class="hm-leg-cell" style="background:#EAF3DE"></span><span class="hm-leg-cell" style="background:#C0DD97"></span>
+          <span class="hm-leg-cell" style="background:#97C459"></span><span class="hm-leg-cell" style="background:#639922"></span>
+          <span class="hm-leg-cell" style="background:#3B6D11"></span>
+          <span>Más rutas</span>
+        </div>
+      </div>
+    </div>
+    <div class="tend-grid">
+      <div class="panel"><h2>Top crecimientos vs semana previa</h2><div id="tendDeltaClientes"></div></div>
+      <div class="panel"><h2>Evolución semanal (últimas 4 semanas)</h2><div class="chart-bars" id="tendEvolChart" style="height:140px"></div><div class="chart-labels" id="tendEvolLabels"></div></div>
+    </div>
+  </div>
+
+  <div class="footer">Dashboard conectado a Google Sheets vía Apps Script · Actualización automática cada 5 min</div>
+</div>
+
+<div class="tooltip" id="tip"></div>
+
+<nav id="bottom-nav">
+  <button class="bnav-btn active" id="bnav-operacion" onclick="switchTab(event,'operacion')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+    <span>Operación</span>
+  </button>
+  <button class="bnav-btn" id="bnav-gps" onclick="switchTab(event,'gps')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    <span>GPS</span>
+  </button>
+  <button class="bnav-btn" id="bnav-bitacora" onclick="switchTab(event,'bitacora')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
+    <span>Bitácora</span>
+  </button>
+  <button class="bnav-btn" id="bnav-supervisiones" onclick="switchTab(event,'supervisiones')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+    <span>Supervis.</span>
+  </button>
+  <button class="bnav-btn" id="bnav-kilometros" onclick="switchTab(event,'kilometros')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+    <span>Km</span>
+  </button>
+  <button class="bnav-btn" id="bnav-tendencias" onclick="switchTab(event,'tendencias')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+    <span>Tendencias</span>
+  </button>
+</nav>
+
+<script>
+// ============================================================================
+// CONFIG
+// ============================================================================
+const API_URL = 'https://script.google.com/macros/s/AKfycbwgzwp6udBKjCyefdw_BGfBRS5gAIBBaPrJ70yXbwtkPWI1JbXb_8CFaXs8y2Fcv42-/exec';
+const REFRESH_INTERVAL_MIN = 5;
+
+const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const mesesShort = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const clientColors = {
+  "Habitat Móvil":"#185FA5","La Araucana Móvil":"#534AB7","Caja 18":"#3B6D11","Caja los Andes":"#0F6E56",
+  "CGE Móvil":"#BA7517","Punto Caja los Andes":"#0F6E56","Punto Caja los Andes Móvil":"#0F6E56",
+  "Fundación Acrux":"#993C1D","Mutual":"#5F5E5A","Minera Los Pelambres":"#D4537E",
+  "Los Pelambres":"#D4537E","Centinela":"#639922","Lampa":"#7F77DD","Naranjo y Asociados":"#E24B4A",
+  "Survías":"#7A5C3F","SURVIAS":"#7A5C3F","Entel":"#1A8FCE","BancoEstado - Express":"#003B73",
+  "Servicio de Salud Metropolitano Sur":"#287F58","Redelcom":"#9C2E5E"
+};
+const tipoColors = {
+  "Mantención":"badge-info","Reparación":"badge-warn","Supervisión":"badge-purple",
+  "Atraso":"badge-warn","Contingencia":"badge-pend","Reclamo":"badge-pend",
+  "Mejora":"badge-ok","Revisión Técnica":"badge-info","Suspensión de ruta":"badge-pend",
+  "Reagendamiento de Rutas":"badge-warn","Incidente":"badge-pend","Felicitaciones":"badge-ok",
+  "Exceso de velocidad":"badge-pend","Amonestación":"badge-warn","Otro":"badge-info",
+  "Término de Atención Anticipado":"badge-warn"
+};
+const ciudadesCoords = {
+  "Iquique":[-20.22,-70.14],"Calama":[-22.46,-68.93],"Antofagasta":[-23.65,-70.40],
+  "Copiapó":[-27.37,-70.33],"La Serena":[-29.91,-71.25],"Coquimbo":[-29.96,-71.34],
+  "Quillota":[-32.88,-71.25],"Valparaíso":[-33.05,-71.63],"Viña del Mar":[-33.03,-71.55],
+  "Santiago":[-33.45,-70.66],"Maipú":[-33.51,-70.76],"San Bernardo":[-33.59,-70.69],
+  "Lampa":[-33.28,-70.87],"Rancagua":[-34.17,-70.74],"Talca":[-35.43,-71.66],
+  "Chillán":[-36.61,-72.10],"Concepción":[-36.83,-73.05],"Los Ángeles":[-37.46,-72.35],
+  "Temuco":[-38.73,-72.60],"Valdivia":[-39.82,-73.24],"Osorno":[-40.57,-73.13],
+  "Puerto Montt":[-41.47,-72.93]
+};
+
+let allData = null;
+let refreshTimer = null;
+let fechaGlobal = null;
+let kamGlobal = '';
+let suKpiMesSeleccionado = null;
+let opObsFiltro = 'all';
+
+// ── Entorno: GAS (testing) vs externo (Netlify/Vercel) ──────────────────────
+const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwgzwp6udBKjCyefdw_BGfBRS5gAIBBaPrJ70yXbwtkPWI1JbXb_8CFaXs8y2Fcv42-/exec';
+const IS_GAS = (function(){ try{ return typeof google!=='undefined'&&typeof google.script!=='undefined'&&typeof google.script.run!=='undefined'; }catch(e){ return false; } })();
+const kpiTooltipContent = {};
+
+function getTodayISO(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+function applyKamFilter(arr){
+  if(!kamGlobal) return arr;
+  const k=kamGlobal.toLowerCase();
+  return arr.filter(x=>{
+    const kams=[x.kam,x.jefeOperaciones,x.KAM].filter(Boolean).map(s=>String(s).toLowerCase());
+    return kams.indexOf(k)>=0;
+  });
+}
+
+function loadData(){
+  setStatus('loading','Cargando datos...');
+  const onOk=function(d){
+    if(!d){setStatus('error','Sin datos recibidos');return;}
+    if(d.error){setStatus('error','Error: '+d.error);console.error(d);return;}
+    allData=d;
+    populateKamSelector();
+    renderAll();
+    const ts=new Date(d.lastUpdated||Date.now());
+    let msg='Actualizado a las '+ts.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+    if(fechaGlobal) msg+=' · viendo '+formatDate(fechaGlobal);
+    setStatus('ok',msg);
+  };
+  const onErr=function(err){setStatus('error','Error al cargar: '+(err&&err.message?err.message:String(err)));};
+  if(IS_GAS){
+    google.script.run.withSuccessHandler(onOk).withFailureHandler(onErr).getDashboardData({fecha:fechaGlobal||null});
+  } else {
+    fetch(GAS_API_URL+'?source=all'+(fechaGlobal?'&fecha='+fechaGlobal:''))
+      .then(function(r){return r.json();}).then(onOk).catch(onErr);
+  }
+}
+
+function setStatus(state,msg){
+  document.getElementById('statusDot').className='status-dot'+(state==='error'?' error':state==='loading'?' loading':'');
+  document.getElementById('statusText').textContent=msg;
+}
+function startAutoRefresh(){if(refreshTimer)clearInterval(refreshTimer);refreshTimer=setInterval(loadData,REFRESH_INTERVAL_MIN*60*1000);}
+
+function switchTab(ev,name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  ev.target.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.toggle('active',b.id==='bnav-'+name));
+  setTimeout(function(){
+    if(name==='gps'&&typeof gpsLeafletMap!=='undefined'&&gpsLeafletMap){gpsLeafletMap.invalidateSize();if(allData&&allData.gps)renderGPSMap();}
+    if(name==='operacion'&&typeof leafletMap!=='undefined'&&leafletMap){leafletMap.invalidateSize();if(allData&&allData.unificador)renderMap();}
+    if(name==='kilometros'&&allData&&!allData.kilometros){loadKilometros();}
+  },250);
+}
+
+function loadKilometros(){
+  const onOk=function(d){if(d&&d.kilometros){if(!allData)allData={};allData.kilometros=d.kilometros;if(typeof renderKilometros==='function')renderKilometros();}};
+  if(IS_GAS){
+    google.script.run.withSuccessHandler(onOk).withFailureHandler(function(){}).getKilometrosData();
+  } else {
+    fetch(GAS_API_URL+'?source=kilometros').then(function(r){return r.json();}).then(onOk).catch(function(){});
+  }
+}
+function switchSubtab(ev,name){
+  const wrap=ev.target.parentElement;
+  wrap.querySelectorAll('.subtab').forEach(t=>t.classList.remove('active'));
+  wrap.parentElement.querySelectorAll('.subtab-content').forEach(t=>t.classList.remove('active'));
+  ev.target.classList.add('active');
+  document.getElementById('sub-'+name).classList.add('active');
+}
+
+// ============================================================================
+// DETALLE OPERACIÓN
+// ============================================================================
+let _detView = 'tabla';
+let _detCurrentMoviles = [];
+
+function renderDetalleOperacion() {
+  if (!allData || !allData.unificador) return;
+  const moviles = allData.unificador.moviles || [];
+  const todos = moviles;
+  const kamSel = document.getElementById('detKam');
+  if (kamSel && kamSel.options.length === 1) {
+    const kams = [...new Set(todos.map(function(m){ return m.kam; }).filter(Boolean))].sort();
+    kams.forEach(function(k){ kamSel.add(new Option(k, k)); });
+  }
+  _renderDetFiltered(todos);
+  ['detBuscar','detEstado','detKam'].forEach(function(id){
+    const el = document.getElementById(id);
+    if (el && !el._detBound) {
+      el.addEventListener('input',  function(){ _renderDetFiltered(todos); });
+      el.addEventListener('change', function(){ _renderDetFiltered(todos); });
+      el._detBound = true;
+    }
+  });
+}
+
+function _renderDetFiltered(todos) {
+  const buscar = (document.getElementById('detBuscar')?.value || '').toLowerCase();
+  const ef     = document.getElementById('detEstado')?.value  || '';
+  const kf     = (document.getElementById('detKam')?.value    || '').toLowerCase();
+  const filtered = todos.filter(function(m) {
+    if (kf && (m.kam || '').toLowerCase() !== kf) return false;
+    if (ef === 'encurso')    { if (!(m.rutasEnCurso > 0)) return false; }
+    else if (ef === 'terminado') { if (!(m.termino > 0 && !m.rutasEnCurso)) return false; }
+    else if (ef === 'sinInicio') { if (m.inicio) return false; }
+    else if (ef === 'doble')     { if (!m.dobleInicioSinTermino) return false; }
+    else if (ef === 'reemplazo') { if (!m.tieneReemplazo) return false; }
+    if (buscar) {
+      const txt = [m.nombre, m.movil, m.cliente, m.conductor, m.conductorTitular, m.kam, m.comuna, m.lugar].join(' ').toLowerCase();
+      if (!txt.includes(buscar)) return false;
+    }
+    return true;
+  });
+  _detCurrentMoviles = filtered;
+  document.getElementById('detCount').textContent = filtered.length + ' / ' + todos.length + ' móviles';
+  _buildDetTabla(filtered);
+  _buildDetCards(filtered);
+}
+
+function _detEstadoKey(m) {
+  if (!m.inicio && !m.cantInicios) return 'sinInicio';
+  if (m.rutasEnCurso > 0) return 'encurso';
+  if (m.termino > 0) return 'terminado';
+  return 'iniciado'; // inicio > 0, termino = 0, rutasEnCurso = 0
+}
+
+function _detBadgesHtml(m) {
+  const est = _detEstadoKey(m);
+  const b = [];
+  if (est === 'terminado')  b.push('<span class="badge badge-ok">Terminado</span>');
+  else if (est === 'encurso')  b.push('<span class="badge badge-encurso">En curso</span>');
+  else if (est === 'iniciado') b.push('<span class="badge badge-teal">Iniciado</span>');
+  else b.push('<span class="badge badge-sinic">Sin inicio</span>');
+  if (m.tieneReemplazo)        b.push('<span class="badge badge-reemplazo">Conductor reemplazo</span>');
+  if (m.dobleInicioSinTermino) b.push('<span class="badge badge-doble">⚠ Doble inicio</span>');
+  return b.join(' ');
+}
+
+function _detCardBorder(m) {
+  if (m.tieneReemplazo) return 'var(--warn-fg)';
+  const est = _detEstadoKey(m);
+  if (est === 'encurso')   return 'var(--info-fg)';
+  if (est === 'terminado') return 'var(--ok-fg)';
+  if (est === 'iniciado')  return 'var(--teal-fg)';
+  return 'var(--border)';
+}
+
+function _buildDetTabla(moviles) {
+  const tbody = document.getElementById('detTbody');
+  if (!tbody) return;
+  tbody.innerHTML = moviles.map(function(m, idx) {
+    const movNom = '<div style="font-weight:500">'+m.cliente+'</div><div style="font-size:12px;color:var(--text-2)">'+m.movil+'</div>';
+    const reemplazante = (m.alertasInicio || []).find(function(a){ return a.esReemplazo; });
+    const reemplazaA = reemplazante?.reemplazaA || m.conductorTitular || '';
+    const cond = m.tieneReemplazo
+      ? '<div>'+m.conductor+'</div><div style="font-size:11px;color:#E65100">reemplaza a '+(reemplazaA||'titular')+'</div>'
+      : (m.conductor || '—');
+    const rutas = '<span class="rutas-chip"><span class="ruta-up">'+(m.cantInicios||0)+'↑</span> <span class="ruta-down">'+(m.cantTerminos||0)+'↓</span></span>';
+    const editBtn = (m.inicio||m.cantInicios)
+      ? '<button class="det-edit-btn" onclick="openDetEdit('+idx+')">✎</button>' : '';
+    const rowClass = '';
+    return '<tr'+rowClass+'>'
+      +'<td>'+movNom+'</td>'
+      +'<td>'+cond+'</td>'
+      +'<td>'+(m.hora||'—')+'</td>'
+      +'<td>'+_detBadgesHtml(m)+'</td>'
+      +'<td>'+rutas+'</td>'
+      +'<td style="font-variant-numeric:tabular-nums">'+(m.atenciones>0?m.atenciones:'—')+'</td>'
+      +'<td style="font-size:12px;color:var(--text-2)">'+(m.kam||'—')+'</td>'
+      +'<td style="font-size:12px;color:var(--text-2)">'+(m.comuna||'—')+'</td>'
+      +'<td>'+editBtn+'</td>'
+      +'</tr>';
+  }).join('');
+}
+
+function _buildDetCards(moviles) {
+  const grid = document.getElementById('detCardsGrid');
+  if (!grid) return;
+  grid.innerHTML = moviles.map(function(m, idx) {
+    const reemplazante = (m.alertasInicio || []).find(function(a){ return a.esReemplazo; });
+    const reemplazaA = reemplazante?.reemplazaA || m.conductorTitular || '';
+    const replRow = m.tieneReemplazo
+      ? '<div class="det-card-replace">↳ '+m.conductor+' reemplaza a '+(reemplazaA||'titular')+'</div>' : '';
+    const lugarRow = (m.lugar || m.comuna)
+      ? '<div class="det-card-info">📍 '+(m.lugar||m.comuna)+'</div>' : '';
+    const editBtn = (m.inicio||m.cantInicios)
+      ? '<button class="det-card-edit" onclick="openDetEdit('+idx+')">✎ Editar</button>' : '';
+    return '<div class="det-card" style="border-left:3px solid '+_detCardBorder(m)+'">'
+      +'<div class="det-card-title">'+m.cliente+'</div>'
+      +'<div style="font-size:12px;color:var(--text-2);margin-top:-4px">'+m.movil+'</div>'
+      +'<div class="det-card-badges">'+_detBadgesHtml(m)+'</div>'
+      +(m.conductor ? '<div class="det-card-info">👤 '+m.conductor+'</div>' : '')
+      +replRow
+      +(m.hora ? '<div class="det-card-info">⏰ '+m.hora+'</div>' : '')
+      +lugarRow
+      +(m.atenciones > 0 ? '<div style="font-size:13px;color:var(--text-2)">Atenciones: <strong>'+m.atenciones+'</strong></div>' : '')
+      +editBtn
+      +'</div>';
+  }).join('');
+}
+
+function setDetView(view) {
+  _detView = view;
+  document.getElementById('detTablaView').style.display    = view === 'tabla'    ? '' : 'none';
+  document.getElementById('detTarjetasView').style.display = view === 'tarjetas' ? '' : 'none';
+  document.getElementById('btnDetTabla').classList.toggle('active',    view === 'tabla');
+  document.getElementById('btnDetTarjetas').classList.toggle('active', view === 'tarjetas');
+}
+
+// ── Modal editar ──
+let _detEditIdx = null;
+
+function openDetEdit(idx) {
+  _detEditIdx = idx;
+  const m = _detCurrentMoviles[idx];
+  if (!m) return;
+  const ini = (m.alertasInicio || [])[m.alertasInicio.length - 1];
+  document.getElementById('detModalTitle').textContent = m.nombre || (m.cliente + ' ' + m.movil);
+  document.getElementById('detModalSub').textContent  = ini?._sheetRow ? 'Fila '+ini._sheetRow+' · Inicio de Ruta · titular: '+(m.conductorTitular||'—') : '';
+  document.getElementById('detEditConductor').value = m.conductor || '';
+  document.getElementById('detEditComuna').value    = m.comuna    || '';
+  document.getElementById('detEditLugar').value     = m.lugar     || '';
+  // Checkbox "actualizar Flota" — solo aparece cuando el conductor difiere del titular
+  const conductorDifiere = (m.conductor||'').toLowerCase() !== (m.conductorTitular||'').toLowerCase();
+  const fReemplazo = document.getElementById('detFReemplazo');
+  fReemplazo.style.display = (conductorDifiere && m._canEditFlota) ? '' : 'none';
+  document.getElementById('detEditActFlota').checked = false;
+  document.getElementById('detFlotaHint').textContent = 'titular actual: '+(m.conductorTitular||'—');
+  const btn = document.getElementById('detBtnGuardar');
+  btn.textContent = 'Guardar'; btn.disabled = false;
+  document.getElementById('detModalOv').classList.add('open');
+}
+
+function closeDetModal() {
+  document.getElementById('detModalOv').classList.remove('open');
+  _detEditIdx = null;
+}
+
+function guardarDetEdit() {
+  if(!IS_GAS){alert('La edición de rutas solo está disponible en el entorno interno (GAS).');return;}
+  const m = _detCurrentMoviles[_detEditIdx];
+  if (!m) return;
+  const conductor   = document.getElementById('detEditConductor').value.trim();
+  const comuna      = document.getElementById('detEditComuna').value.trim();
+  const lugar       = document.getElementById('detEditLugar').value.trim();
+  const actFlota    = document.getElementById('detEditActFlota').checked;
+  const rowIdx = m.lastInicioRowIdx || 0;
+  if (!rowIdx) { alert('Este registro no tiene fila de hoja registrada — no se puede editar.'); return; }
+  const btn = document.getElementById('detBtnGuardar');
+  btn.textContent = 'Guardando…'; btn.disabled = true;
+
+  google.script.run
+    .withSuccessHandler(function() {
+      if (actFlota && conductor && m._canEditFlota) {
+        google.script.run
+          .withSuccessHandler(function() { _afterDetSave(m, conductor, comuna, lugar, false); })
+          .withFailureHandler(function(err) { alert('Inicio guardado. Error al actualizar Flota: '+err.message); _afterDetSave(m, conductor, comuna, lugar, true); })
+          .updateFlotaConductor(m.cliente, m.movil, conductor);
+      } else {
+        _afterDetSave(m, conductor, comuna, lugar, actFlota ? false : m.tieneReemplazo);
+      }
+    })
+    .withFailureHandler(function(err) {
+      alert('Error al guardar: '+err.message);
+      btn.textContent = 'Guardar'; btn.disabled = false;
+    })
+    .updateInicioRuta(rowIdx, conductor, comuna, lugar);
+}
+
+function _afterDetSave(m, conductor, comuna, lugar, tieneReemplazo) {
+  m.conductor = conductor;
+  if (comuna) m.comuna = comuna;
+  if (lugar)  m.lugar  = lugar;
+  m.tieneReemplazo = tieneReemplazo;
+  if (!tieneReemplazo) m.conductorTitular = conductor;
+  const uni = allData && allData.unificador;
+  if (uni) {
+    const buscar = function(arr){ return (arr||[]).find(function(x){ return x.cliente===m.cliente && x.movil===m.movil; }); };
+    const orig = buscar(uni.moviles);
+    if (orig) { orig.conductor = conductor; if (comuna) orig.comuna = comuna; if (lugar) orig.lugar = lugar; orig.tieneReemplazo = tieneReemplazo; if (!tieneReemplazo) orig.conductorTitular = conductor; }
+  }
+  closeDetModal();
+  _renderDetFiltered(uni?.moviles||[]);
+  renderOperacion();
+}
+
+function renderAll(){
+  if(!allData) return;
+  if(allData.unificador) renderOperacion();
+  if(allData.historico) renderHistorico();
+  if(allData.gps) renderGPS();
+  if(allData.bitacora) renderBitacora();
+  if(allData.supervisiones) renderSupervisiones();
+  if(allData.kilometros) renderKilometros();
+  if(allData.unificador) renderDetalleOperacion();
+  renderBannerDormidos();
+  renderTendencias();
+}
+
+// ── OPERACIÓN ──────────────────────────────────────────────────────────────
+function getCoordFor(m){
+  const key=m.comuna||m.movil||'';
+  for(const c in ciudadesCoords){if(key.toLowerCase().includes(c.toLowerCase())||(m.movil&&m.movil.toLowerCase().includes(c.toLowerCase())))return ciudadesCoords[c];}
+  return null;
+}
+
+const INC_KEYWORDS=['pinchadura','accidente','choque','robo','asalto','panne','avería','falla','no funciona','rotura','contingencia','reclamo','queja','no llegó','no se presentó','no asistió','suspendido','cancelado','incidente','emergencia'];
+const OP_KEYWORDS=['mantención','mantenimiento','revisión','reparación','cambio','autorizado','sin registro','pendiente','adblue','combustible','visita','capacitación','evento','anticipado','reducida','feriado','horario'];
+function classifyObservacion(m){
+  const txt=((m.comentarioInicio||'')+' '+(m.comentarioTermino||'')).toLowerCase().trim();
+  if(!txt) return '';
+  for(const k of INC_KEYWORDS){if(txt.indexOf(k)>=0) return 'inc';}
+  for(const k of OP_KEYWORDS){if(txt.indexOf(k)>=0) return 'op';}
+  return 'op';
+}
+
+function renderOperacion(){
+  const moviles=applyKamFilter(allData.unificador.moviles);
+  moviles.forEach(m=>{m._tipoObs=classifyObservacion(m);});
+  const stats=allData.unificador.stats||{};
+  const total            = stats.flotaTotal                          || moviles.length;
+  const movsConIni       = stats.movilesConInicio                   || moviles.filter(m=>m.inicio===1).length;
+  const movsConTerm      = stats.movilesConTermino                  || moviles.filter(m=>m.termino===1).length;
+  const totalInicios     = stats.iniciosHoy                        || movsConIni;
+  // Vehículos con ruta abierta ahora: cantInicios > cantTerminos (incluye 2ª ruta del día)
+  const rutasEnCurso     = moviles.filter(function(m){return (m.cantInicios||0)>(m.cantTerminos||0);}).length;
+  const sinInicio        = total - movsConIni;
+  const movsConDobles    = stats.movilesConDobles                   || moviles.filter(m=>m.multiplesRutas).length;
+  const movsConReemplazo = stats.movilesConReemplazo                || moviles.filter(m=>m.tieneReemplazo).length;
+  const movsConDobleIni  = stats.movilesConDobleInicioSinTermino    || moviles.filter(m=>m.dobleInicioSinTermino).length;
+  const totalAtenc       = stats.totalActividad                     || moviles.reduce((s,m)=>s+(m.actividadTotal||m.atenciones||0),0);
+  const movsConAtenc     = moviles.filter(m=>(m.actividadTotal||m.atenciones||0)>0).length;
+
+  // ─── KPIs ──────────────────────────────────────────────────────────────────
+  document.getElementById('opTotal').textContent=total;
+  document.getElementById('opTotalSub').textContent=total+' móviles en flota';
+  document.getElementById('opIni').textContent=movsConIni;
+  document.getElementById('opIniSub').textContent=sinInicio>0?sinInicio+' sin inicio':'toda la flota inició';
+  document.getElementById('opTermino').textContent=movsConTerm;
+  document.getElementById('opTerminoSub').textContent=rutasEnCurso>0?rutasEnCurso+' pendientes':'todas cerradas';
+  document.getElementById('opEnCurso').textContent=rutasEnCurso;
+  document.getElementById('opEnCursoSub').textContent=rutasEnCurso===1?'ruta activa':rutasEnCurso+' rutas activas';
+  document.getElementById('opReemplazo').textContent=movsConReemplazo;
+  document.getElementById('opReemplazoSub').textContent=movsConReemplazo>0?movsConReemplazo+' con reemplazo':'sin reemplazos';
+  const dobleCard=document.getElementById('kpiDobleCard');
+  if(dobleCard) dobleCard.className='kpi '+(movsConDobleIni>0?'danger':'ok');
+  document.getElementById('opDoble').textContent=movsConDobleIni;
+  document.getElementById('opDobleSub').textContent=movsConDobleIni>0?'requieren revisión':'sin anomalías';
+  document.getElementById('opAtenc').textContent=totalAtenc;
+  document.getElementById('opAtencSub').textContent=movsConAtenc>0?movsConAtenc+' móviles · ~'+(Math.round(totalAtenc/movsConAtenc*10)/10)+'/móvil':'sin registros';
+
+  // ─── Tooltips ──────────────────────────────────────────────────────────────
+  function tipRow(n,s){return '<div style="padding:3px 0;border-bottom:0.5px solid var(--border);font-size:12px"><strong>'+escapeHtml(n)+'</strong>'+(s?' <span style="color:var(--text-3);font-size:11px">'+escapeHtml(s)+'</span>':'')+'</div>';}
+  function tipList(title,rows,empty){
+    if(!rows.length) return '<strong>'+title+'</strong><br><em style="color:var(--text-3);font-size:11px">'+empty+'</em>';
+    return '<strong style="display:block;margin-bottom:4px">'+title+'</strong>'+rows.slice(0,12).join('')+(rows.length>12?'<div style="color:var(--text-3);font-size:11px;margin-top:3px">+ '+(rows.length-12)+' más…</div>':'');
+  }
+  const byCliente={};moviles.forEach(m=>{byCliente[m.cliente]=(byCliente[m.cliente]||0)+1;});
+  kpiTooltipContent['op-flota']='<strong style="display:block;margin-bottom:5px">'+total+' móviles en flota</strong>'+
+    Object.entries(byCliente).sort((a,b)=>b[1]-a[1]).map(([c,n])=>'<div style="display:flex;justify-content:space-between;gap:16px;padding:2px 0;border-bottom:0.5px solid var(--border);font-size:12px"><span>'+escapeHtml(c)+'</span><strong>'+n+'</strong></div>').join('');
+  const sinIniMoviles=moviles.filter(m=>m.inicio===0);
+  kpiTooltipContent['op-inicio']=sinIniMoviles.length>0
+    ? tipList(sinIniMoviles.length+' sin inicio hoy',sinIniMoviles.map(m=>tipRow(m.nombre,m.cliente)),'')
+    : '<strong>Inicio</strong><br><span style="color:var(--ok-fg);font-size:12px">✓ Toda la flota tiene inicio</span>';
+  const pendTerm=moviles.filter(function(m){return (m.cantInicios||0)>(m.cantTerminos||0);});
+  kpiTooltipContent['op-termino']=pendTerm.length>0
+    ? tipList(pendTerm.length+' pendientes de cierre',pendTerm.map(function(m){return tipRow(m.cliente+' '+m.movil,'');}), '')
+    : '<strong>Término</strong><br><span style="color:var(--ok-fg);font-size:12px">✓ Todas las rutas cerradas</span>';
+  kpiTooltipContent['op-encurso']=tipList(pendTerm.length+' rutas en curso',pendTerm.map(function(m){return tipRow(m.cliente+' '+m.movil,'');}), 'Sin rutas activas');
+  kpiTooltipContent['op-reemplazo']='<strong>Reemplazo conductores</strong><br><em style="color:var(--text-3);font-size:11px">Sin reemplazos hoy</em>';
+  try {
+    var reempMoviles2=moviles.filter(function(m){return m.tieneReemplazo;});
+    if(reempMoviles2.length>0){
+      var reempHtml='<strong style="display:block;margin-bottom:6px">'+reempMoviles2.length+' móvil'+(reempMoviles2.length!==1?'es':'')+' con conductor de reemplazo</strong>';
+      for(var ri=0;ri<reempMoviles2.length;ri++){
+        var rm=reempMoviles2[ri];
+        var reempConductor='';
+        var reempA='';
+        var iniArr=rm.alertasInicio||[];
+        for(var ai=0;ai<iniArr.length;ai++){
+          if(iniArr[ai].esReemplazo){reempConductor=iniArr[ai].conductor||'';reempA=iniArr[ai].reemplazaA||'';break;}
+        }
+        reempHtml+='<div style="padding:5px 0;border-bottom:0.5px solid var(--border)">';
+        reempHtml+='<div><strong style="font-size:12px">'+escapeHtml(String(rm.cliente||''))+'</strong> <span style="color:var(--text-3);font-size:11px">'+escapeHtml(String(rm.movil||''))+'</span></div>';
+        if(reempConductor) reempHtml+='<div style="font-size:11.5px;color:var(--ok-fg);font-weight:600">'+escapeHtml(reempConductor)+'</div>';
+        if(reempA) reempHtml+='<div style="font-size:11px;color:var(--text-3)">reemplaza a '+escapeHtml(reempA)+'</div>';
+        reempHtml+='</div>';
+      }
+      kpiTooltipContent['op-reemplazo']=reempHtml;
+    }
+  } catch(e2){ kpiTooltipContent['op-reemplazo']+='<br><small style="color:red">err:'+e2.message+'</small>'; }
+  (function(){
+    const dobleMoviles=moviles.filter(function(m){return m.dobleInicioSinTermino;});
+    if(!dobleMoviles.length){
+      kpiTooltipContent['op-doble']='<strong>Doble inicio s/término</strong><br><em style="color:var(--text-3);font-size:11px">Sin anomalías de doble inicio</em>';
+      return;
+    }
+    var html='<strong style="display:block;margin-bottom:6px">'+dobleMoviles.length+' con doble inicio s/término</strong>';
+    dobleMoviles.forEach(function(m){
+      html+='<div style="padding:5px 0;border-bottom:0.5px solid var(--border)">';
+      html+='<div style="margin-bottom:2px"><strong style="font-size:12px">'+escapeHtml(String(m.cliente||''))+'</strong>';
+      html+=' <span style="color:var(--text-3);font-size:11px">'+escapeHtml(String(m.movil||''))+'</span></div>';
+      var inis=Array.isArray(m.alertasInicio)?m.alertasInicio:[];
+      inis.forEach(function(a){
+        html+='<div style="display:flex;gap:10px;font-size:11px;padding:1px 0">';
+        html+='<span style="color:var(--text-2);min-width:38px">'+escapeHtml(String(a.hora||''))+'</span>';
+        html+='<span>'+escapeHtml(String(a.conductor||''))+'</span>';
+        html+='</div>';
+      });
+      html+='</div>';
+    });
+    kpiTooltipContent['op-doble']=html;
+  })();
+  const topAtenc=[...moviles].filter(m=>(m.actividadTotal||m.atenciones||0)>0).sort((a,b)=>(b.actividadTotal||b.atenciones||0)-(a.actividadTotal||a.atenciones||0));
+  kpiTooltipContent['op-atenc']='<strong style="display:block;margin-bottom:4px">Top atenciones — '+totalAtenc+' total</strong>'+
+    topAtenc.slice(0,10).map(m=>'<div style="display:flex;justify-content:space-between;gap:12px;padding:2px 0;border-bottom:0.5px solid var(--border);font-size:12px"><span>'+escapeHtml(m.nombre)+'</span><strong>'+(m.actividadTotal||m.atenciones||0)+'</strong></div>').join('');
+
+  populateSelect('opFiltCliente',[...new Set(moviles.map(m=>m.cliente))].sort(),'Todos los clientes');
+  populateSelect('opFiltJefe',[...new Set(moviles.map(m=>m.jefeOperaciones).filter(Boolean))].sort(),'Todos los jefes');
+  renderMap();
+  renderOpRanking(moviles);
+  renderOpObs(moviles);
+  renderOpKam(moviles);
+}
+
+function summaryFromBreakdown(m){
+  const bd=(m.breakdown||[]);
+  if(bd.length===0) return '';
+  if(bd.length===1&&bd[0].value===(m.actividadTotal||0)) return bd[0].key;
+  return bd.slice(0,2).map(it=>it.value+' '+it.key.toLowerCase()).join(' · ');
+}
+
+function renderOpRanking(moviles){
+  const cont=document.getElementById('opRankingList');if(!cont) return;
+  const top=moviles.filter(m=>(m.actividadTotal||0)>0).sort((a,b)=>(b.actividadTotal||0)-(a.actividadTotal||0)).slice(0,10);
+  if(top.length===0){cont.innerHTML='<div class="empty">Sin atenciones registradas hoy</div>';return;}
+  const max=top[0].actividadTotal||1;
+  const medals=['🥇','🥈','🥉'];
+  cont.innerHTML=top.map((m,i)=>{
+    const color=clientColors[m.cliente]||'#888780';
+    const pct=Math.round((m.actividadTotal||0)/max*100);
+    const pos=i<3?'<span class="rank-pos">'+medals[i]+'</span>':'<span class="rank-pos num">'+(i+1)+'</span>';
+    const summary=summaryFromBreakdown(m);
+    const summaryHtml=summary?'<div class="rank-meta" title="'+escapeHtml(summary)+'">'+escapeHtml(summary)+'</div>':'';
+    return '<div class="rank-item">'+pos+
+      '<div class="rank-body"><div class="rank-name">'+escapeHtml(m.nombre)+'</div>'+
+      '<div class="rank-meta" style="color:'+color+'">'+escapeHtml(m.cliente)+(m.conductor?' · '+escapeHtml(m.conductor):'')+'</div>'+
+      summaryHtml+'<div class="rank-bar-wrap"><div class="rank-bar-fill" style="width:'+pct+'%;background:'+color+'"></div></div></div>'+
+      '<div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0">'+
+      '<span class="rank-num">'+(m.actividadTotal||0)+'</span>'+
+      '<span style="font-size:9.5px;color:var(--text-3);text-transform:uppercase;letter-spacing:.3px">atenciones</span></div></div>';
+  }).join('');
+}
+
+function renderOpObs(moviles){
+  const cont=document.getElementById('opObsList');if(!cont) return;
+  const conObs=moviles.filter(m=>m._tipoObs==='inc'||m._tipoObs==='op');
+  const filtrados=opObsFiltro==='all'?conObs:conObs.filter(m=>m._tipoObs===opObsFiltro);
+  if(filtrados.length===0){cont.innerHTML='<div class="empty">Sin observaciones para este filtro</div>';return;}
+  filtrados.sort((a,b)=>{if(a._tipoObs!==b._tipoObs)return a._tipoObs==='inc'?-1:1;return(a.nombre||'').localeCompare(b.nombre||'');});
+  cont.innerHTML=filtrados.map(m=>{
+    const esInc=m._tipoObs==='inc';
+    const borderC=esInc?'#E24B4A':'#BA7517';
+    const bgC=esInc?'rgba(226,75,74,0.07)':'rgba(186,117,23,0.07)';
+    const tagBg=esInc?'var(--danger-bg)':'var(--warn-bg)';
+    const tagFg=esInc?'var(--danger-fg)':'var(--warn-fg)';
+    const clColor=clientColors[m.cliente]||'#888780';
+    const texto=(m.comentarioTermino||m.comentarioInicio||'').trim();
+    const kamShort=(m.jefeOperaciones||'').split(' ')[0];
+    return '<div class="obs-card" style="background:'+bgC+';border-left-color:'+borderC+'">'+
+      '<div class="obs-head"><div><span class="obs-mv">'+escapeHtml(m.cliente)+'</span> <span class="obs-cl" style="color:'+clColor+'">· '+escapeHtml(m.nombre||m.movil||'')+'</span></div>'+
+      '<div><span class="obs-tag" style="background:'+tagBg+';color:'+tagFg+'">'+(esInc?'Incidencia':'Operativa')+'</span></div></div>'+
+      '<p class="obs-txt">'+escapeHtml(texto)+'</p>'+
+      '<p class="obs-foot">'+(m.conductor?'Conductor: '+escapeHtml(m.conductor):'')+(kamShort?(m.conductor?' · ':'')+'KAM: '+escapeHtml(kamShort):'')+(m.hora?' · '+m.hora:'')+'</p></div>';
+  }).join('');
+}
+
+document.addEventListener('click',function(e){
+  const btn=e.target.closest('.obs-btn');if(!btn) return;
+  opObsFiltro=btn.dataset.obs||'all';
+  document.querySelectorAll('.obs-btn').forEach(b=>b.classList.toggle('active',b===btn));
+  if(allData&&allData.unificador) renderOpObs(allData.unificador.moviles);
+});
+
+function renderOpKam(moviles){
+  const cont=document.getElementById('opKamList');if(!cont) return;
+  const byKam={};
+  moviles.forEach(m=>{
+    const k=m.jefeOperaciones||m.kam||'—';
+    if(!byKam[k]) byKam[k]={n:0,ini:0,ter:0,atenc:0,inc:0};
+    byKam[k].n++;if(m.inicio===1)byKam[k].ini++;if(m.termino===1)byKam[k].ter++;
+    byKam[k].atenc+=(m.actividadTotal||m.atenciones||0);if(m._tipoObs==='inc')byKam[k].inc++;
+  });
+  const entries=Object.entries(byKam).sort((a,b)=>b[1].atenc-a[1].atenc);
+  if(entries.length===0||(entries.length===1&&entries[0][0]==='—')){cont.innerHTML='<div class="empty">Sin datos de KAM</div>';return;}
+  cont.innerHTML=entries.filter(([n])=>n!=='—').map(([nombre,v])=>{
+    const pct=v.n>0?Math.round(v.ter/v.n*100):0;
+    const color=pct===100?'var(--ok-fg)':pct>=80?'var(--warn-fg)':'var(--danger-fg)';
+    const short=nombre.split(' ').slice(0,2).join(' ');
+    const incBadge=v.inc>0?' <span class="badge badge-pend" style="font-size:9.5px">'+v.inc+' inc.</span>':'';
+    return '<div class="kam-row"><div class="kam-head"><span class="kam-name">'+escapeHtml(short)+'</span>'+
+      '<span class="kam-meta">'+v.atenc+' atenciones · '+v.ter+'/'+v.n+' ('+pct+'%)'+incBadge+'</span></div>'+
+      '<div class="kam-bar"><div class="kam-bar-fill" style="width:'+pct+'%;background:'+color+'"></div></div></div>';
+  }).join('');
+}
+
+function populateSelect(id,options,defaultLabel){
+  const sel=document.getElementById(id);if(!sel||sel.options.length>1) return;
+  sel.innerHTML='<option value="">'+defaultLabel+'</option>';
+  options.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
+}
+
+let leafletMap=null,leafletMarkersLayer=null;
+function initLeafletMap(){
+  if(leafletMap) return;
+  leafletMap=L.map('mapLeaflet',{center:[-35.5,-71.5],zoom:5,minZoom:4,maxZoom:17});
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap, © CARTO',subdomains:'abcd',maxZoom:19}).addTo(leafletMap);
+  leafletMarkersLayer=L.layerGroup().addTo(leafletMap);
+}
+
+function renderMap(){
+  initLeafletMap();
+  const moviles=applyKamFilter(allData.unificador.moviles);
+  const fc=document.getElementById('opFiltCliente').value;
+  const fe=document.getElementById('opFiltEstado').value;
+  const ft=document.getElementById('opFiltTexto').value.toLowerCase().trim();
+  const fj=document.getElementById('opFiltJefe').value;
+  let r=moviles;
+  if(fc) r=r.filter(m=>m.cliente===fc);
+  if(fj) r=r.filter(m=>m.jefeOperaciones===fj);
+  if(fe==='ok') r=r.filter(m=>m.inicio===1&&m.termino===1);
+  if(fe==='termino') r=r.filter(m=>m.inicio===1&&m.termino===0);
+  if(fe==='inicio') r=r.filter(m=>m.inicio===0);
+  if(ft) r=r.filter(m=>(m.nombre||'').toLowerCase().includes(ft)||(m.comuna||'').toLowerCase().includes(ft)||(m.conductor||'').toLowerCase().includes(ft));
+  leafletMarkersLayer.clearLayers();
+  const validCoords=[];
+  r.forEach(m=>{
+    const coord=getCoordFor(m);if(!coord) return;
+    const color=m.inicio===0?'#E24B4A':m.termino===0?'#EF9F27':'#1D9E75';
+    const lbl=m.inicio===0?'Sin inicio':m.termino===0?'Pend. término':'Completo';
+    const cls=m.inicio===0?'badge-pend':m.termino===0?'badge-warn':'badge-ok';
+    const jitter=0.015;
+    const lat=coord[0]+(Math.random()-0.5)*jitter;
+    const lng=coord[1]+(Math.random()-0.5)*jitter;
+    validCoords.push([lat,lng]);
+    const icon=L.divIcon({className:'',html:'<div class="movil-marker" style="width:14px;height:14px;background:'+color+'"></div>',iconSize:[14,14],iconAnchor:[7,7]});
+    let popupHtml='<strong>'+escapeHtml(m.cliente||'')+'</strong> <span style="color:var(--text-2);font-size:12px">'+escapeHtml(m.movil||'')+'</span><span class="badge '+cls+'">'+lbl+'</span>';
+    if(m.conductor) popupHtml+='<div class="pop-line"><b style="color:var(--text)">Conductor:</b> '+escapeHtml(m.conductor)+'</div>';
+    if(m.jefeOperaciones) popupHtml+='<div class="pop-line"><b style="color:var(--text)">KAM:</b> '+escapeHtml(m.jefeOperaciones)+'</div>';
+    if(m.hora) popupHtml+='<div class="pop-line"><b style="color:var(--text)">Hora inicio:</b> '+escapeHtml(m.hora)+'</div>';
+    if(m.comuna) popupHtml+='<div class="pop-line"><b style="color:var(--text)">Comuna:</b> '+escapeHtml(m.comuna)+'</div>';
+    const actTotal=m.actividadTotal||m.atenciones||0;
+    if(actTotal>0){
+      popupHtml+='<div class="pop-line"><b style="color:var(--text)">Atenciones:</b> '+actTotal+'</div>';
+      const bd=m.breakdown||[];
+      if(bd.length>0) popupHtml+=bd.slice(0,8).map(it=>'<div style="font-size:10.5px;color:var(--text-2);margin-left:8px">• '+it.value+' '+escapeHtml(it.key)+'</div>').join('');
+    }
+    let tipText='<strong style="font-size:12px">'+escapeHtml(m.cliente||'')+'</strong><br><span style="color:#666;font-size:11px">'+escapeHtml(m.movil||'')+'</span>';
+    if(m.conductor) tipText+='<br><span style="font-size:11px">'+escapeHtml(m.conductor)+'</span>';
+    L.marker([lat,lng],{icon}).bindTooltip(tipText,{direction:'top',offset:[0,-8],opacity:0.95,className:'custom-tooltip'}).bindPopup(popupHtml,{maxWidth:280}).addTo(leafletMarkersLayer);
+  });
+  renderOpSidebar(r);
+}
+
+function escapeHtml(s){if(!s) return '';return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+function renderOpSidebar(data){
+  const byC={};
+  data.forEach(m=>{if(!byC[m.cliente])byC[m.cliente]={total:0,pend:0};byC[m.cliente].total++;if(m.inicio===0||(m.inicio===1&&m.termino===0))byC[m.cliente].pend++;});
+  const cl=document.getElementById('opClientList');cl.innerHTML='';
+  Object.entries(byC).sort((a,b)=>b[1].total-a[1].total).forEach(([n,v])=>{
+    const row=document.createElement('div');row.className='client-row';
+    const dot='<span class="dot" style="background:'+(clientColors[n]||'#888')+'"></span>';
+    row.innerHTML='<div class="client-name">'+dot+'<span class="tx">'+n+'</span></div><div class="client-count">'+v.total+(v.pend>0?' <span class="badge badge-warn">'+v.pend+'</span>':'')+'</div>';
+    cl.appendChild(row);
+  });
+  const ml=document.getElementById('opMobList');ml.innerHTML='';
+  const pend=data.filter(m=>m.inicio===0||(m.inicio===1&&m.termino===0));
+  if(pend.length===0){ml.innerHTML='<div class="empty">Sin pendientes</div>';return;}
+  pend.forEach(m=>{
+    const lbl=m.inicio===0?'Sin inicio':'Pend. término';
+    const cls=m.inicio===0?'badge-pend':'badge-warn';
+    const item=document.createElement('div');item.className='mob-item';
+    item.innerHTML='<div style="min-width:0;flex:1"><div class="mob-name">'+escapeHtml(m.cliente||m.nombre||'')+'</div><div class="mob-detail">'+escapeHtml(m.movil||m.nombre||'')+(m.hora?' · '+m.hora:'')+'</div></div><span class="badge '+cls+'">'+lbl+'</span>';
+    ml.appendChild(item);
+  });
+}
+
+// ── HISTÓRICO ──────────────────────────────────────────────────────────────
+function parseDDMM_(s){if(!s)return new Date();const m=String(s).match(/^(\d{1,2})-(\d{1,2})-(\d{4})/);if(!m)return new Date();return new Date(parseInt(m[3],10),parseInt(m[2],10)-1,parseInt(m[1],10));}
+function getKamMovilesKeys(){
+  if(!kamGlobal||!allData||!allData.unificador) return null;
+  const k=kamGlobal.toLowerCase();const set=new Set();
+  allData.unificador.moviles.forEach(function(m){if(m.jefeOperaciones&&m.jefeOperaciones.toLowerCase()===k)set.add((m.cliente+'|'+m.movil).toLowerCase());});
+  return set;
+}
+function renderHistorico(){
+  const h=allData.historico;let rutas=h.rutas||[];
+  const kamKeys=getKamMovilesKeys();if(kamKeys) rutas=rutas.filter(r=>kamKeys.has((r.cliente+'|'+r.movil).toLowerCase()));
+  const conteoPorDia={},conteoPorCliente={};
+  rutas.forEach(r=>{conteoPorDia[r.fecha]=(conteoPorDia[r.fecha]||0)+1;if(r.cliente)conteoPorCliente[r.cliente]=(conteoPorCliente[r.cliente]||0)+1;});
+  const total=rutas.length,dias=Object.keys(conteoPorDia).length,clientes=Object.keys(conteoPorCliente).length,prom=dias>0?Math.round(total/dias):0;
+  document.getElementById('hiTotal').textContent=total;document.getElementById('hiPromedio').textContent=prom;
+  document.getElementById('hiClientes').textContent=clientes;document.getElementById('hiDias').textContent=dias;
+  const fechaBase=(allData&&allData.unificador&&allData.unificador.fecha)?parseDDMM_(allData.unificador.fecha):new Date();
+  const dias30=[];
+  for(let i=29;i>=0;i--){const d=new Date(fechaBase);d.setDate(d.getDate()-i);dias30.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'));}
+  const counts=dias30.map(d=>conteoPorDia[d]||0),max=Math.max(...counts,1);
+  const bars=document.getElementById('hiChart'),labels=document.getElementById('hiChartLabels');
+  bars.innerHTML='';labels.innerHTML='';
+  dias30.forEach((d,i)=>{
+    const v=counts[i],hgh=Math.max(2,(v/max)*150);
+    const bar=document.createElement('div');bar.className='chart-bar';bar.style.height=hgh+'px';bar.innerHTML='<div class="bar-tip">'+d+': '+v+' rutas</div>';bars.appendChild(bar);
+    if(i%5===0||i===29){const l=document.createElement('div');l.className='chart-label';l.textContent=d.slice(8,10)+'/'+d.slice(5,7);l.style.flex='5';labels.appendChild(l);}
+  });
+  const cl=document.getElementById('hiClientList');cl.innerHTML='';
+  const ent=Object.entries(conteoPorCliente).sort((a,b)=>b[1]-a[1]).slice(0,12),maxC=ent[0]?ent[0][1]:1;
+  ent.forEach(([n,v])=>{const row=document.createElement('div');row.className='client-row';row.innerHTML='<div class="client-name"><span class="dot" style="background:'+(clientColors[n]||'#888')+'"></span><span class="tx">'+n+'</span></div><div class="client-count"><span class="bar"><span class="bar-fill" style="width:'+(v/maxC*100)+'%"></span></span>'+v+'</div>';cl.appendChild(row);});
+  const sel=document.getElementById('hiFiltCliente');
+  if(sel.options.length<=1){sel.innerHTML='<option value="">Todos los clientes</option>';Object.keys(conteoPorCliente).sort().forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});}
+  renderHiTable();
+}
+function renderHiTable(){
+  if(!allData||!allData.historico) return;
+  const rutas=allData.historico.rutas||[];
+  const fc=document.getElementById('hiFiltCliente').value,ft=document.getElementById('hiFiltTexto').value.toLowerCase().trim();
+  let r=rutas;if(fc) r=r.filter(x=>x.cliente===fc);if(ft) r=r.filter(x=>(x.conductor||'').toLowerCase().includes(ft)||(x.comuna||'').toLowerCase().includes(ft)||(x.lugar||'').toLowerCase().includes(ft));
+  const tb=document.getElementById('hiTableBody');tb.innerHTML='';
+  if(r.length===0){tb.innerHTML='<tr><td colspan="7" class="empty">Sin resultados</td></tr>';return;}
+  r.slice(0,200).forEach(x=>{const tr=document.createElement('tr');tr.innerHTML='<td><span class="evento-fecha">'+formatDate(x.fecha)+'</span></td><td><div class="movil-name">'+x.cliente+'</div><div class="movil-sub">'+x.movil+'</div></td><td>'+x.conductor+'</td><td>'+x.comuna+'</td><td style="font-size:11px;color:var(--text-2)">'+x.lugar+'</td><td class="center">'+x.horaInicio+'</td><td class="center">'+x.horaTermino+'</td>';tb.appendChild(tr);});
+  if(r.length>200){const tr=document.createElement('tr');tr.innerHTML='<td colspan="7" class="empty">Mostrando 200 de '+r.length+' rutas.</td>';tb.appendChild(tr);}
+}
+function formatDate(s){if(!s) return '';const p=s.split('-');if(p.length<3) return s;return p[2]+'/'+p[1]+'/'+p[0];}
+
+// ── GPS ────────────────────────────────────────────────────────────────────
+let gpsLeafletMap=null,gpsMarkersLayer=null;
+function initGPSMap(){
+  if(gpsLeafletMap) return;
+  gpsLeafletMap=L.map('gpsMapLeaflet',{center:[-35.5,-71.5],zoom:5,minZoom:4,maxZoom:17});
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap, © CARTO',subdomains:'abcd',maxZoom:19}).addTo(gpsLeafletMap);
+  gpsMarkersLayer=L.layerGroup().addTo(gpsLeafletMap);
+}
+// GPS naming: r.nombre = "Caja 18 Osorno" (cliente+movil); m.movil = "Osorno", m.cliente = "Caja 18"
+function findGPS_(m, gpsMap){
+  const keys=[
+    (m.cliente+' '+m.movil).trim(),
+    m.nombre,
+    m.movil,
+    m.cliente+' '+(m.nombre||''),
+  ];
+  for(let i=0;i<keys.length;i++){
+    if(keys[i]&&gpsMap[keys[i]]) return gpsMap[keys[i]];
+  }
+  // fallback: case-insensitive partial match on movil name
+  if(m.movil){
+    const mv=m.movil.toLowerCase();
+    for(const k in gpsMap){ if(k.toLowerCase().includes(mv)) return gpsMap[k]; }
+  }
+  return null;
+}
+
+function renderGPS(){
+  initGPSMap();
+  const rutas=allData.gps&&allData.gps.rutas?allData.gps.rutas:[];
+  const rutasKam=applyKamFilter(rutas);
+  const stats={total:rutasKam.length,conAtraso:rutasKam.filter(r=>r.tipoAlerta==='Atraso').length,enHorario:rutasKam.filter(r=>r.tipoAlerta==='En horario').length,sinMovimiento:rutasKam.filter(r=>r.sinMovimiento).length,alejandose:rutasKam.filter(r=>r.alejandose).length};
+  document.getElementById('gpsTotal').textContent=stats.total||0;document.getElementById('gpsHorario').textContent=stats.enHorario||0;
+  document.getElementById('gpsHorarioSub').textContent=stats.total?Math.round((stats.enHorario||0)/stats.total*100)+'% del total':'—';
+  document.getElementById('gpsAtraso').textContent=stats.conAtraso||0;document.getElementById('gpsCritico').textContent=(stats.sinMovimiento||0)+(stats.alejandose||0);
+  const allMovs=allData.unificador&&allData.unificador.moviles?allData.unificador.moviles:[];
+  populateSelect('gpsFiltCliente',[...new Set(allMovs.map(m=>m.cliente).filter(Boolean))].sort(),'Todos los clientes');
+  populateSelect('gpsFiltJefe',[...new Set(allMovs.map(m=>m.kam).filter(Boolean))].sort(),'Todos los KAM');
+  renderGPSMap();
+  renderGPSVehicleList();
+}
+function getGPSColor(r){if(r.sinMovimiento||r.alejandose) return '#E24B4A';if(r.tipoAlerta==='Atraso') return '#EF9F27';if(r.tipoAlerta==='En horario'||r.tipoAlerta==='Con GPS') return '#1D9E75';return '#888780';}
+function renderGPSMap(){
+  initGPSMap();
+  const rutasGPS=allData.gps&&allData.gps.rutas?allData.gps.rutas:[];
+  const gpsMap={};rutasGPS.forEach(function(r){if(r.nombre) gpsMap[r.nombre]=r;});
+  const allMovs=applyKamFilter(allData.unificador&&allData.unificador.moviles?allData.unificador.moviles:[]);
+  const fc=document.getElementById('gpsFiltCliente').value,fj=document.getElementById('gpsFiltJefe').value;
+  const fa=document.getElementById('gpsFiltAlerta').value,ft=document.getElementById('gpsFiltTexto').value.toLowerCase().trim();
+  let movsFilt=allMovs;
+  if(fc) movsFilt=movsFilt.filter(m=>m.cliente===fc);
+  if(fj) movsFilt=movsFilt.filter(m=>m.kam===fj);
+  if(ft) movsFilt=movsFilt.filter(m=>(m.movil||m.nombre||'').toLowerCase().includes(ft)||(m.cliente||'').toLowerCase().includes(ft));
+  if(fa==='atraso')     movsFilt=movsFilt.filter(m=>{const g=findGPS_(m,gpsMap);return g&&g.tipoAlerta==='Atraso';});
+  if(fa==='horario')    movsFilt=movsFilt.filter(m=>{const g=findGPS_(m,gpsMap);return g&&g.tipoAlerta==='En horario';});
+  if(fa==='sinmov')     movsFilt=movsFilt.filter(m=>{const g=findGPS_(m,gpsMap);return g&&g.sinMovimiento;});
+  if(fa==='alejandose') movsFilt=movsFilt.filter(m=>{const g=findGPS_(m,gpsMap);return g&&g.alejandose;});
+  if(fa==='lejos')      movsFilt=movsFilt.filter(m=>{const g=findGPS_(m,gpsMap);return g&&g.distanciaMetros>200;});
+  if(gpsListFiltroRuta) movsFilt=movsFilt.filter(m=>{const g=findGPS_(m,gpsMap);return g&&g.puntoPlanificado;});
+  gpsMarkersLayer.clearLayers();
+  const jitter=0.018,rutasParaAlertas=[];
+  movsFilt.forEach(function(m){
+    const g=findGPS_(m,gpsMap);
+    let coord=null,hasReal=false;
+    if(g&&g.posicionReal){coord=g.posicionReal;hasReal=true;}
+    else if(g&&g.puntoPlanificado){coord=g.puntoPlanificado;}
+    else{const fb=getCoordFor(m);if(fb) coord=[fb[0]+(Math.random()-0.5)*jitter,fb[1]+(Math.random()-0.5)*jitter];}
+    if(!coord) return;
+    const color=g?getGPSColor(g):'#B0AFA9';
+    const sz=hasReal?14:10;
+    const icon=L.divIcon({className:'',html:'<div class="movil-marker" style="width:'+sz+'px;height:'+sz+'px;background:'+color+';'+(hasReal?'':'opacity:0.55;')+'"></div>',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]});
+    let popup='<strong>'+escapeHtml(m.cliente||'')+'</strong> <small style="color:var(--text-2)">'+escapeHtml(m.movil||m.nombre||'')+'</small>';
+    if(g){
+      const lblTipo=g.tipoAlerta||'Con GPS',cls=g.sinMovimiento||g.alejandose?'badge-pend':g.tipoAlerta==='Atraso'?'badge-warn':g.tipoAlerta==='En horario'?'badge-ok':'badge-info';
+      popup+='<span class="badge '+cls+'">'+lblTipo+'</span>';
+      if(g.sinMovimiento) popup+='<span class="badge badge-pend">Sin movimiento</span>';
+      if(g.alejandose) popup+='<span class="badge badge-pend">Alejándose</span>';
+      const atrasoMin=g.atrasoMinutos!=null&&!isNaN(Number(g.atrasoMinutos))?Math.round(Number(g.atrasoMinutos)):null;
+      if(atrasoMin!=null) popup+='<div class="pop-line"><b style="color:var(--warn-fg)">⏱ Atraso:</b> '+atrasoMin+' min</div>';
+      if(g.distanciaMetros!=null) popup+='<div class="pop-line"><b>Dist. al punto:</b> '+Math.round(g.distanciaMetros)+' m</div>';
+      rutasParaAlertas.push(g);
+    } else {
+      popup+='<br><span style="font-size:11px;color:var(--text-3)">Sin GPS · posición aproximada</span>';
+    }
+    if(g&&g.posicionDescripcion) popup+='<div class="pop-line" style="font-size:11px;color:var(--text-2)">📍 '+escapeHtml(g.posicionDescripcion)+'</div>';
+    if(g&&g.horaUltimo) popup+='<div class="pop-line"><b>Última posición:</b> '+escapeHtml(g.horaUltimo)+'</div>';
+    if(m.conductor) popup+='<div class="pop-line"><b>Conductor:</b> '+escapeHtml(m.conductor)+'</div>';
+    if(m.kam) popup+='<div class="pop-line"><b>KAM:</b> '+escapeHtml(m.kam)+'</div>';
+    if(m.comuna) popup+='<div class="pop-line"><b>Comuna:</b> '+escapeHtml(m.comuna)+'</div>';
+    let tip='<strong style="font-size:12px">'+escapeHtml(m.cliente||'')+'</strong><br><span style="font-size:11px;color:#555">'+escapeHtml(m.movil||'')+'</span>';
+    if(g&&g.tipoAlerta) tip+='<br><span style="font-size:11px;color:#666">'+g.tipoAlerta+'</span>';
+    else tip+='<br><span style="font-size:11px;color:#999">Sin GPS</span>';
+    L.marker(coord,{icon}).bindTooltip(tip,{direction:'top',offset:[0,-8],opacity:0.95,className:'custom-tooltip'}).bindPopup(popup,{maxWidth:300}).addTo(gpsMarkersLayer);
+    if(g&&g.distanciaMetros>200&&g.puntoPlanificado&&g.posicionReal){
+      const pi=L.divIcon({className:'',html:'<div style="width:10px;height:10px;border-radius:50%;background:#888;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>',iconSize:[10,10],iconAnchor:[5,5]});
+      L.marker(g.puntoPlanificado,{icon:pi}).bindPopup('<strong>Punto planificado</strong><div class="pop-line">'+escapeHtml(m.cliente||'')+'</div><div class="pop-line">A '+Math.round(g.distanciaMetros)+' m del móvil</div>',{maxWidth:240}).addTo(gpsMarkersLayer);
+      L.polyline([g.posicionReal,g.puntoPlanificado],{color:'#888',weight:2,dashArray:'5,7',opacity:0.7}).addTo(gpsMarkersLayer);
+    }
+  });
+  renderGPSAlertasList(rutasParaAlertas);
+}
+function renderGPSAlertasList(rutas){
+  const list=document.getElementById('gpsAlertasList');list.innerHTML='';
+  const alertas=rutas.filter(r=>r.tipoAlerta==='Atraso'||r.sinMovimiento||r.alejandose||(r.distanciaMetros&&r.distanciaMetros>200));
+  if(alertas.length===0){list.innerHTML='<div class="empty">Sin alertas en la selección</div>';return;}
+  alertas.sort((a,b)=>{const sa=(a.sinMovimiento?3:0)+(a.alejandose?2:0),sb=(b.sinMovimiento?3:0)+(b.alejandose?2:0);if(sa!==sb)return sb-sa;const ma=Number(a.atrasoMinutos)||0,mb=Number(b.atrasoMinutos)||0;if(ma!==mb)return mb-ma;return(b.distanciaMetros||0)-(a.distanciaMetros||0);});
+  alertas.slice(0,50).forEach(rt=>{
+    const atrasoMin=(rt.atrasoMinutos!==null&&!isNaN(Number(rt.atrasoMinutos)))?Math.round(Number(rt.atrasoMinutos)):null;
+    let badgeHtml='';
+    if(rt.sinMovimiento) badgeHtml+='<span class="badge badge-pend">Sin mov.</span> ';
+    if(rt.alejandose) badgeHtml+='<span class="badge badge-pend">Alejándose</span> ';
+    if(rt.tipoAlerta==='Atraso'&&!rt.sinMovimiento) badgeHtml+='<span class="badge badge-warn">'+(atrasoMin!==null?'Atraso '+atrasoMin+' min':'Atraso')+'</span>';
+    const item=document.createElement('div');item.className='mob-item';
+    item.innerHTML='<div style="min-width:0;flex:1"><div class="mob-name">'+escapeHtml(rt.nombre)+'</div><div class="mob-detail">'+(rt.jefeOperaciones||'—')+' · '+((rt.distanciaMetros!==null&&rt.distanciaMetros!==undefined)?Math.round(rt.distanciaMetros)+'m':'—')+'</div></div><div>'+badgeHtml+'</div>';
+    list.appendChild(item);
+  });
+}
+
+let gpsListFiltroRuta=false;
+function toggleGpsRutaFijada(){
+  gpsListFiltroRuta=!gpsListFiltroRuta;
+  const btn=document.getElementById('btnGpsRutaFijada');
+  if(btn) btn.classList.toggle('active',gpsListFiltroRuta);
+  renderGPSMap();
+  renderGPSVehicleList();
+}
+function renderGPSVehicleList(){
+  if(!allData||!allData.unificador) return;
+  const moviles=allData.unificador.moviles||[];
+  const rutasGPS=allData.gps&&allData.gps.rutas?allData.gps.rutas:[];
+  const gpsMap={};
+  rutasGPS.forEach(function(r){ if(r.nombre) gpsMap[r.nombre]=r; });
+  let todos=applyKamFilter(moviles);
+  if(gpsListFiltroRuta) todos=todos.filter(function(m){ const g=findGPS_(m,gpsMap); return g&&g.puntoPlanificado; });
+  const tbody=document.getElementById('gpsVehicleTbody');
+  if(!tbody) return;
+  tbody.innerHTML=todos.map(function(m){
+    const g=findGPS_(m,gpsMap);
+    let gpsBadge;
+    if(g){
+      if(g.sinMovimiento)       gpsBadge='<span class="badge badge-pend">Sin mov.</span>';
+      else if(g.alejandose)     gpsBadge='<span class="badge badge-pend">Alejándose</span>';
+      else if(g.tipoAlerta==='Atraso') gpsBadge='<span class="badge badge-warn">Atraso'+(g.atrasoMinutos?' '+Math.round(g.atrasoMinutos)+' min':'')+'</span>';
+      else if(g.tipoAlerta==='En horario') gpsBadge='<span class="badge badge-ok">En horario</span>';
+      else gpsBadge='<span class="badge badge-info">Con GPS</span>';
+    } else {
+      gpsBadge='<span style="font-size:11px;color:var(--text-3)">Sin GPS</span>';
+    }
+    const est=_detEstadoKey(m);
+    let opBadge;
+    if(est==='sinInicio')  opBadge='<span class="badge badge-pend">Sin inicio</span>';
+    else if(est==='encurso')  opBadge='<span class="badge badge-info">En curso</span>';
+    else if(est==='terminado') opBadge='<span class="badge badge-ok">Terminado</span>';
+    else                   opBadge='<span class="badge badge-teal">Iniciado</span>';
+    const dist=g&&g.distanciaMetros!=null?Math.round(g.distanciaMetros)+' m':'—';
+    return '<tr>'
+      +'<td><div style="font-weight:500">'+escapeHtml(m.cliente||'')+'</div><div style="font-size:11px;color:var(--text-3)">'+escapeHtml(m.movil||m.nombre||'')+'</div></td>'
+      +'<td>'+opBadge+'</td>'
+      +'<td>'+gpsBadge+'</td>'
+      +'<td style="font-size:12px;color:var(--text-2)">'+escapeHtml(m.kam||'—')+'</td>'
+      +'<td class="right" style="font-size:12px;color:var(--text-2)">'+dist+'</td>'
+      +'</tr>';
+  }).join('');
+  document.getElementById('gpsVehicleCount').textContent=todos.length+' móviles';
+}
+
+// ── BITÁCORA ───────────────────────────────────────────────────────────────
+function renderBitacora(){
+  const b=allData.bitacora;let eventos=b.eventos||[];eventos=applyKamFilter(eventos);
+  const total=eventos.length,today=new Date(),mes=today.getMonth()+1,anio=today.getFullYear();
+  const delMes=eventos.filter(e=>parseInt(e.mes)===mes&&parseInt(e.anio)===anio);
+  const criticos=eventos.filter(e=>['Atraso','Contingencia','Suspensión de ruta','Incidente'].includes(e.tipo));
+  const reclamos=eventos.filter(e=>e.tipo==='Reclamo');
+  document.getElementById('biTotal').textContent=total;document.getElementById('biTotalSub').textContent='desde '+formatDate(b.desde||'');
+  document.getElementById('biMes').textContent=delMes.length;document.getElementById('biMesSub').textContent=mesesShort[mes-1]+' '+anio;
+  document.getElementById('biCrit').textContent=criticos.length;document.getElementById('biRec').textContent=reclamos.length;
+  const selC=document.getElementById('biFiltCliente');
+  if(selC.options.length<=1){selC.innerHTML='<option value="">Todos los clientes</option>';[...new Set(eventos.map(e=>e.cliente).filter(Boolean))].sort().forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;selC.appendChild(o);});}
+  const selT=document.getElementById('biFiltTipo');
+  if(selT.options.length<=1){selT.innerHTML='<option value="">Todos los tipos</option>';[...new Set(eventos.map(e=>e.tipo).filter(Boolean))].sort().forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;selT.appendChild(o);});}
+  renderBiList();renderBiSidebar();
+}
+function renderBiList(){
+  if(!allData||!allData.bitacora) return;
+  const fc=document.getElementById('biFiltCliente').value,ft2=document.getElementById('biFiltTipo').value,tx=document.getElementById('biFiltTexto').value.toLowerCase().trim();
+  let r=applyKamFilter(allData.bitacora.eventos||[]);
+  if(fc) r=r.filter(e=>e.cliente===fc);if(ft2) r=r.filter(e=>e.tipo===ft2);if(tx) r=r.filter(e=>(e.conductor||'').toLowerCase().includes(tx)||(e.sucursal||'').toLowerCase().includes(tx)||(e.detalle||'').toLowerCase().includes(tx));
+  const list=document.getElementById('biEventosList');list.innerHTML='';
+  if(r.length===0){list.innerHTML='<div class="empty">Sin eventos en la selección</div>';return;}
+  r.slice(0,80).forEach(e=>{
+    const cls=tipoColors[e.tipo]||'badge-info';
+    const item=document.createElement('div');item.className='evento-item';
+    item.innerHTML='<div class="evento-head"><span class="evento-fecha">'+formatDate(e.fecha)+'</span><span class="badge '+cls+'">'+e.tipo+'</span></div><div class="evento-cliente"><b style="color:var(--text)">'+e.cliente+'</b> · '+e.sucursal+(e.conductor?' · '+e.conductor:'')+'</div>'+(e.detalle?'<div class="evento-detalle">'+e.detalle+'</div>':'');
+    list.appendChild(item);
+  });
+}
+function renderBiSidebar(){
+  const eventos=applyKamFilter(allData.bitacora.eventos||[]);
+  const byT={};eventos.forEach(e=>{if(e.tipo)byT[e.tipo]=(byT[e.tipo]||0)+1;});
+  const tl=document.getElementById('biTipoList');tl.innerHTML='';
+  Object.entries(byT).sort((a,b)=>b[1]-a[1]).slice(0,10).forEach(([n,v])=>{const cls=tipoColors[n]||'badge-info';const row=document.createElement('div');row.className='client-row';row.innerHTML='<div class="client-name"><span class="badge '+cls+'" style="font-size:10px">'+n+'</span></div><div class="client-count">'+v+'</div>';tl.appendChild(row);});
+  const byC={};eventos.forEach(e=>{if(e.cliente)byC[e.cliente]=(byC[e.cliente]||0)+1;});
+  const cl=document.getElementById('biClientList');cl.innerHTML='';
+  Object.entries(byC).sort((a,b)=>b[1]-a[1]).slice(0,10).forEach(([n,v])=>{const dot='<span class="dot" style="background:'+(clientColors[n]||'#888')+'"></span>';const row=document.createElement('div');row.className='client-row';row.innerHTML='<div class="client-name">'+dot+'<span class="tx">'+n+'</span></div><div class="client-count">'+v+'</div>';cl.appendChild(row);});
+}
+
+// ── SUPERVISIONES ──────────────────────────────────────────────────────────
+function populateSuKpiMesFilter(){
+  const sel=document.getElementById('suKpiFiltMes');if(!sel||sel.options.length>0) return;
+  const hoy=new Date(),mesActual=hoy.getMonth(),anio=(allData&&allData.supervisiones&&allData.supervisiones.anio)?allData.supervisiones.anio:hoy.getFullYear();
+  meses.forEach((m,i)=>{const o=document.createElement('option');o.value=i;o.textContent=(m.charAt(0).toUpperCase()+m.slice(1))+' '+anio;if(i===mesActual)o.selected=true;sel.appendChild(o);});
+  sel.addEventListener('change',function(){suKpiMesSeleccionado=parseInt(sel.value,10);if(allData&&allData.supervisiones)renderSupervisiones();});
+  const btn=document.getElementById('suKpiBtnMesActual');
+  if(btn){btn.addEventListener('click',function(){const hoy2=new Date();sel.value=hoy2.getMonth();suKpiMesSeleccionado=hoy2.getMonth();if(allData&&allData.supervisiones)renderSupervisiones();});}
+}
+function renderSupervisiones(){
+  const s=allData.supervisiones,data=s.moviles||[];
+  populateSuKpiMesFilter();renderSuKpiMes(data,suKpiMesSeleccionado);
+  const hoy=new Date(),mesIdxKpi=(suKpiMesSeleccionado!==null&&suKpiMesSeleccionado!==undefined)?suKpiMesSeleccionado:hoy.getMonth(),mesNombreKpi=meses[mesIdxKpi];
+  const movsSupervisadosAnio=data.filter(d=>d.total>0).length,movsSupervisadosMes=data.filter(d=>(d.meses[mesNombreKpi]||0)>0).length;
+  const sin=data.filter(d=>d.total===0).length,cumpls=data.filter(d=>d.meta>0).map(d=>Math.min(d.pctMovil,1.5)),prom=cumpls.length?cumpls.reduce((x,v)=>x+v,0)/cumpls.length:0;
+  document.getElementById('suTotal').textContent=movsSupervisadosAnio;if(s.anio) document.getElementById('suSub').textContent='al menos 1 vez · año '+s.anio;
+  document.getElementById('suSup').textContent=movsSupervisadosMes;document.getElementById('suSupSub').textContent=(mesNombreKpi.charAt(0).toUpperCase()+mesNombreKpi.slice(1))+(data.length>0?' · '+Math.round(movsSupervisadosMes/data.length*100)+'% del total':'');
+  document.getElementById('suSinSup').textContent=sin;document.getElementById('suCumpl').textContent=Math.round(prom*100)+'%';
+  const totales=meses.map(m=>data.reduce((x,d)=>x+(d.meses[m]||0),0)),max=Math.max(...totales,1);
+  const bars=document.getElementById('suChart'),labels=document.getElementById('suChartLabels');bars.innerHTML='';labels.innerHTML='';
+  totales.forEach((v,i)=>{const h=Math.max(2,(v/max)*150);const bar=document.createElement('div');bar.className='chart-bar';bar.style.height=h+'px';bar.innerHTML='<div class="bar-tip">'+v+' supervisiones</div>';bars.appendChild(bar);const l=document.createElement('div');l.className='chart-label';l.textContent=mesesShort[i];labels.appendChild(l);});
+  const byC={};data.forEach(d=>{if(!byC[d.cliente])byC[d.cliente]={moviles:0,sup:0,cumpl:0,n:0};byC[d.cliente].moviles++;byC[d.cliente].sup+=d.total;if(d.meta>0){byC[d.cliente].cumpl+=Math.min(d.pctMovil,1.5);byC[d.cliente].n++;}});
+  const cl=document.getElementById('suClientList');cl.innerHTML='';
+  Object.entries(byC).sort((a,b)=>b[1].moviles-a[1].moviles).forEach(([n,v])=>{const p=v.n>0?v.cumpl/v.n:0;const cls=p>=0.7?'':p>=0.3?'warn':'danger';const row=document.createElement('div');row.className='client-row';row.innerHTML='<div class="client-name"><span class="dot" style="background:'+(clientColors[n]||'#888')+'"></span><span class="tx">'+n+'</span></div><div class="client-count"><span class="bar"><span class="bar-fill '+cls+'" style="width:'+Math.min(100,p*100)+'%"></span></span>'+Math.round(p*100)+'%</div>';cl.appendChild(row);});
+  const sel=document.getElementById('suFiltCliente');
+  if(sel.options.length<=1){sel.innerHTML='<option value="">Todos los clientes</option>';[...new Set(data.map(d=>d.cliente))].sort().forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});}
+  renderSuTable();
+}
+function renderSuKpiMes(data,mesIdxOverride){
+  const hoy=new Date(),mesActualReal=hoy.getMonth(),mesIdx=(mesIdxOverride!==null&&mesIdxOverride!==undefined)?mesIdxOverride:mesActualReal,esMesActual=(mesIdx===mesActualReal);
+  const mesNombre=meses[mesIdx],mesNombreCap=mesNombre.charAt(0).toUpperCase()+mesNombre.slice(1),anio=hoy.getFullYear();
+  const badge=document.getElementById('suKpiBadgePasado');if(badge) badge.style.display=esMesActual?'none':'inline-block';
+  const mesAntIdx=(mesIdx-1+12)%12,mesAntNombre=meses[mesAntIdx];
+  const mesesCount=mesIdx+1;
+  document.getElementById('suKpiTitle').textContent='Resumen KPI supervisiones — '+mesNombreCap+' '+anio;
+  const byC={};data.forEach(d=>{if(!byC[d.cliente])byC[d.cliente]={moviles:[]};byC[d.cliente].moviles.push(d);});
+  const filas=[];let totalMov=0,totalSup=0,totalCubiertos=0;
+  Object.entries(byC).forEach(([cliente,info])=>{
+    const total=info.moviles.length,supEsteMes=info.moviles.filter(m=>(m.meses[mesNombre]||0)>0).length;
+    const metaCount=Math.ceil(total*0.5);
+    const vehiculos=info.moviles.map(m=>{
+      const supThisMes=(m.meses[mesNombre]||0)>0,cubierto=supThisMes||(m.meses[mesAntNombre]||0)>0;
+      const totalYTD=meses.slice(0,mesIdx+1).reduce((s,mn)=>s+(m.meses[mn]||0),0);
+      const supRate=mesesCount>0?Math.round(totalYTD/mesesCount*100):0;
+      return{nombre:m.movil||m.nombre,cubierto,supThisMes,supRate};
+    });
+    const cubiertos=vehiculos.filter(v=>v.cubierto).length;
+    const noRequiere=cubiertos>0&&supEsteMes===0;
+    const metaAlcanzada=supEsteMes>=metaCount;
+    const cumpl=noRequiere?100:(metaCount>0?Math.round(supEsteMes/metaCount*100):0);
+    const falt=noRequiere?0:Math.max(0,metaCount-supEsteMes);
+    const recomVehiculos=vehiculos.filter(v=>!v.cubierto||v.supRate<=50).sort((a,b)=>a.supRate-b.supRate).slice(0,5);
+    filas.push({cliente,total,supervisados:supEsteMes,cubiertos,metaAlcanzada,cumpl,falt,noRequiere,recomVehiculos});
+    totalMov+=total;totalSup+=supEsteMes;totalCubiertos+=cubiertos;
+  });
+  filas.sort((a,b)=>{if(a.metaAlcanzada!==b.metaAlcanzada)return a.metaAlcanzada?1:-1;return a.cumpl-b.cumpl;});
+  const metaCountGlobal=Math.ceil(totalMov*0.5),pctGlobalReal=totalMov>0?totalSup/totalMov:0,pctGlobalVsMeta=pctGlobalReal/0.5,faltanGlobal=Math.max(0,metaCountGlobal-totalSup);
+  document.getElementById('suKpiTotal').textContent=totalMov;document.getElementById('suKpiSup').textContent=totalSup;document.getElementById('suKpiSupSub').textContent=mesNombreCap+' '+anio;
+  document.getElementById('suKpiFalta').textContent=faltanGlobal;document.getElementById('suKpiPct').textContent=Math.round(pctGlobalVsMeta*100)+'%';
+  document.getElementById('suKpiPctSub').textContent=pctGlobalVsMeta>=1?'meta cumplida ✓ ('+Math.round(pctGlobalReal*100)+'% real)':'falta '+Math.round((1-pctGlobalVsMeta)*100)+'% para meta';
+  const alertBox=document.getElementById('suAlertBox'),alerts=[];
+  if(pctGlobalVsMeta<1) alerts.push('<div class="alert alert-danger"><strong>⚠ Meta global no alcanzada:</strong> el cumplimiento va en <strong>'+Math.round(pctGlobalVsMeta*100)+'%</strong> de la meta del 50%. Faltan <strong>'+faltanGlobal+' móviles</strong> por supervisar.</div>');
+  const araucana=filas.find(f=>f.cliente==='La Araucana Móvil');
+  if(araucana&&!araucana.metaAlcanzada&&araucana.falt>0) alerts.push('<div class="alert alert-warn">⚠ <strong>La Araucana Móvil</strong> no cumple meta del 50%: '+araucana.supervisados+' de '+araucana.total+' supervisados. Se requieren <strong>'+araucana.falt+' adicionales</strong>.</div>');
+  if(alerts.length===0) alerts.push('<div class="alert alert-ok"><strong>✓ Meta global cumplida</strong> ('+Math.round(pctGlobalVsMeta*100)+'% — '+Math.round(pctGlobalReal*100)+'% real).</div>');
+  alertBox.innerHTML=alerts.join('');
+  const tb=document.getElementById('suKpiTableBody');tb.innerHTML='';
+  filas.forEach(f=>{
+    const tr=document.createElement('tr');
+    if(f.falt>0) tr.className='row-sup-alerta';
+    const pctCls=f.cumpl>=100||f.noRequiere?'ok':(f.cumpl>=60?'warn':'danger'),dot='<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+(clientColors[f.cliente]||'#888')+';margin-right:6px;vertical-align:middle"></span>';
+    let recomendHtml;
+    if(f.noRequiere) recomendHtml='<span class="no-recommend">No requiere supervisión este mes</span>';
+    else if(f.recomVehiculos.length===0) recomendHtml='<span class="no-recommend">—</span>';
+    else recomendHtml='<ul class="faltantes-list">'+f.recomVehiculos.map(v=>'<li>· <span style="color:'+(v.cubierto?'var(--warn-fg)':'var(--danger-fg)')+'">'+escapeHtml(v.nombre)+' ('+v.supRate+'%)</span></li>').join('')+'</ul>';
+    tr.innerHTML='<td>'+dot+escapeHtml(f.cliente)+'</td><td class="center">'+f.total+'</td><td class="center">'+f.supervisados+'</td>'+
+      '<td class="center"><span class="pct-meta '+pctCls+'">'+f.cumpl+'%</span></td>'+
+      '<td class="center">'+f.falt+'</td><td>'+recomendHtml+'</td>';
+    tb.appendChild(tr);
+  });
+  const tf=document.getElementById('suKpiTableFoot'),pctCls=pctGlobalVsMeta>=1?'ok':(pctGlobalVsMeta>=0.6?'warn':'danger');
+  tf.innerHTML='<tr><td><strong>Total</strong></td><td class="center"><strong>'+totalMov+'</strong></td><td class="center"><strong>'+totalSup+'</strong></td>'+
+    '<td class="center"><span class="pct-meta '+pctCls+'"><strong>'+Math.round(pctGlobalVsMeta*100)+'%</strong></span></td>'+
+    '<td class="center"><strong>'+faltanGlobal+'</strong></td><td style="font-size:11.5px;color:var(--text-2)">Meta global: 50% ('+Math.round(pctGlobalReal*100)+'% real)</td></tr>';
+}
+function renderSuTable(){
+  if(!allData||!allData.supervisiones) return;
+  const data=allData.supervisiones.moviles||[];
+  const fc=document.getElementById('suFiltCliente').value,fe=document.getElementById('suFiltEstado').value,ft=document.getElementById('suFiltTexto').value.toLowerCase().trim(),ob=document.getElementById('suOrden').value;
+  let r=data.slice();
+  if(fc) r=r.filter(d=>d.cliente===fc);if(fe==='sin') r=r.filter(d=>d.total===0);if(fe==='bajo') r=r.filter(d=>d.pctMovil<0.3);if(fe==='medio') r=r.filter(d=>d.pctMovil>=0.3&&d.pctMovil<0.7);if(fe==='alto') r=r.filter(d=>d.pctMovil>=0.7);if(ft) r=r.filter(d=>d.nombre.toLowerCase().includes(ft));
+  if(ob==='cumpl-desc') r.sort((a,b)=>b.pctMovil-a.pctMovil);if(ob==='cumpl-asc') r.sort((a,b)=>a.pctMovil-b.pctMovil);if(ob==='total-desc') r.sort((a,b)=>b.total-a.total);if(ob==='cliente') r.sort((a,b)=>a.cliente.localeCompare(b.cliente)||a.nombre.localeCompare(b.nombre));
+  const tb=document.getElementById('suTableBody');tb.innerHTML='';
+  if(r.length===0){tb.innerHTML='<tr><td colspan="16" class="empty">Sin resultados</td></tr>';return;}
+  r.forEach(d=>{
+    const tr=document.createElement('tr');let cells='<td><div class="movil-name">'+d.nombre+'</div><div class="movil-sub">'+d.cliente+'</div></td>';
+    meses.forEach(m=>{const v=d.meses[m]||0,cls=v===0?'mes-0':v===1?'mes-1':v===2?'mes-2':'mes-3';cells+='<td class="center"><span class="cell-mes '+cls+'">'+(v||'')+'</span></td>';});
+    cells+='<td class="right" style="font-weight:500">'+d.total+'</td><td class="right" style="color:var(--text-3)">'+(d.meta||'—')+'</td>';
+    const pct=d.pctMovil,cls=pct>=0.7?'':pct>=0.3?'warn':'danger';
+    cells+='<td><span class="bar"><span class="bar-fill '+cls+'" style="width:'+Math.min(100,pct*100)+'%"></span></span><span class="pct">'+Math.round(pct*100)+'%</span></td>';
+    tr.innerHTML=cells;tb.appendChild(tr);
+  });
+}
+
+// ── KILÓMETROS ─────────────────────────────────────────────────────────────
+function renderKilometros(){
+  const km=allData.kilometros;
+  if(!km){
+    ['kmRankingHoy','kmRankingMes','kmClienteHoy','kmKamHoy','kmClienteMes','kmSinRegistros','kmDiagnostico'].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el) el.innerHTML='<div class="empty" style="padding:24px 0">Sin datos de km — asegurate de usar el Apps Script v20 (con readKilometros).</div>';
+    });
+    return;
+  }
+  const totales=km.totales||{},moviles=km.moviles||[],sinAsignar=km.sinAsignar||{},stats=km.stats||{};
+
+  // KPIs HOY
+  const kmHoy=totales.hoy||0,kmSem=totales.semana||0,kmMes=totales.mes||0,movsConKm=totales.movilesConKmHoy||0;
+  const promHoy=movsConKm>0?Math.round(kmHoy/movsConKm):0;
+  document.getElementById('kmHoyTotal').textContent=Math.round(kmHoy).toLocaleString('es-CL')+' km';
+  document.getElementById('kmHoyTotalSub').textContent='incluye '+Math.round(sinAsignar.hoy||0)+' km sin asignar';
+  document.getElementById('kmHoyMoviles').textContent=movsConKm;
+  document.getElementById('kmHoyMovilesSub').textContent='de '+(moviles.length)+' móviles en la flota';
+  document.getElementById('kmHoyProm').textContent=promHoy+' km';
+  document.getElementById('kmHoySinAsignar').textContent=Math.round(sinAsignar.hoy||0)+' km';
+  document.getElementById('kmHoySinAsignarSub').textContent=(sinAsignar.cantidadAgrupaciones||0)+' agrupaciones GPS sin match';
+
+  // Alerta sin asignar
+  const alertSA=document.getElementById('kmSinAsignarAlert');
+  if((sinAsignar.hoy||0)>50){
+    alertSA.style.display='block';
+    const top=(sinAsignar.topAgrupaciones||[]).slice(0,5);
+    alertSA.innerHTML='<strong>⚠ '+Math.round(sinAsignar.hoy)+' km sin asignar hoy</strong> — '+
+      (sinAsignar.cantidadAgrupaciones||0)+' agrupaciones GPS no matchearon contra la flota. '+
+      (top.length>0?'Top: '+top.map(x=>x.agrupacion.slice(0,30)+'… ('+Math.round(x.km)+' km)').join(', ')+'.':'')+
+      ' Revisá los aliases en el Apps Script (<code>ALIAS_KM_</code>).';
+  } else {
+    alertSA.style.display='none';
+  }
+
+  // KPIs MES
+  document.getElementById('kmMesTotal').textContent=Math.round(kmMes).toLocaleString('es-CL')+' km';
+  document.getElementById('kmMesTotalSub').textContent='mes en curso · incluye '+Math.round(sinAsignar.mes||0)+' km sin asignar';
+  document.getElementById('kmSemanaTotal').textContent=Math.round(kmSem).toLocaleString('es-CL')+' km';
+  const movsConKmMes=moviles.filter(m=>m.diasActivos>0).length;
+  const diasActivosTotal=moviles.reduce((s,m)=>s+(m.diasActivos||0),0);
+  const kmMesFlota=moviles.reduce((s,m)=>s+(m.kmMes||0),0);
+  const promDiarioMes=diasActivosTotal>0?Math.round(kmMesFlota/diasActivosTotal):0;
+  document.getElementById('kmMesProm').textContent=promDiarioMes+' km';
+  document.getElementById('kmMesMoviles').textContent=movsConKmMes;
+
+  // Poblar filtros
+  const clientesKm=[...new Set(moviles.map(m=>m.cliente).filter(Boolean))].sort();
+  populateSelect('kmFiltCliente',clientesKm,'Todos los clientes');
+  populateSelect('kmMesFiltCliente',clientesKm,'Todos los clientes');
+  // Filtro KAM para km
+  const kamsKm=[...new Set((allData.unificador&&allData.unificador.moviles?allData.unificador.moviles:[]).map(m=>m.jefeOperaciones).filter(Boolean))].sort();
+  populateSelect('kmFiltJefe',kamsKm,'Todos los KAM');
+
+  renderKmRankingHoy();
+  renderKmRankingMes();
+  renderKmSinRegistros();
+  renderKmDiagnostico();
+}
+
+function getKmMovilesFiltered(tipo){
+  const km=allData.kilometros;if(!km) return [];
+  let moviles=km.moviles||[];
+  // Cruzar con info de flota para tener jefeOperaciones
+  const flotaMap={};
+  (allData.unificador&&allData.unificador.moviles||[]).forEach(m=>{flotaMap[(m.cliente+'|'+m.movil).toLowerCase()]=m;});
+  moviles=moviles.map(m=>{const f=flotaMap[(m.cliente+'|'+m.movil).toLowerCase()];return Object.assign({},m,{jefeOperaciones:(f&&f.jefeOperaciones)||''});});
+  // Filtros
+  const fc=document.getElementById(tipo==='hoy'?'kmFiltCliente':'kmMesFiltCliente').value;
+  const ft=document.getElementById(tipo==='hoy'?'kmFiltTexto':'kmMesFiltTexto').value.toLowerCase().trim();
+  const fj=tipo==='hoy'?document.getElementById('kmFiltJefe').value:'';
+  if(kamGlobal) moviles=moviles.filter(m=>m.jefeOperaciones&&m.jefeOperaciones.toLowerCase()===kamGlobal.toLowerCase());
+  if(fc) moviles=moviles.filter(m=>m.cliente===fc);
+  if(fj) moviles=moviles.filter(m=>m.jefeOperaciones===fj);
+  if(ft) moviles=moviles.filter(m=>(m.nombre||'').toLowerCase().includes(ft)||(m.movil||'').toLowerCase().includes(ft));
+  return moviles;
+}
+
+function renderKmRankingHoy(){
+  const moviles=getKmMovilesFiltered('hoy');
+  const top=moviles.filter(m=>(m.kmHoy||0)>0).sort((a,b)=>(b.kmHoy||0)-(a.kmHoy||0)).slice(0,20);
+  const cont=document.getElementById('kmRankingHoy');cont.innerHTML='';
+  if(top.length===0){cont.innerHTML='<div class="empty">Sin registros de km para hoy. Los datos del GPS se actualizan cada hora.</div>';return;}
+  const maxKm=top[0].kmHoy||1;
+  const medals=['🥇','🥈','🥉'];
+  top.forEach((m,i)=>{
+    const pct=Math.round((m.kmHoy||0)/maxKm*100);
+    const pos=i<3?'<span class="km-rank-pos">'+medals[i]+'</span>':'<span class="km-rank-pos num">'+(i+1)+'</span>';
+    const color=clientColors[m.cliente]||'#0F6E56';
+    const item=document.createElement('div');item.className='km-rank-item';
+    item.innerHTML=pos+
+      '<div class="km-rank-body"><div class="km-rank-name">'+escapeHtml(m.nombre||m.movil)+'</div>'+
+      '<div class="km-rank-meta" style="color:'+color+'">'+escapeHtml(m.cliente)+(m.jefeOperaciones?' · KAM: '+escapeHtml(m.jefeOperaciones.split(' ')[0]):'')+'</div></div>'+
+      '<div class="km-rank-bar-wrap"><div class="km-rank-bar-fill" style="width:'+pct+'%"></div></div>'+
+      '<span class="km-rank-num">'+Math.round(m.kmHoy).toLocaleString('es-CL')+' km</span>';
+    cont.appendChild(item);
+  });
+  // Por cliente hoy
+  renderKmPorCliente('hoy','kmClienteHoy',moviles,'kmHoy');
+  renderKmPorKam('hoy','kmKamHoy',moviles,'kmHoy');
+}
+
+function renderKmRankingMes(){
+  const moviles=getKmMovilesFiltered('mes');
+  const top=moviles.filter(m=>(m.kmMes||0)>0).sort((a,b)=>(b.kmMes||0)-(a.kmMes||0)).slice(0,20);
+  const cont=document.getElementById('kmRankingMes');cont.innerHTML='';
+  if(top.length===0){cont.innerHTML='<div class="empty">Sin registros de km para este mes.</div>';return;}
+  const maxKm=top[0].kmMes||1;
+  const medals=['🥇','🥈','🥉'];
+  top.forEach((m,i)=>{
+    const pct=Math.round((m.kmMes||0)/maxKm*100);
+    const pos=i<3?'<span class="km-rank-pos">'+medals[i]+'</span>':'<span class="km-rank-pos num">'+(i+1)+'</span>';
+    const color=clientColors[m.cliente]||'#0F6E56';
+    const item=document.createElement('div');item.className='km-rank-item';
+    item.innerHTML=pos+
+      '<div class="km-rank-body"><div class="km-rank-name">'+escapeHtml(m.nombre||m.movil)+'</div>'+
+      '<div class="km-rank-meta" style="color:'+color+'">'+escapeHtml(m.cliente)+' · prom '+Math.round(m.promedioDiario||0)+' km/día · '+( m.diasActivos||0)+' días activos</div></div>'+
+      '<div class="km-rank-bar-wrap"><div class="km-rank-bar-fill" style="width:'+pct+'%"></div></div>'+
+      '<span class="km-rank-num">'+Math.round(m.kmMes).toLocaleString('es-CL')+' km</span>';
+    cont.appendChild(item);
+  });
+  renderKmPorCliente('mes','kmClienteMes',moviles,'kmMes');
+}
+
+function renderKmPorCliente(tipo,contId,moviles,campo){
+  const byC={};
+  moviles.forEach(m=>{if(!byC[m.cliente])byC[m.cliente]=0;byC[m.cliente]+=(m[campo]||0);});
+  const entries=Object.entries(byC).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const cont=document.getElementById(contId);cont.innerHTML='';
+  if(entries.length===0){cont.innerHTML='<div class="empty">Sin datos</div>';return;}
+  const maxV=entries[0][1]||1;
+  entries.forEach(([n,v])=>{
+    const row=document.createElement('div');row.className='client-row';
+    const dot='<span class="dot" style="background:'+(clientColors[n]||'#0F6E56')+'"></span>';
+    row.innerHTML='<div class="client-name">'+dot+'<span class="tx">'+n+'</span></div>'+
+      '<div class="client-count"><span class="bar"><span class="bar-fill teal" style="width:'+(v/maxV*100)+'%"></span></span>'+Math.round(v).toLocaleString('es-CL')+' km</div>';
+    cont.appendChild(row);
+  });
+}
+
+function renderKmPorKam(tipo,contId,moviles,campo){
+  const flotaMap={};
+  (allData.unificador&&allData.unificador.moviles||[]).forEach(m=>{flotaMap[(m.cliente+'|'+m.movil).toLowerCase()]=m;});
+  const byKam={};
+  moviles.forEach(m=>{
+    const f=flotaMap[(m.cliente+'|'+m.movil).toLowerCase()];
+    const k=(f&&f.jefeOperaciones)||'Sin KAM';
+    if(!byKam[k])byKam[k]=0;byKam[k]+=(m[campo]||0);
+  });
+  const entries=Object.entries(byKam).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  const cont=document.getElementById(contId);cont.innerHTML='';
+  if(entries.length===0){cont.innerHTML='<div class="empty">Sin datos de KAM</div>';return;}
+  const maxV=entries[0][1]||1;
+  entries.forEach(([n,v])=>{
+    const row=document.createElement('div');row.className='client-row';
+    row.innerHTML='<div class="client-name"><span style="font-size:11.5px">'+escapeHtml(n)+'</span></div>'+
+      '<div class="client-count"><span class="bar"><span class="bar-fill teal" style="width:'+(v/maxV*100)+'%"></span></span>'+Math.round(v).toLocaleString('es-CL')+' km</div>';
+    cont.appendChild(row);
+  });
+}
+
+function renderKmSinRegistros(){
+  const km=allData.kilometros;if(!km) return;
+  const moviles=km.moviles||[];
+  const sinKm=moviles.filter(m=>(m.kmMes||0)===0).slice(0,30);
+  const cont=document.getElementById('kmSinRegistros');cont.innerHTML='';
+  if(sinKm.length===0){cont.innerHTML='<div class="empty">Todos los móviles tienen km registrados este mes.</div>';return;}
+  sinKm.forEach(m=>{
+    const item=document.createElement('div');item.className='mob-item';
+    const color=clientColors[m.cliente]||'#888';
+    item.innerHTML='<div style="min-width:0;flex:1"><div class="mob-name" style="color:'+color+'">'+escapeHtml(m.nombre||m.movil)+'</div>'+
+      '<div class="mob-detail">'+escapeHtml(m.cliente)+'</div></div>'+
+      '<span class="badge badge-warn">Sin km</span>';
+    cont.appendChild(item);
+  });
+  if(moviles.filter(m=>(m.kmMes||0)===0).length>30){
+    const more=document.createElement('div');more.className='empty';more.style.padding='10px';
+    more.textContent='Mostrando 30 de '+moviles.filter(m=>(m.kmMes||0)===0).length+' sin registros.';
+    cont.appendChild(more);
+  }
+}
+
+function renderKmDiagnostico(){
+  const km=allData.kilometros;if(!km) return;
+  const stats=km.stats||{},sinAsignar=km.sinAsignar||{};
+  const cont=document.getElementById('kmDiagnostico');
+  let html='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px">';
+  html+='<div class="km-kpi" style="padding:10px 14px"><div class="km-kpi-label">Filas procesadas</div><div style="font-size:20px;font-weight:500;color:var(--teal-fg)">'+(stats.filasProcesadas||0)+'</div></div>';
+  html+='<div class="km-kpi" style="padding:10px 14px"><div class="km-kpi-label">Filas ignoradas</div><div style="font-size:20px;font-weight:500;color:var(--text-3)">'+(stats.filasIgnoradas||0)+'</div></div>';
+  html+='<div class="km-kpi" style="padding:10px 14px"><div class="km-kpi-label">Agrupaciones sin match</div><div style="font-size:20px;font-weight:500;color:var(--warn-fg)">'+(stats.cantSinMatch||0)+'</div></div>';
+  html+='<div class="km-kpi" style="padding:10px 14px"><div class="km-kpi-label">Km sin asignar (mes)</div><div style="font-size:20px;font-weight:500;color:var(--warn-fg)">'+Math.round(sinAsignar.mes||0)+' km</div></div>';
+  html+='</div>';
+  if((sinAsignar.topAgrupaciones||[]).length>0){
+    html+='<div style="font-size:12px;font-weight:500;color:var(--text-2);margin-bottom:6px">Top agrupaciones sin match (más km sin asignar este mes):</div>';
+    html+='<div style="font-size:12px;color:var(--text-2)">';
+    sinAsignar.topAgrupaciones.forEach(x=>{html+='<div style="padding:4px 0;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between"><span>'+escapeHtml(x.agrupacion)+'</span><span style="color:var(--warn-fg);font-weight:500;flex-shrink:0;margin-left:12px">'+Math.round(x.km)+' km</span></div>';});
+    html+='</div>';
+  }
+  if((stats.scoresBajos||[]).length>0){
+    html+='<div style="font-size:12px;font-weight:500;color:var(--text-2);margin:10px 0 6px">Matches con score bajo (revisá si son correctos):</div>';
+    html+='<div style="font-size:12px;color:var(--text-2)">';
+    stats.scoresBajos.forEach(x=>{html+='<div style="padding:4px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--text-3)">"'+escapeHtml(x.agrupacion)+'"</span> → <span style="font-weight:500">'+escapeHtml(x.asignadoA)+'</span> <span class="badge badge-warn" style="font-size:10px">'+Math.round((x.score||0)*100)+'%</span></div>';});
+    html+='</div>';
+  }
+  if(!(sinAsignar.topAgrupaciones||[]).length&&!(stats.scoresBajos||[]).length){
+    html+='<div class="empty" style="padding:16px 0">Sin problemas de matching detectados. Todos los km están asignados correctamente.</div>';
+  }
+  cont.innerHTML=html;
+}
+
+// ── BANNER DORMIDOS ────────────────────────────────────────────────────────
+function getMovilesDormidos(diasUmbral){
+  diasUmbral=diasUmbral||14;if(!allData||!allData.unificador||!allData.historico) return [];
+  const flota=allData.unificador.moviles||[],rutas=allData.historico.rutas||[];
+  const ultimoVisto={};rutas.forEach(r=>{const k=(r.cliente+'|'+r.movil).toLowerCase();if(!ultimoVisto[k]||r.fecha>ultimoVisto[k])ultimoVisto[k]=r.fecha;});
+  const fechaRef=(allData.unificador&&allData.unificador.fecha)?parseDDMM_(allData.unificador.fecha):new Date();
+  fechaRef.setHours(0,0,0,0);const cutoff=new Date(fechaRef);cutoff.setDate(cutoff.getDate()-diasUmbral);
+  return flota.map(m=>{const k=(m.cliente+'|'+m.movil).toLowerCase(),ultimo=ultimoVisto[k]||null,ultimoDate=ultimo?new Date(ultimo):null,diasSin=ultimo?Math.floor((fechaRef-ultimoDate)/(1000*60*60*24)):999;return{movil:m,ultimo:ultimo,diasSin:diasSin};}).filter(x=>x.diasSin>diasUmbral).sort((a,b)=>b.diasSin-a.diasSin);
+}
+function renderBannerDormidos(){
+  const banner=document.getElementById('bannerDormidos'),txt=document.getElementById('bannerDormidosTxt');if(!banner||!txt) return;
+  const dormidos=getMovilesDormidos(14);
+  const filtrados=kamGlobal?dormidos.filter(d=>d.movil.jefeOperaciones&&d.movil.jefeOperaciones.toLowerCase()===kamGlobal.toLowerCase()):dormidos;
+  if(filtrados.length===0){banner.style.display='none';document.getElementById('dormidosDetalle').style.display='none';return;}
+  banner.style.display='flex';txt.textContent=filtrados.length+(filtrados.length===1?' móvil':' móviles')+' sin actividad hace más de 14 días';
+  const list=document.getElementById('dormidosList');
+  list.innerHTML=filtrados.slice(0,30).map(d=>{
+    const dotColor=clientColors[d.movil.cliente]||'#888',ultimoTxt=d.ultimo?formatDate(d.ultimo):'nunca registrado',diasTxt=d.diasSin>=999?'sin registros':'hace '+d.diasSin+' días';
+    return '<div class="dormido-item"><div style="min-width:0;flex:1"><div><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+dotColor+';margin-right:6px;vertical-align:middle"></span><b>'+escapeHtml(d.movil.nombre)+'</b></div>'+
+      '<div class="dormido-meta">'+escapeHtml(d.movil.cliente)+(d.movil.jefeOperaciones?' · KAM: '+escapeHtml(d.movil.jefeOperaciones):'')+'</div></div>'+
+      '<div style="text-align:right"><div style="font-size:11.5px;color:var(--warn-fg);font-weight:500">'+diasTxt+'</div><div class="dormido-meta">Último: '+ultimoTxt+'</div></div></div>';
+  }).join('');
+}
+
+// ── TENDENCIAS ─────────────────────────────────────────────────────────────
+function getRutasEnRango(rutas,desdeISO,hastaISO){return rutas.filter(r=>r.fecha>=desdeISO&&r.fecha<=hastaISO);}
+function isoOffset(baseDate,days){const d=new Date(baseDate);d.setDate(d.getDate()+days);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function deltaPct(actual,previo){if(previo===0)return actual>0?100:0;return Math.round((actual-previo)/previo*1000)/10;}
+function formatDelta(d){if(Math.abs(d)<0.5)return{txt:'≈',cls:'flat'};const arrow=d>0?'↑':'↓';return{txt:arrow+Math.abs(d)+'%',cls:d>0?'up':'down'};}
+function parseHoraToInt_(s){if(!s) return null;const m=String(s).match(/^(\d{1,2}):/);if(!m) return null;const h=parseInt(m[1],10);return(h>=0&&h<=23)?h:null;}
+
+function renderTendencias(){
+  if(!allData||!allData.historico) return;
+  let rutas=(allData.historico.rutas||[]).slice();
+  const kamKeys=getKamMovilesKeys();if(kamKeys) rutas=rutas.filter(r=>kamKeys.has((r.cliente+'|'+r.movil).toLowerCase()));
+  const fechaRef=(allData.unificador&&allData.unificador.fecha)?parseDDMM_(allData.unificador.fecha):new Date();
+  fechaRef.setHours(0,0,0,0);const hoyISO=isoOffset(fechaRef,0);
+  const sem1Desde=isoOffset(fechaRef,-6),sem1Hasta=hoyISO,sem2Desde=isoOffset(fechaRef,-13),sem2Hasta=isoOffset(fechaRef,-7);
+  const semActual=getRutasEnRango(rutas,sem1Desde,sem1Hasta).length,semPrev=getRutasEnRango(rutas,sem2Desde,sem2Hasta).length;
+  const deltaSem=deltaPct(semActual,semPrev),fmtSem=formatDelta(deltaSem);
+  document.getElementById('tendSemActual').textContent=semActual;
+  const dsEl=document.getElementById('tendSemDelta');dsEl.textContent=fmtSem.txt;dsEl.className='kpi-delta '+fmtSem.cls;
+  document.getElementById('tendSemSub').textContent='vs '+semPrev+' (7 días previos)';
+  const mesActual=getRutasEnRango(rutas,isoOffset(fechaRef,-27),hoyISO).length,mesPrev=getRutasEnRango(rutas,isoOffset(fechaRef,-55),isoOffset(fechaRef,-28)).length;
+  document.getElementById('tendMesActual').textContent=mesActual;
+  const dmEl=document.getElementById('tendMesDelta');
+  if(mesPrev===0){dmEl.textContent='sin datos';dmEl.className='kpi-delta flat';document.getElementById('tendMesSub').textContent='históricos limitados a 30 días';}
+  else{const deltaMes=deltaPct(mesActual,mesPrev),fmtMes=formatDelta(deltaMes);dmEl.textContent=fmtMes.txt;dmEl.className='kpi-delta '+fmtMes.cls;document.getElementById('tendMesSub').textContent='vs '+mesPrev+' (28 días previos)';}
+  document.getElementById('tendPromDiario').textContent=Math.round(semActual/7);
+  const byHour=new Array(24).fill(0);rutas.forEach(r=>{const h=parseHoraToInt_(r.horaInicio);if(h!==null)byHour[h]++;});
+  let horaPico=0,maxH=0;for(let h=0;h<24;h++){if(byHour[h]>maxH){maxH=byHour[h];horaPico=h;}}
+  document.getElementById('tendHoraPico').textContent=maxH>0?String(horaPico).padStart(2,'0')+':00':'—';
+  document.getElementById('tendHoraPicoSub').textContent=maxH>0?maxH+' rutas en esa franja':'sin datos';
+  const byCliSem1={},byCliSem2={};
+  getRutasEnRango(rutas,sem1Desde,sem1Hasta).forEach(r=>{if(r.cliente)byCliSem1[r.cliente]=(byCliSem1[r.cliente]||0)+1;});
+  getRutasEnRango(rutas,sem2Desde,sem2Hasta).forEach(r=>{if(r.cliente)byCliSem2[r.cliente]=(byCliSem2[r.cliente]||0)+1;});
+  const allClis=new Set([...Object.keys(byCliSem1),...Object.keys(byCliSem2)]);
+  const deltas=Array.from(allClis).map(c=>{const a=byCliSem1[c]||0,p=byCliSem2[c]||0;return{cliente:c,actual:a,previo:p,delta:deltaPct(a,p),diff:a-p};}).filter(x=>x.actual+x.previo>=3).sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff)).slice(0,8);
+  const tDelta=document.getElementById('tendDeltaClientes');
+  if(deltas.length===0){tDelta.innerHTML='<div class="empty">Sin variaciones significativas</div>';}
+  else{tDelta.innerHTML=deltas.map(d=>{const fmt=formatDelta(d.delta);const dot='<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+(clientColors[d.cliente]||'#888')+';margin-right:6px;vertical-align:middle"></span>';return '<div class="client-row"><div class="client-name">'+dot+'<span class="tx">'+escapeHtml(d.cliente)+'</span></div><div class="client-count" style="gap:8px"><span style="font-size:11px;color:var(--text-3)">'+d.previo+' → '+d.actual+'</span><span class="kpi-delta '+fmt.cls+'" style="margin-left:0">'+fmt.txt+'</span></div></div>';}).join('');}
+  const semanas=[];for(let i=3;i>=0;i--){const wDesde=isoOffset(fechaRef,-((i+1)*7-1)),wHasta=isoOffset(fechaRef,-(i*7));semanas.push({label:'Sem '+(i===0?'actual':'-'+i),count:getRutasEnRango(rutas,wDesde,wHasta).length});}
+  const maxSem=Math.max.apply(null,semanas.map(s=>s.count).concat(1));
+  const bars=document.getElementById('tendEvolChart'),labels=document.getElementById('tendEvolLabels');bars.innerHTML='';labels.innerHTML='';
+  semanas.forEach(s=>{const h=Math.max(2,s.count/maxSem*130);const bar=document.createElement('div');bar.className='chart-bar';bar.style.height=h+'px';bar.innerHTML='<div class="bar-tip">'+s.label+': '+s.count+' rutas</div>';bars.appendChild(bar);const l=document.createElement('div');l.className='chart-label';l.textContent=s.label;labels.appendChild(l);});
+  renderHeatmap(rutas);
+}
+
+function renderHeatmap(rutas){
+  const grid=[];for(let i=0;i<7;i++)grid.push(new Array(24).fill(0));
+  rutas.forEach(r=>{const h=parseHoraToInt_(r.horaInicio);if(h===null) return;if(!r.fecha) return;const d=new Date(r.fecha);if(isNaN(d.getTime())) return;let dia=d.getDay()-1;if(dia<0)dia=6;grid[dia][h]++;});
+  const allValues=[];for(let d=0;d<7;d++)for(let h=0;h<24;h++)if(grid[d][h]>0)allValues.push(grid[d][h]);
+  if(allValues.length===0){document.getElementById('hmBody').innerHTML='<div class="empty" style="grid-column:1/-1;padding:30px">Sin datos suficientes</div>';document.getElementById('hmHeader').innerHTML='';return;}
+  allValues.sort((a,b)=>a-b);const q=p=>allValues[Math.floor(allValues.length*p)]||1;
+  const t1=q(0.2),t2=q(0.4),t3=q(0.6),t4=q(0.8);
+  const colors=['transparent','#EAF3DE','#C0DD97','#97C459','#639922','#3B6D11'];
+  function colorFor(v){if(v===0)return colors[0];if(v<=t1)return colors[1];if(v<=t2)return colors[2];if(v<=t3)return colors[3];if(v<=t4)return colors[4];return colors[5];}
+  const dias=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+  const header=document.getElementById('hmHeader');let headerHtml='<div></div>';
+  for(let h=0;h<24;h++) headerHtml+='<div class="hm-hour-label">'+(h%3===0?String(h):'')+'</div>';
+  header.innerHTML=headerHtml;
+  const body=document.getElementById('hmBody');let bodyHtml='';
+  for(let d=0;d<7;d++){
+    bodyHtml+='<div class="hm-day-label">'+dias[d]+'</div>';
+    for(let h=0;h<24;h++){const v=grid[d][h],bg=colorFor(v),border=(v===0)?'border:0.5px solid var(--border);':'',tip=dias[d]+' '+String(h).padStart(2,'0')+':00 — '+v+' '+(v===1?'ruta':'rutas');bodyHtml+='<div class="hm-cell" style="background:'+bg+';'+border+'" title="'+tip+'"></div>';}
+  }
+  body.innerHTML=bodyHtml;
+}
+
+// ── FILTROS GLOBALES ───────────────────────────────────────────────────────
+function populateKamSelector(){
+  const sel=document.getElementById('kamGlobal');if(!sel) return;
+  const kams=(allData&&allData.kams)?allData.kams:[];
+  if(sel.options.length>1) return;
+  kams.forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;sel.appendChild(o);});
+}
+
+(function initGlobalFilters(){
+  const fechaInput=document.getElementById('fechaGlobal'),kamSel=document.getElementById('kamGlobal');
+  const btnHoy=document.getElementById('fgBtnHoy'),badgeHist=document.getElementById('fgBadgeHistorico'),badgeKam=document.getElementById('fgBadgeKam'),bannerBtn=document.getElementById('bannerDormidosBtn');
+  fechaInput.value=getTodayISO();fechaInput.max=getTodayISO();
+  fechaInput.addEventListener('change',function(){const v=fechaInput.value,hoy=getTodayISO();if(!v||v===hoy){fechaGlobal=null;badgeHist.style.display='none';}else{fechaGlobal=v;badgeHist.style.display='inline-block';}loadData();});
+  btnHoy.addEventListener('click',function(){fechaInput.value=getTodayISO();fechaGlobal=null;badgeHist.style.display='none';loadData();});
+  kamSel.addEventListener('change',function(){kamGlobal=kamSel.value||'';if(kamGlobal){badgeKam.style.display='inline-block';badgeKam.textContent='Filtrando por '+kamGlobal;}else{badgeKam.style.display='none';}if(allData) renderAll();});
+  bannerBtn.addEventListener('click',function(){const det=document.getElementById('dormidosDetalle');det.style.display=det.style.display==='none'?'block':'none';});
+})();
+
+// ── LISTENERS ──────────────────────────────────────────────────────────────
+['opFiltCliente','opFiltJefe','opFiltEstado','opFiltTexto'].forEach(id=>{document.getElementById(id).addEventListener(id==='opFiltTexto'?'input':'change',renderMap);});
+['gpsFiltCliente','gpsFiltJefe','gpsFiltAlerta','gpsFiltTexto'].forEach(id=>{document.getElementById(id).addEventListener(id==='gpsFiltTexto'?'input':'change',renderGPSMap);});
+['hiFiltCliente','hiFiltTexto'].forEach(id=>{document.getElementById(id).addEventListener(id==='hiFiltTexto'?'input':'change',renderHiTable);});
+['biFiltCliente','biFiltTipo','biFiltTexto'].forEach(id=>{document.getElementById(id).addEventListener(id==='biFiltTexto'?'input':'change',renderBiList);});
+['suFiltCliente','suFiltEstado','suFiltTexto','suOrden'].forEach(id=>{document.getElementById(id).addEventListener(id==='suFiltTexto'?'input':'change',renderSuTable);});
+['kmFiltCliente','kmFiltJefe','kmFiltTexto'].forEach(id=>{document.getElementById(id).addEventListener(id==='kmFiltTexto'?'input':'change',renderKmRankingHoy);});
+['kmMesFiltCliente','kmMesFiltTexto'].forEach(id=>{document.getElementById(id).addEventListener(id==='kmMesFiltTexto'?'input':'change',renderKmRankingMes);});
+
+// ── MOBILE LAYOUT ──────────────────────────────────────────────────────────
+(function applyMobileIfNeeded(){
+  var ua = navigator.userAgent;
+  var isPhone = /iPhone|iPod|Android|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+  var sw = Math.min(window.screen.width, window.screen.height);
+  if(!isPhone && sw >= 768) return;
+  var css = [
+    /* base */
+    'body{padding:16px 14px!important;font-size:16px!important}',
+    /* topbar */
+    '.topbar{flex-direction:column!important;align-items:flex-start!important;gap:10px!important;margin-bottom:16px!important}',
+    '.topbar h1{font-size:24px!important;font-weight:600!important}',
+    '.topbar .meta{font-size:13px!important}',
+    '.status{width:100%!important;justify-content:space-between!important;font-size:14px!important}',
+    /* filtros globales */
+    '.filtros-globales{flex-direction:column!important;gap:10px!important;padding:14px!important}',
+    '.fg-grupo{width:100%!important;gap:8px!important;flex-direction:column!important;align-items:flex-start!important}',
+    '.fg-label{font-size:13px!important;text-transform:uppercase!important;letter-spacing:.3px!important}',
+    '.fg-input{width:100%!important;min-width:0!important;font-size:16px!important;padding:12px 14px!important;box-sizing:border-box!important;border-radius:8px!important}',
+    '#fgBtnHoy{font-size:14px!important;padding:10px 16px!important;min-height:40px!important}',
+    /* banner */
+    '.banner-alert{flex-direction:column!important;align-items:flex-start!important;gap:10px!important;font-size:15px!important;padding:14px!important}',
+    /* tabs */
+    '.tab{font-size:15px!important;padding:12px 16px!important}',
+    '.subtab{font-size:14px!important;padding:9px 16px!important}',
+    /* KPI cards */
+    '.kpi-grid{grid-template-columns:1fr 1fr!important;gap:10px!important;margin-bottom:16px!important}',
+    '.km-kpi-grid{grid-template-columns:1fr 1fr!important;gap:10px!important;margin-bottom:16px!important}',
+    '.kpi{padding:16px 14px!important}',
+    '.kpi-label{font-size:11px!important;letter-spacing:.5px!important}',
+    '.kpi-val{font-size:36px!important;line-height:1.1!important}',
+    '.kpi-sub{font-size:13px!important;margin-top:4px!important}',
+    '.km-kpi{padding:16px 14px!important}',
+    '.km-kpi-label{font-size:11px!important}',
+    '.km-kpi-val{font-size:36px!important;line-height:1.1!important}',
+    '.km-kpi-sub{font-size:13px!important}',
+    /* layouts */
+    '.body-grid{grid-template-columns:1fr!important;gap:12px!important}',
+    '.day-grid{grid-template-columns:1fr!important;gap:12px!important}',
+    '.tend-grid{grid-template-columns:1fr!important;gap:12px!important}',
+    /* mapas */
+    '#mapLeaflet,#gpsMapLeaflet{height:320px!important}',
+    /* paneles */
+    '.panel{padding:16px 14px!important}',
+    '.panel h2{font-size:17px!important;margin-bottom:14px!important}',
+    /* filtros dentro de paneles */
+    '.filter-row{flex-direction:column!important;gap:8px!important}',
+    '.filter-row select,.filter-row input{width:100%!important;min-width:0!important;font-size:16px!important;padding:12px 14px!important;box-sizing:border-box!important}',
+    /* tablas */
+    '.tabla-wrap{overflow-x:auto!important}',
+    'table{min-width:480px!important;font-size:14px!important}',
+    'th{font-size:12px!important;padding:10px 8px!important}',
+    'td{font-size:14px!important;padding:11px 8px!important}',
+    /* listas */
+    '.mob-item{font-size:15px!important;padding:12px 0!important}',
+    '.mob-name{font-size:15px!important;max-width:100%!important}',
+    '.mob-detail{font-size:13px!important;margin-top:3px!important}',
+    '.client-row{font-size:15px!important;padding:10px 0!important}',
+    '.client-count{font-size:15px!important}',
+    '.client-name .tx{font-size:15px!important}',
+    /* ranking */
+    '.rank-name{font-size:15px!important}',
+    '.rank-meta{font-size:13px!important}',
+    '.rank-num{font-size:20px!important}',
+    /* eventos */
+    '.evento-item{font-size:15px!important;padding:14px 0!important}',
+    '.evento-fecha,.evento-cliente{font-size:13px!important}',
+    '.evento-detalle{font-size:14px!important}',
+    /* obs */
+    '.obs-card{padding:14px!important}',
+    '.obs-card .obs-mv{font-size:15px!important}',
+    '.obs-card .obs-txt{font-size:14px!important}',
+    '.obs-card .obs-foot{font-size:13px!important}',
+    /* badges */
+    '.badge{font-size:13px!important;padding:4px 10px!important}',
+    /* heatmap */
+    '.heatmap-wrap{overflow-x:auto!important}',
+    '.hm-grid{min-width:640px!important}',
+    /* botones */
+    '.btn-refresh{min-height:44px!important;padding:12px 18px!important;font-size:15px!important}',
+    '.obs-btn{font-size:14px!important;padding:8px 14px!important;min-height:40px!important}',
+    /* km */
+    '.km-rank-name{font-size:15px!important}',
+    '.km-rank-meta{font-size:13px!important}',
+    '.km-rank-num{font-size:18px!important}',
+    '.km-sin-asignar{font-size:14px!important}',
+    /* KAM */
+    '.kam-name{font-size:15px!important}',
+    '.kam-meta{font-size:13px!important}',
+    /* dormidos */
+    '.dormido-item{font-size:15px!important}',
+    '.dormido-meta{font-size:13px!important}',
+    /* footer */
+    '.footer{font-size:13px!important;padding-top:18px!important}',
+  ].join('');
+  var s = document.createElement('style');
+  s.id = 'mobile-override';
+  s.textContent = css;
+  document.head.appendChild(s);
+})();
+
+// ── OFFLINE DETECTION ─────────────────────────────────────────────────────
+(function(){
+  var b = document.getElementById('offline-banner');
+  function upd(){ if(b) b.style.display = navigator.onLine ? 'none' : 'flex'; }
+  upd();
+  window.addEventListener('online', upd);
+  window.addEventListener('offline', upd);
+})();
+
+// ── PWA INSTALL ────────────────────────────────────────────────────────────
+var _deferredInstall = null;
+
+function showPwaHint(){
+  var standalone = window.navigator.standalone || window.matchMedia('(display-mode:standalone)').matches;
+  if(standalone) return;
+  if(localStorage.getItem('pwaDismissed')) return;
+  var ua = navigator.userAgent;
+  var isIOS = /iPhone|iPod/.test(ua);
+  var isAndroid = /Android/.test(ua);
+  if(!isIOS && !isAndroid) return;
+  var banner = document.getElementById('pwa-banner');
+  var txt = document.getElementById('pwa-banner-txt');
+  if(isIOS){
+    txt.innerHTML = 'Instalá como app: tocá <b>Compartir ↑</b> → <b>"Agregar a inicio"</b>.';
+    banner.style.display = 'flex';
+  } else if(_deferredInstall) {
+    txt.innerHTML = '<b>Instalá como app</b> para acceso rápido desde tu pantalla de inicio.';
+    if(!document.getElementById('pwa-install-btn')){
+      var btn = document.createElement('button');
+      btn.id = 'pwa-install-btn';
+      btn.className = 'btn-refresh';
+      btn.style.cssText = 'font-size:13px;font-weight:500;background:var(--info-fg);color:#fff;border-color:var(--info-fg)';
+      btn.textContent = 'Instalar';
+      btn.onclick = function(){
+        _deferredInstall.prompt();
+        _deferredInstall.userChoice.then(function(){
+          banner.style.display = 'none';
+          _deferredInstall = null;
+        });
+      };
+      txt.after(btn);
+    }
+    banner.style.display = 'flex';
+  } else if(isAndroid) {
+    txt.innerHTML = 'Instalá como app: en el menú del browser → <b>"Agregar a pantalla de inicio"</b>.';
+    banner.style.display = 'flex';
+  }
+}
+
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault();
+  _deferredInstall = e;
+  showPwaHint();
+});
+
+window.addEventListener('appinstalled', function(){
+  document.getElementById('pwa-banner').style.display = 'none';
+  _deferredInstall = null;
+});
+
+showPwaHint();
+
+// ─── KPI Tooltip ──────────────────────────────────────────────────────────
+(function(){
+  var tip=document.getElementById('kpiTip');
+  if(!tip){tip=document.createElement('div');tip.id='kpiTip';tip.className='tooltip';tip.style.cssText='position:fixed;max-width:300px;line-height:1.6;font-size:12px;pointer-events:none;display:none;z-index:99';document.body.appendChild(tip);}
+  tip.style.maxHeight='70vh';tip.style.overflowY='auto';
+  document.addEventListener('mouseover',function(e){
+    const c=e.target.closest('[data-kpi]');
+    if(!c){tip.style.display='none';return;}
+    const html=kpiTooltipContent[c.dataset.kpi];
+    if(!html){tip.style.display='none';return;}
+    tip.innerHTML=html;tip.style.display='block';
+  });
+  document.addEventListener('mousemove',function(e){
+    if(tip.style.display==='none') return;
+    const x=e.clientX+16,y=e.clientY;
+    const tipH=tip.offsetHeight,tipW=tip.offsetWidth;
+    const left=Math.min(x,window.innerWidth-tipW-8);
+    const topCentered=y-tipH/2;
+    const top=Math.min(Math.max(4,topCentered),window.innerHeight-tipH-8);
+    tip.style.left=left+'px';tip.style.top=top+'px';
+  });
+  document.addEventListener('mouseout',function(e){
+    const c=e.target.closest('[data-kpi]');
+    if(c&&!c.contains(e.relatedTarget)) tip.style.display='none';
+  });
+})();
+
+loadData();
+startAutoRefresh();
+</script>
+<div id="kpiTip" class="tooltip" style="max-width:300px;line-height:1.6;font-size:12px"></div>
+
+<!-- MODAL: EDITAR RUTA -->
+<div class="det-modal-ov" id="detModalOv" onclick="if(event.target===this)closeDetModal()">
+  <div class="det-modal">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px">
+      <div>
+        <h3 id="detModalTitle" style="margin:0">Editar inicio de ruta</h3>
+        <div id="detModalSub" style="font-size:12px;color:var(--text-2);margin-top:3px"></div>
+      </div>
+      <button onclick="closeDetModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-2);padding:0 0 0 12px">✕</button>
+    </div>
+    <div class="det-f">
+      <label>Conductor que inició</label>
+      <input id="detEditConductor" type="text" placeholder="Nombre del conductor" />
+    </div>
+    <div class="det-f" id="detFReemplazo" style="display:none">
+      <div class="det-f-check">
+        <input type="checkbox" id="detEditActFlota" />
+        <div>
+          <div><strong>No es reemplazo</strong> — actualizar titular en Flota</div>
+          <div class="det-f-hint" id="detFlotaHint"></div>
+        </div>
+      </div>
+    </div>
+    <div class="det-f">
+      <label>Comuna</label>
+      <input id="detEditComuna" type="text" placeholder="Comuna" />
+    </div>
+    <div class="det-f">
+      <label>Lugar de Atención</label>
+      <input id="detEditLugar" type="text" placeholder="Dirección o lugar" />
+    </div>
+    <div class="det-modal-btns">
+      <button class="det-btn-cancel" onclick="closeDetModal()">Cancelar</button>
+      <button class="det-btn-save" id="detBtnGuardar" onclick="guardarDetEdit()">Guardar</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

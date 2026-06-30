@@ -1,0 +1,25 @@
+# GAS / CLASP
+.clasp.json
+
+# Next.js / Node (archivos residuales)
+node_modules/
+.next/
+app/
+lib/
+package.json
+package-lock.json
+next.config.mjs
+jsconfig.json
+
+# Vercel output
+public/
+
+# Env y scripts locales
+.env
+.env.*
+.env.local
+comandos_clasp.txt
+deploy.bat
+
+# Claude
+.claude/

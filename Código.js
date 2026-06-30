@@ -1,0 +1,1603 @@
+﻿/**
+ * ON STREET — Apps Script v18
+ */
+// Proyecto conectado con VS Code mediante clasp
+
+const SHEETS = {
+  unificador:           '1IzNAVAWVB38YJ1Iy9ZLDhCAJ8xjIDlBbYXI7L9Nc3Sc',
+  supervisiones:        '1Ox_gLRbPqVxxuFt2b5lJ5lvPtrXhIy7RNSworQd8Kog',
+  bitacora:             '1juemCEa5J9oHyKEWbH0dui2OO6x3sk7qZINqOVedoic',
+  finalizados:          '1wNm1No20TkwfZKcC1JtpMdnJ-hA5raWT78C9-hc9C0Y',
+  gpsRealTime:          '1r5r9p2byBh15ovWwpgL75FTLUxD6Zlb-HmFtCqPhu3k',
+  informesGPS:          '1sbkeem-7PiPpfYsZByzosdrcacsdKQqSYbiQRKuRakY',
+  transformCalendarios: '1vtTdj3RSdTNhYPVlpuzQ5bY7_D3aMRFyTiQWlb2oMRI'
+};
+
+const SUPERVISIONES_TAB = 'Resumen Supervisiones 2026';
+const CACHE_DURATION_SECONDS = 300;
+const CACHE_GPS_SECONDS = 60;
+const CACHE_MAX_BYTES = 95000;
+const BITACORA_MONTHS_BACK = 12;
+const FINALIZADOS_DAYS_BACK = 30;
+const KM_DAYS_BACK = 31;
+
+function doGet(e) {
+  const params = (e && e.parameter) ? e.parameter : {};
+  const source = params.source || null;
+  const callback = params.callback || null;
+
+  // Manifest para PWA / Add to Home Screen
+  if (source === 'manifest') {
+    const url = ScriptApp.getService().getUrl();
+    const iconSvg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='114' fill='%23185FA5'/%3E%3Ctext x='256' y='338' font-family='system-ui%2C-apple-system%2Csans-serif' font-size='224' font-weight='700' fill='white' text-anchor='middle'%3EOS%3C/text%3E%3C/svg%3E";
+    const manifest = {
+      name: 'Dashboard On Street',
+      short_name: 'Dashboard OS',
+      description: 'Operación · Bitácora · Supervisiones · Kilómetros',
+      start_url: url,
+      id: url,
+      scope: url,
+      display: 'standalone',
+      orientation: 'portrait-primary',
+      background_color: '#f7f6f2',
+      theme_color: '#185FA5',
+      icons: [
+        { src: iconSvg, sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+        { src: iconSvg, sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' }
+      ]
+    };
+    return ContentService
+      .createTextOutput(JSON.stringify(manifest))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // Si NO viene source, muestra el dashboard visual
+  if (!source) {
+    return HtmlService
+      .createHtmlOutputFromFile('Index')
+      .setTitle('Dashboard On Street')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+
+  let result;
+
+  const fechaParam = params.fecha || null;
+  const fechaSuffix = fechaParam ? fechaParam : 'today';
+
+  try {
+    if (source === 'ping') {
+      result = {
+        ok: true,
+        message: 'Apps Script v17 funcionando',
+        time: new Date().toISOString(),
+        user: Session.getActiveUser().getEmail() || '(sin email)'
+      };
+
+    } else if (source === 'all') {
+      function safeRead(fn, fallback) {
+        try { return fn(); } catch (e) { return fallback !== undefined ? fallback : { error: e.toString() }; }
+      }
+      const flotaInfo = safeRead(function() { return getCached('flota', readFlota, CACHE_DURATION_SECONDS); }, { flota: [], jefePorMovil: {}, jefePorNombre: {}, kams: [] });
+
+      result = {
+        unificador: safeRead(function() { return getCached('unificador_' + fechaSuffix, function() { return readUnificador(flotaInfo, fechaParam); }, CACHE_DURATION_SECONDS); }, null),
+        gps:        safeRead(function() { return getCached('gps', function() { return readGPS(flotaInfo); }, CACHE_GPS_SECONDS); }, null),
+        historico:  safeRead(function() { return getCached('historico_' + fechaSuffix, function() { return readFinalizados(fechaParam); }, CACHE_DURATION_SECONDS); }, null),
+        supervisiones: safeRead(function() { return getCached('supervisiones', function() { return readSupervisiones(flotaInfo); }, CACHE_DURATION_SECONDS); }, null),
+        bitacora:   safeRead(function() { return getCached('bitacora_' + fechaSuffix, function() { return readBitacora(fechaParam); }, CACHE_DURATION_SECONDS); }, null),
+        // kilómetros se carga bajo demanda vía source=kilometros para no ralentizar la carga inicial
+        kams: flotaInfo.kams || [],
+        fechaConsultada: fechaParam || formatDateISO(new Date()),
+        lastUpdated: new Date().toISOString()
+      };
+
+    } else if (source === 'unificador') {
+      result = {
+        unificador: getCached(
+          'unificador_' + fechaSuffix,
+          function () {
+            return readUnificador(
+              getCached('flota', readFlota, CACHE_DURATION_SECONDS),
+              fechaParam
+            );
+          },
+          CACHE_DURATION_SECONDS
+        ),
+        lastUpdated: new Date().toISOString()
+      };
+
+    } else if (source === 'gps') {
+      result = {
+        gps: getCached(
+          'gps',
+          function () {
+            return readGPS(getCached('flota', readFlota, CACHE_DURATION_SECONDS));
+          },
+          CACHE_GPS_SECONDS
+        ),
+        lastUpdated: new Date().toISOString()
+      };
+
+    } else if (source === 'historico') {
+      result = {
+        historico: getCached(
+          'historico_' + fechaSuffix,
+          function () { return readFinalizados(fechaParam); },
+          CACHE_DURATION_SECONDS
+        ),
+        lastUpdated: new Date().toISOString()
+      };
+
+    } else if (source === 'supervisiones') {
+      result = {
+        supervisiones: getCached(
+          'supervisiones',
+          function () {
+            return readSupervisiones(
+              getCached('flota', readFlota, CACHE_DURATION_SECONDS)
+            );
+          },
+          CACHE_DURATION_SECONDS
+        ),
+        lastUpdated: new Date().toISOString()
+      };
+
+    } else if (source === 'bitacora') {
+      result = {
+        bitacora: getCached(
+          'bitacora_' + fechaSuffix,
+          function () { return readBitacora(fechaParam); },
+          CACHE_DURATION_SECONDS
+        ),
+        lastUpdated: new Date().toISOString()
+      };
+
+    } else if (source === 'kilometros') {
+      result = {
+        kilometros: getCached(
+          'kilometros',
+          function () {
+            return readKilometros(
+              getCached('flota', readFlota, CACHE_DURATION_SECONDS)
+            );
+          },
+          CACHE_DURATION_SECONDS
+        ),
+        lastUpdated: new Date().toISOString()
+      };
+
+    } else {
+      result = { error: 'source no reconocido' };
+    }
+
+  } catch (err) {
+    result = {
+      error: err.toString(),
+      stack: (err.stack || '').slice(0, 800)
+    };
+  }
+
+  return respond(result, callback);
+}
+
+// Callable desde el HTML via google.script.run.getDashboardData(params)
+function getDashboardData(params) {
+  const fechaParam = (params && params.fecha) || null;
+  const fechaSuffix = fechaParam || 'today';
+  function safeRead(fn, fallback) {
+    try { return fn(); } catch (e) { return (fallback !== undefined) ? fallback : { error: e.toString() }; }
+  }
+  const flotaInfo = safeRead(function() { return getCached('flota', readFlota, CACHE_DURATION_SECONDS); }, { flota: [], jefePorMovil: {}, jefePorNombre: {}, kams: [] });
+  return {
+    unificador:   safeRead(function() { return getCached('unificador_'   + fechaSuffix, function() { return readUnificador(flotaInfo, fechaParam); },   CACHE_DURATION_SECONDS); }, null),
+    gps:          safeRead(function() { return getCached('gps',                          function() { return readGPS(flotaInfo); },                      CACHE_GPS_SECONDS); },     null),
+    historico:    safeRead(function() { return getCached('historico_'    + fechaSuffix, function() { return readFinalizados(fechaParam); },              CACHE_DURATION_SECONDS); }, null),
+    supervisiones:safeRead(function() { return getCached('supervisiones',               function() { return readSupervisiones(flotaInfo); },             CACHE_DURATION_SECONDS); }, null),
+    bitacora:     safeRead(function() { return getCached('bitacora_'     + fechaSuffix, function() { return readBitacora(fechaParam); },                 CACHE_DURATION_SECONDS); }, null),
+    kams: flotaInfo.kams || [],
+    fechaConsultada: fechaParam || formatDateISO(new Date()),
+    lastUpdated: new Date().toISOString()
+  };
+}
+
+// Callable desde el HTML via google.script.run.getKilometrosData()
+function getKilometrosData() {
+  function safeRead(fn) { try { return fn(); } catch (e) { return { error: e.toString() }; } }
+  const flotaInfo = safeRead(function() { return getCached('flota', readFlota, CACHE_DURATION_SECONDS); });
+  return {
+    kilometros: safeRead(function() { return getCached('kilometros', function() { return readKilometros(flotaInfo); }, CACHE_DURATION_SECONDS); })
+  };
+}
+
+function respond(obj, callback) {
+  const json = JSON.stringify(obj);
+  if (callback && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(callback)) {
+    return ContentService.createTextOutput(callback + '(' + json + ');').setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+}
+
+function getCached(key, fn, durationSec) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'os_v18_' + key;
+  const cached = cache.get(cacheKey);
+  if (cached) { try { return JSON.parse(cached); } catch (e) {} }
+  const data = fn();
+  const json = JSON.stringify(data);
+  if (json.length < CACHE_MAX_BYTES) {
+    try { cache.put(cacheKey, json, durationSec || CACHE_DURATION_SECONDS); } catch (e) {}
+  }
+  return data;
+}
+
+// Normaliza un string: lowercase, sin tildes, sin paréntesis, espacios colapsados
+function normalize_(s) {
+  if (!s) return '';
+  return String(s)
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\(\)]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// ============================================================================
+// LECTOR: FLOTA
+// ============================================================================
+function readFlota() {
+  const ss = SpreadsheetApp.openById(SHEETS.unificador);
+  const sheet = ss.getSheetByName('Flota');
+  if (!sheet) throw new Error('Pestaña "Flota" no encontrada');
+
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return { flota: [], jefePorMovil: {}, jefePorNombre: {} };
+
+  // Lookup case-insensitive + sin tildes para mayor robustez
+  const headers = values[0].map(h => String(h || '').trim());
+  const headersN = headers.map(h => normalize_(h));
+  function col(names) {
+    for (let i = 0; i < names.length; i++) {
+      const idx = headersN.indexOf(normalize_(names[i]));
+      if (idx >= 0) return idx;
+    }
+    return -1;
+  }
+  const fIdx = {
+    cliente:       col(['Cliente', 'CLIENTE']),
+    movil:         col(['Móvil', 'MÓVIL', 'Movil', 'MOVIL']),
+    conductor:     col(['Conductor', 'CONDUCTOR', 'Nombre Conductor']),
+    kam:           col(['KAM', 'Kam', 'Jefe Operaciones']),
+    sucursal:      col(['Sucursal', 'SUCURSAL']),
+    movilCompleto: col(['Movil', 'Nombre Móvil', 'Nombre Movil'])
+  };
+
+  if (fIdx.cliente === -1 || fIdx.movil === -1) throw new Error('Columnas Cliente/Móvil no encontradas en Flota. Headers: ' + headers.slice(0, 10).join(', '));
+
+  const flota = [];
+  const flotaSet = {};
+  const jefePorMovil = {};
+  const jefePorNombre = {};
+
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const cliente = String(row[fIdx.cliente] || '').trim();
+    const movil = String(row[fIdx.movil] || '').trim();
+    if (!cliente || !movil) continue;
+
+    const key = (cliente + '|' + movil).toLowerCase();
+    if (flotaSet[key]) continue;
+    flotaSet[key] = true;
+
+    const nombre = fIdx.movilCompleto >= 0
+      ? String(row[fIdx.movilCompleto] || (cliente + ' ' + movil)).trim()
+      : (cliente + ' ' + movil);
+    const kam = fIdx.kam >= 0 ? String(row[fIdx.kam] || '').trim() : '';
+
+    flota.push({
+      cliente: cliente, movil: movil, nombre: nombre,
+      conductor: fIdx.conductor >= 0 ? String(row[fIdx.conductor] || '').trim() : '',
+      kam: kam, jefeOperaciones: kam,
+      sucursal: fIdx.sucursal >= 0 ? String(row[fIdx.sucursal] || '').trim() : ''
+    });
+
+    jefePorMovil[key] = kam;
+    if (nombre) jefePorNombre[nombre.toLowerCase()] = kam;
+  }
+
+  // Lista única de KAMs (para el selector global del dashboard)
+  const kamsSet = {};
+  flota.forEach(function(f){ if(f.kam) kamsSet[f.kam] = true; });
+  const kams = Object.keys(kamsSet).sort();
+
+  return { flota: flota, jefePorMovil: jefePorMovil, jefePorNombre: jefePorNombre, kams: kams };
+}
+
+// ============================================================================
+// LECTOR: UNIFICADOR
+// ============================================================================
+function readUnificador(flotaInfo, fechaParam) {
+  const ss = SpreadsheetApp.openById(SHEETS.unificador);
+  flotaInfo = flotaInfo || readFlota();
+  const flota = flotaInfo.flota;
+
+  const targetDate = fechaParam ? parseFlexibleDate(fechaParam) : new Date();
+  if (!targetDate || isNaN(targetDate.getTime())) throw new Error('Fecha inválida: ' + fechaParam);
+  targetDate.setHours(0, 0, 0, 0);
+  const today = targetDate;
+
+  const inicios = readRouteEvents(ss, 'Inicio de Ruta', today, {
+    fecha: 'Fecha', cliente: 'Cliente', movil: 'Móvil',
+    conductor: 'Nombre Conductor', hora: 'Hora', comuna: 'Comuna',
+    comentario: 'Comentario', lugar: 'Lugar de Atención',
+    idItem: 'Id Item', otroConductor: 'Otro Conductor', reemplazaACol: 'Reemplaza a'
+  });
+
+  // ↓ Ahora también leemos "Hora" en términos para detectar orden cronológico
+  const terminos = readRouteEvents(ss, 'Termino de Ruta', today, {
+    fecha: 'Fecha', cliente: 'Cliente', movil: 'Móvil',
+    conductor: 'Nombre Conductor', hora: 'Hora', comentario: 'Comentario',
+    indicadores: 'Indicadores', comuna: 'Comuna'
+  });
+
+  // Agrupar por móvil (un móvil puede tener varios inicios y términos en el mismo día)
+  const iniciosPorMovil = {};
+  const terminosPorMovil = {};
+  inicios.forEach(function(e){
+    const k = normalize_(e.cliente) + '|' + normalize_(e.movil);
+    if (!iniciosPorMovil[k]) iniciosPorMovil[k] = [];
+    iniciosPorMovil[k].push(e);
+  });
+  terminos.forEach(function(e){
+    const k = normalize_(e.cliente) + '|' + normalize_(e.movil);
+    if (!terminosPorMovil[k]) terminosPorMovil[k] = [];
+    terminosPorMovil[k].push(e);
+  });
+  // Ordenar cronológicamente por hora dentro de cada móvil
+  function sortByHora(arr){ arr.sort(function(a, b){ return String(a.hora || '').localeCompare(String(b.hora || '')); }); }
+  Object.keys(iniciosPorMovil).forEach(function(k){ sortByHora(iniciosPorMovil[k]); });
+  Object.keys(terminosPorMovil).forEach(function(k){ sortByHora(terminosPorMovil[k]); });
+
+  const moviles = flota.map(function(f) {
+    const key = normalize_(f.cliente) + '|' + normalize_(f.movil);
+    const inisArr = iniciosPorMovil[key] || [];
+    const tersArr = terminosPorMovil[key] || [];
+    const cantInicios = inisArr.length;
+    const cantTerminos = tersArr.length;
+
+    // ─── Detectar conductor distinto al titular ───
+    const condTitular = normalize_(f.conductor || '');
+    const alertasInicio = inisArr.map(function(ini){
+      const cond = normalize_(ini.conductor || '');
+      const esReemplazo = condTitular && cond && cond !== condTitular;
+      // reemplazaA: usa "Reemplaza a" o "Otro Conductor" del sheet, sino infiere desde el titular
+      const reemplazaA = ini.reemplazaACol || ini.otroConductor || (esReemplazo ? (f.conductor || '') : '');
+      return {
+        hora: ini.hora || '',
+        conductor: ini.conductor || '',
+        esReemplazo: esReemplazo,
+        reemplazaA: reemplazaA,
+        movilReemplazado: '',
+        comuna: ini.comuna || '',
+        lugar: ini.lugar || '',
+        idItem: ini.idItem || '',
+        rowIdx: ini.rowIdx || 0,
+        _sheetRow: ini.rowIdx || 0
+      };
+    });
+    const tieneReemplazo = alertasInicio.some(function(a){ return a.esReemplazo; });
+
+    // ─── Detectar doble inicio sin término registrado ───
+    // Hay doble inicio cuando hay más rutas iniciadas que (términos + 1).
+    // Ejemplos: 2i/0t → sí | 2i/1t → no (una cerró, la otra activa) | 3i/1t → sí
+    const dobleInicioSinTermino = cantInicios > cantTerminos + 1;
+
+    // ─── Consolidar indicadores: sumar atenciones de TODOS los términos ───
+    let totalAtenciones = 0;
+    const breakdownAcc = {};
+    tersArr.forEach(function(ter){
+      const ind = parsearIndicadores_(ter.indicadores);
+      totalAtenciones += ind.total;
+      ind.breakdown.forEach(function(it){
+        breakdownAcc[it.key] = (breakdownAcc[it.key] || 0) + it.value;
+      });
+    });
+    const breakdown = Object.keys(breakdownAcc)
+      .map(function(k){ return { key: k, value: breakdownAcc[k] }; })
+      .sort(function(a, b){ return b.value - a.value; });
+
+    const conductorActual = cantInicios > 0 ? inisArr[cantInicios - 1].conductor :
+                            (cantTerminos > 0 ? tersArr[cantTerminos - 1].conductor : f.conductor);
+    const horaPrimerInicio = cantInicios > 0 ? inisArr[0].hora : '';
+    const comunaActual = cantInicios > 0 ? inisArr[cantInicios - 1].comuna :
+                        (cantTerminos > 0 ? tersArr[cantTerminos - 1].comuna : '');
+    const lugarActual = cantInicios > 0 ? inisArr[cantInicios - 1].lugar : '';
+
+    return {
+      cliente: f.cliente, movil: f.movil, nombre: f.nombre,
+      conductor: conductorActual,
+      conductorTitular: f.conductor || '',
+      hora: horaPrimerInicio,
+      comuna: comunaActual, lugar: lugarActual,
+      kam: f.kam, jefeOperaciones: f.jefeOperaciones, sucursal: f.sucursal,
+
+      // Backward compat (0/1)
+      inicio: cantInicios > 0 ? 1 : 0,
+      termino: cantTerminos > 0 ? 1 : 0,
+
+      // Contadores reales
+      cantInicios: cantInicios,
+      cantTerminos: cantTerminos,
+      rutasEnCurso: Math.max(0, cantInicios - cantTerminos),
+
+      // Alertas
+      alertasInicio: alertasInicio,
+      tieneReemplazo: tieneReemplazo,
+      dobleInicioSinTermino: dobleInicioSinTermino,
+      multiplesRutas: cantInicios > 1,
+
+      // Atenciones consolidadas
+      actividadTotal: totalAtenciones,
+      atenciones: totalAtenciones,
+      breakdown: breakdown,
+
+      indicadoresRaw: cantTerminos > 0 ? String(tersArr[cantTerminos - 1].indicadores || '').slice(0, 300) : '',
+      comentarioInicio: cantInicios > 0 ? String(inisArr[0].comentario || '').slice(0, 150) : '',
+      comentarioTermino: cantTerminos > 0 ? String(tersArr[cantTerminos - 1].comentario || '').slice(0, 150) : '',
+      lastInicioRowIdx: cantInicios > 0 ? (inisArr[cantInicios - 1].rowIdx || 0) : 0,
+      lastInicioIdItem: cantInicios > 0 ? (inisArr[cantInicios - 1].idItem || '') : '',
+      esMovilDeReemplazo: false,
+      _canEditFlota: !!(f.conductor)
+    };
+  });
+
+  // Detectar móviles de reemplazo: entradas en Inicio de Ruta que no matchearon ningún vehículo de Flota
+  const flotaKeys = new Set(moviles.map(function(m){ return (m.cliente + '|' + m.movil).toLowerCase(); }));
+  const movilesDeReemplazo = [];
+  Object.keys(iniciosPorMovil).forEach(function(k){
+    if (flotaKeys.has(k)) return;
+    const inisArr = iniciosPorMovil[k];
+    const tersArr = terminosPorMovil[k] || [];
+    const ini = inisArr[inisArr.length - 1];
+    const cantI = inisArr.length, cantT = tersArr.length;
+    movilesDeReemplazo.push({
+      cliente: ini.cliente, movil: ini.movil,
+      nombre: ini.cliente + ' ' + ini.movil,
+      conductor: ini.conductor || '',
+      conductorTitular: ini.otroConductor || '',
+      hora: ini.hora || '', comuna: ini.comuna || '', lugar: ini.lugar || '',
+      kam: '', sucursal: '', jefeOperaciones: '',
+      inicio: 1, termino: cantT > 0 ? 1 : 0,
+      cantInicios: cantI, cantTerminos: cantT,
+      rutasEnCurso: Math.max(0, cantI - cantT),
+      atenciones: 0, actividadTotal: 0, breakdown: [],
+      tieneReemplazo: false, esMovilDeReemplazo: true,
+      dobleInicioSinTermino: false, multiplesRutas: cantI > 1,
+      alertasInicio: inisArr.map(function(i){ return { hora: i.hora, conductor: i.conductor, esReemplazo: false, reemplazaA: '', _sheetRow: i.rowIdx || 0, rowIdx: i.rowIdx || 0 }; }),
+      lastInicioRowIdx: ini.rowIdx || 0, lastInicioIdItem: ini.idItem || '',
+      _canEditFlota: false
+    });
+  });
+
+  const totalInicios = inicios.length;
+  const totalTerminos = terminos.length;
+  const movilesConInicio = Object.keys(iniciosPorMovil).length;
+  const movilesConTermino = Object.keys(terminosPorMovil).length;
+  const movilesConDobles = moviles.filter(function(m){ return m.multiplesRutas; }).length;
+  const movilesConReemplazo = moviles.filter(function(m){ return m.tieneReemplazo; }).length;
+  const movilesConDobleInicioSinTermino = moviles.filter(function(m){ return m.dobleInicioSinTermino; }).length;
+  const totalActividad = moviles.reduce(function(s, m){ return s + (m.actividadTotal || 0); }, 0);
+
+  return {
+    moviles: moviles,
+    movilesDeReemplazo: movilesDeReemplazo,
+    fecha: formatDateDDMMYYYY(today),
+    stats: {
+      flotaTotal: flota.length,
+      iniciosHoy: totalInicios,
+      terminosHoy: totalTerminos,
+      movilesConInicio: movilesConInicio,
+      movilesConTermino: movilesConTermino,
+      movilesConDobles: movilesConDobles,
+      movilesConReemplazo: movilesConReemplazo,
+      movilesConDobleInicioSinTermino: movilesConDobleInicioSinTermino,
+      rutasEnCurso: Math.max(0, totalInicios - totalTerminos),
+      totalActividad: totalActividad,
+      totalAtenciones: totalActividad
+    }
+  };
+}
+
+// Parsea el campo Indicadores y devuelve {total, breakdown}.
+//
+// Acepta cualquiera de estos formatos por celda:
+//   - JSON estricto:                  {"Atenciones": 23, "Trámites": 5}
+//   - JSON-like sin comillas en keys: {Atenciones: 23, Trámites: 5}
+//   - JSON-like con keys vacías:      {"Total Afiliados Ejecutivo 1": 2, "Total Afiliados Ejecutivo 2": ,}
+//   - Texto plano:                    "Atenciones: 23, Trámites: 5"
+//   - Número directo
+//
+// Reglas:
+//   1. Solo cuenta pares "clave: número entero positivo o cero" (ignora vacíos, null, strings).
+//   2. Si existe un campo consolidador ("Total atenciones", "Total personas atendidas",
+//      "Total Pacientes Atendidos", "Total Atenciones") cuyo valor coincide aproximadamente
+//      con la suma del resto, usa ese como total y el resto como breakdown
+//      (evita doble conteo).
+//   3. Si no hay consolidador, suma todos los campos.
+//   4. breakdown es array de {key, value} solo con valores > 0, ordenado desc.
+function parsearIndicadores_(v) {
+  if (v === null || v === undefined || v === '') return { total: 0, breakdown: [] };
+  if (typeof v === 'number') return { total: Math.max(0, Math.floor(v)), breakdown: [] };
+  const s = String(v).trim();
+  if (!s) return { total: 0, breakdown: [] };
+  if (/^\d+$/.test(s)) return { total: parseInt(s, 10), breakdown: [] };
+
+  // Regex tolerante: captura "key": número  o  key: número
+  // Permite letras, dígitos, espacios, paréntesis, guiones, puntos, %, <, >, /, & en el nombre.
+  const re = /["']?([A-Za-z0-9ÁÉÍÓÚáéíóúÑñ\u00C0-\u017F\(\)\-\.\s<>%\/&]+?)["']?\s*:\s*([0-9]+)(?=\s*[,\}\n\r]|\s*$)/g;
+  const items = [];
+  let m;
+  while ((m = re.exec(s)) !== null) {
+    const key = m[1].trim().replace(/^["']|["']$/g, '');
+    const val = parseInt(m[2], 10);
+    if (!isNaN(val) && val > 0 && key) {
+      items.push({ key: key, value: val });
+    }
+  }
+  if (items.length === 0) return { total: 0, breakdown: [] };
+
+  // Detectar consolidador
+  const CONSOLIDATORS = [
+    'total atenciones', 'total personas atendidas',
+    'total pacientes atendidos', 'total pacientes con necesidad de derivacion a especialista'
+  ];
+  let consolidadorIdx = -1;
+  for (let i = 0; i < items.length; i++) {
+    if (CONSOLIDATORS.indexOf(normalize_(items[i].key)) >= 0) {
+      consolidadorIdx = i;
+      break;
+    }
+  }
+
+  let total, breakdown;
+  if (consolidadorIdx >= 0) {
+    const cons = items[consolidadorIdx];
+    // Verificar que el consolidador no sea sospechoso: si la suma del resto es
+    // 0 (no hay desglose), igual usar el consolidador como total.
+    const otros = items.filter(function(_, i){ return i !== consolidadorIdx; });
+    const sumaOtros = otros.reduce(function(a, b){ return a + b.value; }, 0);
+    // Si la suma del resto es muy distinta al consolidador (>2x o <0.5x), preferir la suma.
+    // Esto cubre casos raros donde "Total atenciones" no calza con el detalle.
+    if (sumaOtros > 0 && (sumaOtros > cons.value * 2 || sumaOtros < cons.value * 0.5)) {
+      total = sumaOtros;
+      breakdown = otros.slice().sort(function(a, b){ return b.value - a.value; });
+    } else {
+      total = cons.value;
+      breakdown = otros.sort(function(a, b){ return b.value - a.value; });
+    }
+  } else {
+    total = items.reduce(function(a, b){ return a + b.value; }, 0);
+    breakdown = items.slice().sort(function(a, b){ return b.value - a.value; });
+  }
+  return { total: total, breakdown: breakdown };
+}
+
+function readRouteEvents(ss, sheetName, targetDate, colMap) {
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) throw new Error('Pestaña "' + sheetName + '" no encontrada');
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+
+  const values = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
+  const headers = values[0].map(h => String(h || '').trim());
+  const idx = {};
+  Object.keys(colMap).forEach(field => { idx[field] = headers.indexOf(colMap[field]); });
+
+  if (idx.fecha === -1) throw new Error('Columna "' + colMap.fecha + '" no encontrada en ' + sheetName);
+
+  const targetDay = formatDateISO(targetDate);
+  const eventos = [];
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const fechaRaw = row[idx.fecha];
+    if (!fechaRaw) continue;
+    const fecha = parseFlexibleDate(fechaRaw);
+    if (!fecha || isNaN(fecha.getTime())) continue;
+    if (formatDateISO(fecha) !== targetDay) continue;
+
+    const evt = { fecha: targetDay, rowIdx: i + 1 };
+    Object.keys(idx).forEach(field => {
+      if (field === 'fecha') return;
+      if (idx[field] >= 0) {
+        const v = row[idx[field]];
+        if (field === 'hora') evt[field] = formatTime(v);
+        else evt[field] = String(v || '').trim();
+      }
+    });
+    eventos.push(evt);
+  }
+  return eventos;
+}
+
+// ============================================================================
+// LECTOR: GPS
+// ============================================================================
+// LECTOR: GPS — hoja Base de Informes GPS
+// ============================================================================
+
+// Fingerprint de palabras: normaliza, quita "movil", reemplaza separadores,
+// ordena palabras → resultado comparable sin importar orden ni acentos.
+// Ejemplos:
+//   "Caja 18 Móvil Osorno"        → "18|caja|osorno"
+//   "Caja 18 Osorno"              → "18|caja|osorno"   (mismo fp)
+//   "Clínica Dental 1 - Lampa"    → "1|clinica|dental|lampa"
+//   "Lampa Clínica Dental 1"      → "1|clinica|dental|lampa"   (mismo fp)
+function fingerprintGPS_(s) {
+  return normalize_(s)
+    .replace(/\bmovil\b/g, '')
+    .replace(/[\/\-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(function(w) { return w.length > 1; })
+    .sort()
+    .join('|');
+}
+
+function readGPS(flotaInfo) {
+  flotaInfo = flotaInfo || readFlota();
+
+  // Doble índice de Flota:
+  //   flotaByFP      → fingerprint(cliente + movil) → entrada de flota
+  //   flotaByMovilFP → fingerprint(movil)            → entrada de flota (fallback)
+  const flotaByFP = {}, flotaByMovilFP = {};
+  (flotaInfo.flota || []).forEach(function(f) {
+    const fp  = fingerprintGPS_(f.cliente + ' ' + f.movil);
+    const fpM = fingerprintGPS_(f.movil);
+    if (!flotaByFP[fp])      flotaByFP[fp]      = f;
+    if (!flotaByMovilFP[fpM]) flotaByMovilFP[fpM] = f;
+  });
+
+  const ss = SpreadsheetApp.openById(SHEETS.informesGPS);
+  const sheet = ss.getSheetByName('Base');
+  if (!sheet) return { rutas: [], fecha: formatDateISO(new Date()), stats: { total: 0, conAtraso: 0, enHorario: 0, sinMovimiento: 0, alejandose: 0 } };
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { rutas: [], fecha: formatDateISO(new Date()), stats: { total: 0, conAtraso: 0, enHorario: 0, sinMovimiento: 0, alejandose: 0 } };
+
+  const values = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
+  const headers = values[0].map(function(h) { return String(h || '').trim(); });
+
+  const idx = {
+    agrupacion: headers.indexOf('Agrupación'),
+    comienzo:   headers.indexOf('Comienzo'),
+    fin:        headers.indexOf('Fin'),
+    posFinal:   headers.indexOf('Posición final'),
+    coordInic:  headers.indexOf('Coordenadas iniciales'),
+    coordFin:   headers.indexOf('Coordenadas finales')
+  };
+  if (idx.agrupacion === -1) throw new Error('Falta columna "Agrupación" en hoja Base de Informes GPS');
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = formatDateISO(today);
+
+  // Recolectar TODOS los viajes de hoy por Agrupación (de abajo a arriba = más reciente primero)
+  const todasPorAgr = {}; // agr → [row más reciente, row anterior, ...]
+  for (var i = lastRow - 1; i >= 1; i--) {
+    const row = values[i];
+    const agr = String(row[idx.agrupacion] || '').trim();
+    if (!agr) continue;
+    // Usar Comienzo o Fin para verificar la fecha
+    const fechaRef = row[idx.comienzo] || row[idx.fin];
+    if (!fechaRef) continue;
+    const fecha = parseFlexibleDate(fechaRef);
+    if (!fecha || formatDateISO(fecha) !== todayStr) continue;
+    if (!todasPorAgr[agr]) todasPorAgr[agr] = [];
+    todasPorAgr[agr].push(row);
+  }
+
+  const rutas = [];
+  for (var agr in todasPorAgr) {
+    const entries = todasPorAgr[agr]; // índice 0 = más reciente
+    const row = entries[0]; // usar el viaje más reciente para posición/hora
+
+    // dobleInicioSinTermino se determina desde readUnificador (hojas "Inicio de Ruta" / "Termino de Ruta")
+    // No se infiere desde la hoja Base del GPS.
+
+    // Limpiar Agrupación: quitar patente final (" - AB-1234" o " - AB1234")
+    // y reemplazar guiones internos por espacios para el fingerprint
+    const agrSinPatente = agr.replace(/\s*-\s*[A-Z]{2,4}[-]?\d{2,4}\s*$/, '');
+    const fp = fingerprintGPS_(agrSinPatente);
+
+    // Buscar en Flota: primero por (cliente+movil), luego solo por movil
+    const flotaEntry = flotaByFP[fp] || flotaByMovilFP[fp];
+
+    const cliente = flotaEntry ? flotaEntry.cliente : '';
+    const movil   = flotaEntry ? flotaEntry.movil   : agrSinPatente.replace(/-/g, ' ').trim();
+    const nombre  = (cliente + ' ' + movil).trim() || agr;
+    const kam     = flotaEntry ? (flotaEntry.kam || '') : '';
+
+    const coordFin  = idx.coordFin  >= 0 ? parseLatLng(row[idx.coordFin])  : null;
+    const coordInic = idx.coordInic >= 0 ? parseLatLng(row[idx.coordInic]) : null;
+    const posicion  = coordFin || coordInic;
+    const horaFin   = idx.fin >= 0 ? formatTime(row[idx.fin]) : '';
+    const posDesc   = idx.posFinal >= 0 ? String(row[idx.posFinal] || '').trim() : '';
+
+    rutas.push({
+      nombre: nombre, cliente: cliente, movil: movil,
+      jefeOperaciones: kam,
+      posicionReal: posicion,
+      puntoPlanificado: null,
+      tipoAlerta: posicion ? 'Con GPS' : 'Sin datos',
+      sinMovimiento: false, alejandose: false,
+      distanciaMetros: null, atrasoMinutos: null,
+      horaUltimo: horaFin,
+      posicionDescripcion: posDesc
+    });
+  }
+
+  // Fusionar alertas del spreadsheet Tiempo Real
+  try {
+    const alertMap = readGPSAlertas_();
+    rutas.forEach(function(r) {
+      const fp = fingerprintGPS_(r.nombre);
+      const a = alertMap[fp];
+      if (a) {
+        r.tipoAlerta       = a.tipoAlerta;
+        r.sinMovimiento    = a.sinMovimiento;
+        r.alejandose       = a.alejandose;
+        r.distanciaMetros  = a.distanciaMetros;
+        r.puntoPlanificado = a.puntoPlanificado;
+        r.atrasoMinutos    = a.atrasoMinutos;
+      }
+    });
+  } catch (e) { /* alertas opcionales, no bloquear */ }
+
+  return {
+    rutas: rutas, fecha: todayStr,
+    stats: {
+      total:         rutas.length,
+      conAtraso:     rutas.filter(function(r){ return r.tipoAlerta === 'Atraso'; }).length,
+      enHorario:     rutas.filter(function(r){ return r.tipoAlerta === 'En horario'; }).length,
+      sinMovimiento: rutas.filter(function(r){ return r.sinMovimiento; }).length,
+      alejandose:    rutas.filter(function(r){ return r.alejandose; }).length
+    }
+  };
+}
+
+// Lee alertas del spreadsheet GPS Tiempo Real (Calendario diario)
+function readGPSAlertas_() {
+  const ss = SpreadsheetApp.openById(SHEETS.gpsRealTime);
+  const sheet = ss.getSheetByName('Calendario diario') || ss.getSheets()[0];
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return {};
+
+  const values = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
+  const headers = values[0].map(function(h){ return String(h||'').trim(); });
+
+  const idx = {
+    movil:      headers.indexOf('Movil'),
+    fecha:      headers.indexOf('Fecha'),
+    estadoRuta: headers.indexOf('Estado de Ruta'),
+    punto1:     headers.indexOf('Punto de Atención'),
+    sinMov:     headers.indexOf('Alerta no Movimiento'),
+    dist1:      headers.indexOf('Distancia Punto de Atención 1'),
+    alej1:      headers.indexOf('Alerta Alejándose punto 1'),
+    dist2:      headers.indexOf('Distancia Punto de Atención 2'),
+    alej2:      headers.indexOf('Alerta Alejándose Punto 2')
+  };
+  if (idx.movil === -1 || idx.fecha === -1) return {};
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayStr = formatDateISO(today);
+  const alertMap = {};
+
+  for (var i = 1; i < values.length; i++) {
+    const row = values[i];
+    const fechaRaw = row[idx.fecha];
+    if (!fechaRaw) continue;
+    const fecha = parseFlexibleDate(fechaRaw);
+    if (!fecha || formatDateISO(fecha) !== todayStr) continue;
+
+    const movilStr = String(row[idx.movil]||'').trim();
+    if (!movilStr) continue;
+    const fp = fingerprintGPS_(movilStr);
+    if (alertMap[fp]) continue; // ya procesado
+
+    const estado = idx.estadoRuta >= 0 ? String(row[idx.estadoRuta]||'').trim() : '';
+    var tipoAlerta = 'Con GPS';
+    if (estado.indexOf('Atraso')     >= 0) tipoAlerta = 'Atraso';
+    else if (estado.indexOf('En horario') >= 0) tipoAlerta = 'En horario';
+
+    const sinMov = idx.sinMov >= 0 && String(row[idx.sinMov]||'').indexOf('✓') >= 0;
+    const alej1  = idx.alej1  >= 0 && String(row[idx.alej1] ||'').indexOf('✓') >= 0;
+    const alej2  = idx.alej2  >= 0 && String(row[idx.alej2] ||'').indexOf('✓') >= 0;
+    const dist1  = idx.dist1  >= 0 ? lastNumberGPS_(row[idx.dist1]) : null;
+    const dist2  = idx.dist2  >= 0 ? lastNumberGPS_(row[idx.dist2]) : null;
+    const punto  = idx.punto1 >= 0 ? parseLatLng(row[idx.punto1]) : null;
+    const tGPS   = calcularTiempoGPS_(row, idx, estado, dist1, dist2, alej1, alej2);
+
+    alertMap[fp] = {
+      tipoAlerta:       tipoAlerta,
+      sinMovimiento:    sinMov,
+      alejandose:       alej1 || alej2,
+      distanciaMetros:  dist1 !== null ? dist1 : dist2,
+      puntoPlanificado: punto,
+      atrasoMinutos:    tGPS.atrasoMinutos
+    };
+  }
+  return alertMap;
+}
+
+function timeToMinutesGPS_(v) {
+  const t = formatTime(v); if (!t) return null;
+  const m = String(t).match(/^(\d{1,2}):(\d{2})/); if (!m) return null;
+  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+}
+function lastNumberGPS_(v) {
+  if (v === null || v === undefined || v === '') return null;
+  const nums = String(v).split(',').map(x => parseFloat(String(x).trim())).filter(n => !isNaN(n));
+  return nums.length ? nums[nums.length - 1] : null;
+}
+function extractMinutesGPS_(texto) {
+  if (!texto) return null;
+  const s = String(texto);
+  let m = s.match(/\((\d+)\s*min/i); if (m) return parseInt(m[1], 10);
+  m = s.match(/(\d+)\s*minutos/i); if (m) return parseInt(m[1], 10);
+  m = s.match(/(\d+)\s*min/i); if (m) return parseInt(m[1], 10);
+  return null;
+}
+function extractPuntoGPS_(texto) {
+  if (!texto) return null;
+  const m = String(texto).match(/Punto\s*(1|2)/i);
+  return m ? parseInt(m[1], 10) : null;
+}
+function calcularTiempoGPS_(row, idx, estado, dist1, dist2, alej1, alej2) {
+  const ahora = new Date();
+  const ahoraMin = ahora.getHours() * 60 + ahora.getMinutes();
+  const ini1 = idx.horaInicio1 >= 0 ? timeToMinutesGPS_(row[idx.horaInicio1]) : null;
+  const fin1 = idx.horaFin1 >= 0 ? timeToMinutesGPS_(row[idx.horaFin1]) : null;
+  const ini2 = idx.horaInicio2 >= 0 ? timeToMinutesGPS_(row[idx.horaInicio2]) : null;
+  const fin2 = idx.horaFin2 >= 0 ? timeToMinutesGPS_(row[idx.horaFin2]) : null;
+  const estadoTxt = String(estado || '');
+  const estadoLower = estadoTxt.toLowerCase();
+
+  let puntoActivo = extractPuntoGPS_(estadoTxt) || 1;
+  if (!extractPuntoGPS_(estadoTxt)) {
+    if (ini2 !== null && (ahoraMin >= ini2 || (fin1 !== null && ahoraMin > fin1))) puntoActivo = 2;
+  }
+  const iniActivo = puntoActivo === 2 ? ini2 : ini1;
+  const finActivo = puntoActivo === 2 ? fin2 : fin1;
+  const distActivo = puntoActivo === 2 ? dist2 : dist1;
+  const alejActivo = puntoActivo === 2 ? alej2 : alej1;
+
+  let atrasoMinutos = null, salidaAnticipadaMinutos = null;
+  if (estadoLower.indexOf('atraso') >= 0) {
+    atrasoMinutos = extractMinutesGPS_(estadoTxt);
+    if (atrasoMinutos === null && iniActivo !== null && ahoraMin > iniActivo) atrasoMinutos = ahoraMin - iniActivo;
+  }
+  if (estadoLower.indexOf('anticipado') >= 0 || estadoLower.indexOf('temprano') >= 0 || estadoLower.indexOf('salio antes') >= 0 || estadoLower.indexOf('salió antes') >= 0) {
+    salidaAnticipadaMinutos = extractMinutesGPS_(estadoTxt);
+  }
+  if (salidaAnticipadaMinutos === null && alejActivo && finActivo !== null && ahoraMin < finActivo && distActivo !== null && distActivo > 200) {
+    salidaAnticipadaMinutos = finActivo - ahoraMin;
+  }
+  return { puntoActivo: puntoActivo, atrasoMinutos: atrasoMinutos, salidaAnticipadaMinutos: salidaAnticipadaMinutos };
+}
+
+function parseLatLng(v) {
+  if (!v) return null;
+  const s = String(v).trim();
+  const m = s.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)/);
+  if (!m) return null;
+  const lat = parseFloat(m[1]); const lng = parseFloat(m[2]);
+  if (isNaN(lat) || isNaN(lng)) return null;
+  return [lat, lng];
+}
+
+function detectClienteFromMovil(nombreCompleto) {
+  const clientes = ['Habitat Móvil', 'La Araucana Móvil', 'Caja 18', 'CGE Móvil',
+    'Punto Caja Los Andes', 'Punto Caja los Andes', 'Fundación Acrux', 'Mutual',
+    'Minera Los Pelambres', 'Los Pelambres', 'Centinela', 'Lampa', 'Naranjo y Asociados'];
+  for (let i = 0; i < clientes.length; i++) {
+    if (nombreCompleto.indexOf(clientes[i]) === 0) return clientes[i];
+  }
+  return nombreCompleto.split(' ')[0];
+}
+
+// ============================================================================
+// LECTOR: FINALIZADOS
+// ============================================================================
+function readFinalizados(fechaFinParam) {
+  const ss = SpreadsheetApp.openById(SHEETS.finalizados);
+  const sheet = ss.getSheetByName('Finalizados') || ss.getSheets()[0];
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < 2) return { rutas: [], conteoPorDia: {}, conteoPorCliente: {}, totalRutas: 0, ventanaDias: FINALIZADOS_DAYS_BACK };
+
+  const values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+  const headers = values[0];
+  const idx = {};
+  headers.forEach((h, i) => { idx[String(h).trim()] = i; });
+
+  // Ventana: 30 días terminados en fechaFinParam (o en hoy si no viene).
+  const fechaFin = fechaFinParam ? parseFlexibleDate(fechaFinParam) : new Date();
+  if (!fechaFin || isNaN(fechaFin.getTime())) throw new Error('Fecha inválida en readFinalizados: ' + fechaFinParam);
+  fechaFin.setHours(23, 59, 59, 999);
+  const cutoff = new Date(fechaFin);
+  cutoff.setDate(cutoff.getDate() - FINALIZADOS_DAYS_BACK);
+  cutoff.setHours(0, 0, 0, 0);
+
+  const rutas = [];
+  const conteoPorDia = {};
+  const conteoPorCliente = {};
+
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const fechaRaw = row[idx['Fecha']];
+    if (!fechaRaw) continue;
+    const fecha = parseFlexibleDate(fechaRaw);
+    if (!fecha || isNaN(fecha.getTime())) continue;
+    if (fecha < cutoff || fecha > fechaFin) continue;
+
+    const fechaISO = formatDateISO(fecha);
+    const cliente = String(row[idx['Cliente']] || '').trim();
+    const movil = String(row[idx['Notacion']] || '').trim();
+
+    rutas.push({
+      id: String(row[idx['ID']] || '').slice(0, 12),
+      fecha: fechaISO, cliente: cliente, movil: movil,
+      conductor: String(row[idx['Conductor']] || '').trim().slice(0, 60),
+      region: String(row[idx['Region']] || '').trim(),
+      comuna: String(row[idx['Comuna']] || '').trim(),
+      lugar: String(row[idx['Lugar de Atencion']] || '').trim().slice(0, 80),
+      horaInicio: formatTime(row[idx['Hora Inicio']]),
+      horaTermino: formatTime(row[idx['Hora Termino']])
+    });
+    conteoPorDia[fechaISO] = (conteoPorDia[fechaISO] || 0) + 1;
+    if (cliente) conteoPorCliente[cliente] = (conteoPorCliente[cliente] || 0) + 1;
+  }
+  rutas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+  return { rutas: rutas.slice(0, 500), conteoPorDia: conteoPorDia, conteoPorCliente: conteoPorCliente, totalRutas: rutas.length, ventanaDias: FINALIZADOS_DAYS_BACK, desde: formatDateISO(cutoff), hasta: formatDateISO(fechaFin) };
+}
+
+// ============================================================================
+// LECTOR: SUPERVISIONES — v14
+//   Match por columnas "Concat" y "Cliente" del Sheet (verdad explícita).
+//   Fallback: estrategias antiguas (propagación de logos + normalización).
+// ============================================================================
+function readSupervisiones(flotaInfo) {
+  const ss = SpreadsheetApp.openById(SHEETS.supervisiones);
+  const sheet = ss.getSheetByName(SUPERVISIONES_TAB);
+  if (!sheet) throw new Error('Pestaña "' + SUPERVISIONES_TAB + '" no encontrada');
+
+  flotaInfo = flotaInfo || readFlota();
+  const flota = flotaInfo.flota;
+
+  // Índices de Flota para match
+  const flotaPorClienteMovilExacto = {};
+  const flotaPorClienteMovilNorm = {};
+  const flotaPorNombre = {};
+  const flotaPorNombreNorm = {};
+  // Fingerprint de palabras para match parcial (ej. "Minera Los Pelambres" ↔ "Los Pelambres")
+  const flotaFPWords = []; // [{words: Set, f}]
+  function fpWords_(s) {
+    return new Set(normalize_(s).replace(/\bmovil\b/g,'').replace(/[\/\-]/g,' ')
+      .split(' ').filter(function(w){return w.length>1;}));
+  }
+  flota.forEach(f => {
+    flotaPorClienteMovilExacto[(f.cliente + '|' + f.movil).toLowerCase()] = f;
+    flotaPorClienteMovilNorm[normalize_(f.cliente + ' ' + f.movil)] = f;
+    // Siempre indexar por cliente+movil para subset matching
+    flotaFPWords.push({ words: fpWords_(f.cliente + ' ' + f.movil), f: f });
+    if (f.nombre && normalize_(f.nombre) !== normalize_(f.cliente + ' ' + f.movil)) {
+      flotaPorNombre[f.nombre.toLowerCase()] = f;
+      flotaPorNombreNorm[normalize_(f.nombre)] = f;
+      flotaFPWords.push({ words: fpWords_(f.nombre), f: f });
+    } else if (f.nombre) {
+      flotaPorNombre[f.nombre.toLowerCase()] = f;
+      flotaPorNombreNorm[normalize_(f.nombre)] = f;
+    }
+  });
+  // Subconjunto: todas las palabras de A están en B (o viceversa)
+  function subsetMatch_(concatStr) {
+    const cw = fpWords_(concatStr);
+    if (cw.size === 0) return null;
+    for (var i = 0; i < flotaFPWords.length; i++) {
+      const fw = flotaFPWords[i].words;
+      if (fw.size === 0) continue;
+      // Verificar si fw ⊆ cw o cw ⊆ fw
+      var fwInCw = true;
+      fw.forEach(function(w){ if (!cw.has(w)) fwInCw = false; });
+      if (fwInCw) return flotaFPWords[i].f;
+      var cwInFw = true;
+      cw.forEach(function(w){ if (!fw.has(w)) cwInFw = false; });
+      if (cwInFw) return flotaFPWords[i].f;
+    }
+    return null;
+  }
+
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) {
+    return { moviles: [], anio: '', stats: { flotaActiva: flota.length, cruzados: 0, sinCruce: flota.length } };
+  }
+
+  // ---- Detectar columnas por header ----
+  // Las primeras filas pueden ser de título. Buscamos la fila que tenga
+  // headers reconocibles ("Concat" o "Movil"/"Móvil" + "Cliente" + meses).
+  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const mesesNorm = meses.map(m => normalize_(m));
+
+  let headerRow = -1;
+  let idx = { concat: -1, cliente: -1, movil: -1, total: -1, mesesSup: -1, meta: -1, pctMovil: -1, meses: [] };
+
+  for (let r = 0; r < Math.min(values.length, 10); r++) {
+    const row = values[r].map(c => normalize_(c));
+    const concatI = row.indexOf('concat');
+    const clienteI = row.indexOf('cliente');
+    // contar cuántos meses aparecen en esa fila
+    let mesesFound = 0;
+    mesesNorm.forEach(mn => { if (row.indexOf(mn) >= 0) mesesFound++; });
+    if (concatI >= 0 && clienteI >= 0 && mesesFound >= 6) {
+      headerRow = r;
+      idx.concat = concatI;
+      idx.cliente = clienteI;
+      // Buscar índices de cada mes
+      idx.meses = mesesNorm.map(mn => row.indexOf(mn));
+      // móvil (columna del "código" o "nombre corto", opcional)
+      idx.movil = row.indexOf('movil');
+      if (idx.movil < 0) idx.movil = row.indexOf('móvil'.normalize('NFD').replace(/[\u0300-\u036f]/g,''));
+      // total / meses sup / meta / pct — substring match (headers pueden ser "Total Supervisiones", "Meta Anual", etc.)
+      const findSub_ = function(terms) {
+        for (var t = 0; t < terms.length; t++) {
+          var exact = row.indexOf(terms[t]);
+          if (exact >= 0) return exact;
+        }
+        for (var t = 0; t < terms.length; t++) {
+          for (var k = 0; k < row.length; k++) {
+            if (row[k].indexOf(terms[t]) >= 0) return k;
+          }
+        }
+        return -1;
+      };
+      idx.total    = findSub_(['total supervisiones', 'total']);
+      idx.mesesSup = findSub_(['meses supervisados', 'meses sup']);
+      idx.meta     = findSub_(['meta anual', 'meta']);
+      idx.pctMovil = findSub_(['% cumplimiento visita anual movil', '% movil', 'cumplimiento', 'porcentaje']);
+      break;
+    }
+  }
+
+  // Fallback al esquema "v13" (sin headers) si no encontramos headers
+  const usingHeaders = headerRow >= 0;
+  if (!usingHeaders) {
+    // Esquema legacy: col 0 = nombre completo, col 1 = cliente, col 3 = móvil,
+    // meses col 5..16, total 17, mesesSup 18, meta 19, pctMovil 20.
+    headerRow = 0;
+    idx.concat = 0;
+    idx.cliente = 1;
+    idx.movil = 3;
+    idx.meses = [];
+    for (let j = 0; j < 12; j++) idx.meses.push(5 + j);
+    idx.total = 17;
+    idx.mesesSup = 18;
+    idx.meta = 19;
+    idx.pctMovil = 20;
+  }
+
+  // ---- Leer filas de datos ----
+  const supPorFlotaKey = {};
+  const sinMatch = [];
+  let lastCliente = '';
+
+  for (let i = headerRow + 1; i < values.length; i++) {
+    const row = values[i];
+    const concat = idx.concat >= 0 ? String(row[idx.concat] || '').trim() : '';
+    let cliente = idx.cliente >= 0 ? String(row[idx.cliente] || '').trim() : '';
+    const movil = idx.movil >= 0 ? String(row[idx.movil] || '').trim() : '';
+
+    // Propagar cliente cuando viene vacío (caso logo)
+    if (!cliente && (concat || movil) && lastCliente) cliente = lastCliente;
+    else if (cliente) lastCliente = cliente;
+
+    // Necesitamos al menos un identificador
+    if (!concat && !movil) continue;
+    if (!cliente && !concat) continue;
+
+    // Construir el objeto de datos (meses + agregados)
+    const supMeses = {};
+    for (let j = 0; j < 12; j++) {
+      const col = idx.meses[j];
+      const v = (col >= 0 && col < row.length) ? row[col] : '';
+      supMeses[meses[j]] = (v === '' || v === null) ? 0 : (parseInt(v, 10) || 0);
+    }
+
+    const data = {
+      meses: supMeses,
+      total: idx.total >= 0 ? (parseInt(row[idx.total], 10) || 0) : 0,
+      mesesSup: idx.mesesSup >= 0 ? (parseInt(row[idx.mesesSup], 10) || 0) : 0,
+      meta: idx.meta >= 0 ? (parseFloat(row[idx.meta]) || 0) : 0,
+      pctMovil: idx.pctMovil >= 0 ? (parseFloat(row[idx.pctMovil]) || 0) : 0
+    };
+
+    // ---- MATCH ----
+    // Estrategia 1: por Concat → Flota.Movil (nombre completo)  ← match nuevo
+    // Estrategia 2: por Cliente + Movil (exacto)
+    // Estrategia 3: por Cliente + Movil (normalizado)
+    // Estrategia 4: por nombre normalizado (Concat normalizado vs Flota.Movil normalizado)
+    let f = null;
+
+    if (concat) {
+      f = flotaPorNombre[concat.toLowerCase()] || flotaPorNombreNorm[normalize_(concat)];
+    }
+    if (!f && cliente && movil) {
+      const k1 = (cliente + '|' + movil).toLowerCase();
+      f = flotaPorClienteMovilExacto[k1] || flotaPorClienteMovilNorm[normalize_(cliente + ' ' + movil)];
+    }
+    // Fallback: coincidencia por subconjunto de palabras (ej "Minera Los Pelambres Móvil" ↔ "Los Pelambres Móvil")
+    if (!f && concat) {
+      f = subsetMatch_(concat);
+    }
+    if (!f && cliente && movil) {
+      f = subsetMatch_(cliente + ' ' + movil);
+    }
+
+    if (f) {
+      supPorFlotaKey[(f.cliente + '|' + f.movil).toLowerCase()] = data;
+    } else {
+      sinMatch.push({ concat: concat, cliente: cliente, movil: movil });
+    }
+  }
+
+  // ---- Salida: una fila por móvil de la Flota ----
+  const moviles = flota.map(f => {
+    const key = (f.cliente + '|' + f.movil).toLowerCase();
+    const sup = supPorFlotaKey[key];
+    if (sup) {
+      return {
+        nombre: f.nombre, cliente: f.cliente, movil: f.movil,
+        meses: sup.meses, total: sup.total, mesesSup: sup.mesesSup,
+        meta: sup.meta, pctMovil: sup.pctMovil
+      };
+    }
+    const supMesesVacio = {};
+    meses.forEach(m => { supMesesVacio[m] = 0; });
+    return {
+      nombre: f.nombre, cliente: f.cliente, movil: f.movil,
+      meses: supMesesVacio, total: 0, mesesSup: 0, meta: 0, pctMovil: 0
+    };
+  });
+
+  return {
+    moviles: moviles,
+    anio: SUPERVISIONES_TAB.match(/\d{4}/) ? SUPERVISIONES_TAB.match(/\d{4}/)[0] : '',
+    stats: {
+      flotaActiva: flota.length,
+      cruzados: moviles.filter(m => m.total > 0 || m.meta > 0).length,
+      sinCruce: moviles.filter(m => m.total === 0 && m.meta === 0).length,
+      filasSupervisionesSinMatch: sinMatch.length,
+      modoHeaders: usingHeaders ? 'concat+cliente' : 'legacy-posicional'
+    }
+  };
+}
+
+// ============================================================================
+// LECTOR: BITÁCORA
+// ============================================================================
+function readBitacora(fechaFinParam) {
+  const ss = SpreadsheetApp.openById(SHEETS.bitacora);
+  const sheet = ss.getSheetByName('BBDD Bitácora') || ss.getSheets()[0];
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return { eventos: [], totalVentana: 0, desde: '', hasta: formatDateISO(new Date()), ventanaMeses: BITACORA_MONTHS_BACK };
+
+  const headers = values[0];
+  const idx = {};
+  headers.forEach((h, i) => { idx[String(h).trim()] = i; });
+
+  // Ventana: 12 meses terminados en fechaFinParam (o hoy)
+  const fechaFin = fechaFinParam ? parseFlexibleDate(fechaFinParam) : new Date();
+  if (!fechaFin || isNaN(fechaFin.getTime())) throw new Error('Fecha inválida en readBitacora: ' + fechaFinParam);
+  fechaFin.setHours(23, 59, 59, 999);
+  const cutoff = new Date(fechaFin);
+  cutoff.setMonth(cutoff.getMonth() - BITACORA_MONTHS_BACK);
+  cutoff.setHours(0, 0, 0, 0);
+
+  const eventos = [];
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const fechaRaw = row[idx['Fecha']];
+    if (!fechaRaw) continue;
+    const fecha = parseFlexibleDate(fechaRaw);
+    if (!fecha || isNaN(fecha.getTime())) continue;
+    if (fecha < cutoff || fecha > fechaFin) continue;
+
+    eventos.push({
+      fecha: formatDateISO(fecha),
+      mes: row[idx['Mes']] || (fecha.getMonth() + 1),
+      anio: row[idx['Año']] || fecha.getFullYear(),
+      cliente: String(row[idx['Cliente']] || '').trim(),
+      sucursal: String(row[idx['Sucursal']] || '').trim(),
+      conductor: String(row[idx['Conductor']] || '').trim().slice(0, 60),
+      tipo: String(row[idx['Tipo de Acontecimiento']] || '').trim(),
+      detalle: String(row[idx['Detalle Acontecimiento']] || '').trim().slice(0, 150),
+      kam: String(row[idx['KAM']] || '').trim()
+    });
+  }
+  eventos.sort((a, b) => b.fecha.localeCompare(a.fecha));
+  return { eventos: eventos.slice(0, 500), totalVentana: eventos.length, desde: formatDateISO(cutoff), hasta: formatDateISO(fechaFin), ventanaMeses: BITACORA_MONTHS_BACK };
+}
+
+// ============================================================================
+// ESCRITURA: INICIO DE RUTA / FLOTA
+// ============================================================================
+
+// Llamada desde el cliente con google.script.run — actualiza campos de un inicio de ruta
+function updateInicioRuta(rowIdx, conductor, comuna, lugar) {
+  if (!rowIdx || rowIdx < 2) throw new Error('rowIdx inválido: ' + rowIdx);
+  const ss = SpreadsheetApp.openById(SHEETS.unificador);
+  const sheet = ss.getSheetByName('Inicio de Ruta');
+  if (!sheet) throw new Error('Hoja "Inicio de Ruta" no encontrada');
+  const lastCol = sheet.getLastColumn();
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h){ return String(h || '').trim(); });
+  const updates = [];
+  if (conductor != null) { const c = headers.indexOf('Nombre Conductor'); if (c >= 0) updates.push([c + 1, conductor]); }
+  if (comuna   != null) { const c = headers.indexOf('Comuna');           if (c >= 0) updates.push([c + 1, comuna]); }
+  if (lugar    != null) { const c = headers.indexOf('Lugar de Atención');if (c >= 0) updates.push([c + 1, lugar]); }
+  updates.forEach(function(u){ sheet.getRange(rowIdx, u[0]).setValue(u[1]); });
+  clearWriteCaches_();
+  return { ok: true, rowIdx: rowIdx };
+}
+
+// Llamada desde el cliente — actualiza el conductor titular en la hoja Flota
+function updateFlotaConductor(cliente, movil, newConductor) {
+  const ss = SpreadsheetApp.openById(SHEETS.unificador);
+  const sheet = ss.getSheetByName('Flota');
+  if (!sheet) throw new Error('Hoja "Flota" no encontrada');
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map(function(h){ return String(h || '').trim(); });
+  const idxC = headers.indexOf('Cliente'), idxM = headers.indexOf('Móvil'), idxK = headers.indexOf('Conductor');
+  if (idxK < 0) throw new Error('Columna "Conductor" no encontrada en Flota');
+  const nc = normalize_(cliente), nm = normalize_(movil);
+  for (let i = 1; i < values.length; i++) {
+    if (normalize_(String(values[i][idxC] || '')) === nc && normalize_(String(values[i][idxM] || '')) === nm) {
+      sheet.getRange(i + 1, idxK + 1).setValue(newConductor);
+      clearWriteCaches_();
+      return { ok: true };
+    }
+  }
+  throw new Error('Móvil no encontrado en Flota: ' + cliente + ' / ' + movil);
+}
+
+function clearWriteCaches_() {
+  const cache = CacheService.getScriptCache();
+  const keys = [];
+  const today = formatDateISO(new Date());
+  ['v17', 'v18'].forEach(function(v){
+    ['flota', 'unificador', 'unificador_today', 'unificador_' + today].forEach(function(k){
+      keys.push('os_' + v + '_' + k);
+    });
+  });
+  cache.removeAll(keys);
+}
+
+// ============================================================================
+// LECTOR: KILÓMETROS (Informes GPS)
+// ============================================================================
+function readKilometros(flotaInfo) {
+  flotaInfo = flotaInfo || readFlota();
+  const flota = flotaInfo.flota;
+
+  const flotaPorNombre = {}, flotaPorNombreNorm = {};
+  flota.forEach(function(f) {
+    if (f.nombre) {
+      flotaPorNombre[f.nombre.toLowerCase()] = f;
+      flotaPorNombreNorm[normalize_(f.nombre)] = f;
+    }
+  });
+  const flotaSubstr = flota
+    .filter(function(f) { return f.cliente && f.movil; })
+    .map(function(f) { return { normCliente: normalize_(f.cliente), normMovil: normalize_(f.movil), item: f }; })
+    .filter(function(f) { return f.normCliente.length > 2 && f.normMovil.length > 2; });
+
+  const aliasMap = {
+    'habitat movil v cordillera':               'Habitat Móvil Quillota',
+    'habitat movil v costa':                    'Habitat Móvil 5ta Costa',
+    'cge movil rancagua':                       "CGE Móvil O'Higgins",
+    'la araucana movil agencia talca - curico': 'La Araucana Móvil Agencia Curicó',
+    'movil de reemplazo - jrwl-21':             'CGE Móvil RM',
+    'movil de reemplazo - jypx-20':             'CGE Móvil RM',
+  };
+
+  // Cargar aliases extras desde hoja "Alias Kilómetros" del Unificador (opcional)
+  try {
+    const ssUni = SpreadsheetApp.openById(SHEETS.unificador);
+    const aliasSheet = ssUni.getSheetByName('Alias Kilómetros');
+    if (aliasSheet) {
+      const aliasVals = aliasSheet.getDataRange().getValues();
+      for (let i = 1; i < aliasVals.length; i++) {
+        const gpsNom   = String(aliasVals[i][0] || '').trim();
+        const flotaNom = String(aliasVals[i][1] || '').trim();
+        if (gpsNom && flotaNom) aliasMap[normalize_(gpsNom)] = flotaNom;
+      }
+    }
+  } catch(e) { /* hoja no existe */ }
+
+  const ssGPS = SpreadsheetApp.openById(SHEETS.informesGPS);
+  const kmSheetData = findKmSheet_(ssGPS);
+  if (!kmSheetData) return buildEmptyKm_(flota);
+
+  const rawHeaders = kmSheetData.values[0];
+  let idxAgr = -1, idxCom = -1, idxKm = -1;
+  rawHeaders.forEach(function(h, i) {
+    const n = normalize_(String(h || ''));
+    if (n.indexOf('agrupacion') >= 0) idxAgr = i;
+    if (n === 'comienzo') idxCom = i;
+    if (n.indexOf('kilometr') >= 0) idxKm = i;
+  });
+  if (idxAgr < 0 || idxCom < 0 || idxKm < 0) return buildEmptyKm_(flota);
+
+  const now = new Date();
+  const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+  const todayISO = formatDateISO(todayStart);
+  const semStart = new Date(todayStart); semStart.setDate(semStart.getDate() - 6);
+  const mesStart = new Date(todayStart); mesStart.setDate(mesStart.getDate() - KM_DAYS_BACK);
+
+  const byKey = {}, sinMatch = {};
+  let filasProcesadas = 0, filasIgnoradas = 0;
+
+  for (let r = 1; r < kmSheetData.values.length; r++) {
+    const row = kmSheetData.values[r];
+    const agrupacion = String(row[idxAgr] || '').trim();
+    const comienzoRaw = row[idxCom];
+    const kmRaw = row[idxKm];
+
+    if (!agrupacion || !comienzoRaw || kmRaw === '' || kmRaw == null) { filasIgnoradas++; continue; }
+
+    const fecha = parseGPSDate_(comienzoRaw);
+    if (!fecha || isNaN(fecha.getTime()) || fecha < mesStart) { filasIgnoradas++; continue; }
+
+    const km = parseGPSKm_(kmRaw);
+    if (km === null || km < 0) { filasIgnoradas++; continue; }
+
+    filasProcesadas++;
+    const fechaISO = formatDateISO(fecha);
+    const esHoy = fechaISO === todayISO;
+    const esSem = fecha >= semStart;
+
+    const nombreSinPlaca = stripPlate_(agrupacion);
+    const nombreSinNum   = nombreSinPlaca.replace(/^\d+\s+/, '').trim();
+    const normAgr        = normalize_(nombreSinNum);
+
+    const aliasNombre = aliasMap[normAgr] || aliasMap[normalize_(nombreSinPlaca)] || aliasMap[normalize_(agrupacion)];
+
+    let flotaItem = (aliasNombre
+        ? (flotaPorNombre[aliasNombre.toLowerCase()] || flotaPorNombreNorm[normalize_(aliasNombre)])
+        : null)
+      || flotaPorNombre[nombreSinPlaca.toLowerCase()]
+      || flotaPorNombreNorm[normalize_(nombreSinPlaca)]
+      || flotaPorNombre[nombreSinNum.toLowerCase()]
+      || flotaPorNombreNorm[normAgr]
+      || flotaPorNombre[agrupacion.toLowerCase()]
+      || flotaPorNombreNorm[normalize_(agrupacion)];
+
+    if (!flotaItem) {
+      let match = null;
+      for (let fi = 0; fi < flotaSubstr.length; fi++) {
+        if (normAgr.indexOf(flotaSubstr[fi].normCliente) >= 0 && normAgr.indexOf(flotaSubstr[fi].normMovil) >= 0) {
+          match = flotaSubstr[fi]; break;
+        }
+      }
+      flotaItem = match ? match.item : null;
+    }
+
+    if (!flotaItem) {
+      flotaItem = flotaPorNombreNorm[normAgr + ' movil'] || null;
+    }
+
+    if (!flotaItem) {
+      const k = agrupacion.toLowerCase();
+      if (!sinMatch[k]) sinMatch[k] = { agrupacion: agrupacion, kmHoy: 0, kmMes: 0 };
+      sinMatch[k].kmMes += km;
+      if (esHoy) sinMatch[k].kmHoy += km;
+      continue;
+    }
+
+    const key = (flotaItem.cliente + '|' + flotaItem.movil).toLowerCase();
+    if (!byKey[key]) byKey[key] = { kmHoy: 0, kmSem: 0, kmMes: 0, dias: {} };
+    byKey[key].kmMes += km;
+    byKey[key].dias[fechaISO] = true;
+    if (esSem) byKey[key].kmSem += km;
+    if (esHoy) byKey[key].kmHoy += km;
+  }
+
+  let totHoy = 0, totSem = 0, totMes = 0, movsConKmHoy = 0;
+  const moviles = flota.map(function(f) {
+    const key = (f.cliente + '|' + f.movil).toLowerCase();
+    const d = byKey[key];
+    const kmHoy = d ? Math.round(d.kmHoy * 10) / 10 : 0;
+    const kmSem = d ? Math.round(d.kmSem * 10) / 10 : 0;
+    const kmMes = d ? Math.round(d.kmMes * 10) / 10 : 0;
+    const diasActivos = d ? Object.keys(d.dias).length : 0;
+    const promedioDiario = diasActivos > 0 ? Math.round(kmMes / diasActivos * 10) / 10 : 0;
+    totHoy += kmHoy; totSem += kmSem; totMes += kmMes;
+    if (kmHoy > 0) movsConKmHoy++;
+    return { nombre: f.nombre, movil: f.movil, cliente: f.cliente, kam: f.kam,
+             kmHoy: kmHoy, kmSem: kmSem, kmMes: kmMes,
+             diasActivos: diasActivos, promedioDiario: promedioDiario };
+  });
+
+  const sinArr = Object.values(sinMatch).sort(function(a, b) { return b.kmMes - a.kmMes; });
+
+  return {
+    totales: { hoy: Math.round(totHoy), semana: Math.round(totSem), mes: Math.round(totMes), movilesConKmHoy: movsConKmHoy },
+    moviles: moviles,
+    sinAsignar: {
+      hoy:  Math.round(sinArr.reduce(function(s, x) { return s + x.kmHoy; }, 0)),
+      mes:  Math.round(sinArr.reduce(function(s, x) { return s + x.kmMes; }, 0)),
+      cantidadAgrupaciones: sinArr.length,
+      topAgrupaciones: sinArr.slice(0, 20).map(function(x) { return { agrupacion: x.agrupacion, km: Math.round(x.kmMes) }; }),
+    },
+    stats: { filasProcesadas: filasProcesadas, filasIgnoradas: filasIgnoradas, cantSinMatch: sinArr.length },
+  };
+}
+
+function buildEmptyKm_(flota) {
+  return {
+    totales: { hoy: 0, semana: 0, mes: 0, movilesConKmHoy: 0 },
+    moviles: flota.map(function(f) {
+      return { nombre: f.nombre, movil: f.movil, cliente: f.cliente, kam: f.kam,
+               kmHoy: 0, kmSem: 0, kmMes: 0, diasActivos: 0, promedioDiario: 0 };
+    }),
+    sinAsignar: { hoy: 0, mes: 0, cantidadAgrupaciones: 0, topAgrupaciones: [] },
+    stats: { filasProcesadas: 0, filasIgnoradas: 0, cantSinMatch: 0 },
+  };
+}
+
+// Busca la hoja de km en el spreadsheet: tiene columnas 'Agrupación' y 'Kilometraje'
+function findKmSheet_(ss) {
+  // Intentar nombres conocidos primero (solo lee headers, más rápido)
+  const knownNames = ['Informes GPS', 'Kilómetros', 'KM', 'Km', 'GPS', 'Informe GPS'];
+  for (let i = 0; i < knownNames.length; i++) {
+    const sh = ss.getSheetByName(knownNames[i]);
+    if (!sh || sh.getLastColumn() < 2) continue;
+    const norm = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0]
+      .map(function(h) { return normalize_(String(h || '')); });
+    if (norm.some(function(h) { return h.indexOf('agrupacion') >= 0; }) &&
+        norm.some(function(h) { return h.indexOf('kilometr') >= 0; })) {
+      return { name: knownNames[i], values: sh.getDataRange().getValues() };
+    }
+  }
+  // Fallback: escanear todas las hojas revisando solo sus headers
+  const sheets = ss.getSheets();
+  for (let i = 0; i < sheets.length; i++) {
+    const sh = sheets[i];
+    if (sh.getLastColumn() < 2 || sh.getLastRow() < 2) continue;
+    const norm = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0]
+      .map(function(h) { return normalize_(String(h || '')); });
+    if (norm.some(function(h) { return h.indexOf('agrupacion') >= 0; }) &&
+        norm.some(function(h) { return h.indexOf('kilometr') >= 0; })) {
+      return { name: sh.getName(), values: sh.getDataRange().getValues() };
+    }
+  }
+  return null;
+}
+
+// Parsea fechas con formato "DD.MM.YYYY HH:MM:SS" (formato GPS) y también formatos flexibles
+function parseGPSDate_(v) {
+  if (!v) return null;
+  if (v instanceof Date) return v;
+  const s = String(v).trim();
+  const m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})/);
+  if (m) return new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]),
+                         parseInt(m[4]), parseInt(m[5]), parseInt(m[6]));
+  return parseFlexibleDate(v);
+}
+
+// Parsea kilómetros: acepta "123.4 km", "123,4" o número directo
+function parseGPSKm_(v) {
+  if (v === null || v === undefined || v === '') return null;
+  const s = String(v).trim();
+  const m = s.match(/^([\d]+\.?[\d]*)\s*km/i);
+  if (m) return parseFloat(m[1]);
+  const n = parseFloat(s.replace(',', '.'));
+  return isNaN(n) ? null : n;
+}
+
+// Elimina la placa patente del final del nombre GPS: "Habitat Móvil Quillota JTHB-59" → "Habitat Móvil Quillota"
+function stripPlate_(agrupacion) {
+  return String(agrupacion)
+    .replace(/\s+-\s*[A-Z]{4}-\d{2,3}$/i, '')
+    .replace(/\s+[A-Z]{4}-\d{2,3}$/i, '')
+    .trim();
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+function formatDateDDMMYYYY(d) {
+  return String(d.getDate()).padStart(2, '0') + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + d.getFullYear();
+}
+function formatDateISO(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function formatTime(v) {
+  if (!v) return '';
+  if (v instanceof Date) return String(v.getHours()).padStart(2, '0') + ':' + String(v.getMinutes()).padStart(2, '0');
+  const s = String(v);
+  const m = s.match(/^(\d{1,2}):(\d{2})/);
+  if (m) return m[1].padStart(2, '0') + ':' + m[2];
+  return s.slice(0, 5);
+}
+function parseFlexibleDate(v) {
+  if (!v) return null;
+  if (v instanceof Date) return v;
+  const s = String(v).trim();
+  // DD.MM.YYYY HH:MM:SS  (formato GPS europeo)
+  let m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (m) return new Date(parseInt(m[3],10), parseInt(m[2],10)-1, parseInt(m[1],10), parseInt(m[4]||0,10), parseInt(m[5]||0,10), parseInt(m[6]||0,10));
+  m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (m) return new Date(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10));
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// ============================================================================
+// FUNCIONES DE PRUEBA
+// ============================================================================
+function testAuthorization() {
+  Object.keys(SHEETS).forEach(k => {
+    const ss = SpreadsheetApp.openById(SHEETS[k]);
+    Logger.log('OK [' + k + ']: ' + ss.getName());
+  });
+}
+
+function clearCache() {
+  const cache = CacheService.getScriptCache();
+  const keys = [];
+
+  // Generar sufijos de fecha para los últimos 3 días + 'today'
+  const dateSuffixes = ['today'];
+  for (let d = 0; d <= 3; d++) {
+    const dt = new Date();
+    dt.setDate(dt.getDate() - d);
+    dateSuffixes.push(formatDateISO(dt));
+  }
+
+  const versions = ['v8','v9','v10','v11','v12','v13','v14','v15','v16','v17'];
+  const baseKeys = ['gps','supervisiones','flota','jefes'];
+  const dateKeys = ['unificador','historico','bitacora'];
+
+  versions.forEach(v => {
+    baseKeys.forEach(k => { keys.push('os_' + v + '_' + k); });
+    dateKeys.forEach(k => {
+      keys.push('os_' + v + '_' + k); // sin sufijo (por si acaso)
+      dateSuffixes.forEach(s => { keys.push('os_' + v + '_' + k + '_' + s); });
+    });
+  });
+
+  cache.removeAll(keys);
+  Logger.log('Cache limpiado: ' + keys.length + ' keys');
+}
+
+function debugSupervisiones() {
+  const flotaInfo = readFlota();
+  Logger.log('Flota: ' + flotaInfo.flota.length + ' móviles');
+
+  const sup = readSupervisiones(flotaInfo);
+  Logger.log('Stats: ' + JSON.stringify(sup.stats));
+
+  const sinCruce = sup.moviles.filter(m => m.total === 0 && m.meta === 0);
+  Logger.log('Sin cruce con Supervisiones (' + sinCruce.length + '):');
+  sinCruce.forEach(m => Logger.log('  - ' + m.cliente + ' / ' + m.movil + '  (' + m.nombre + ')'));
+
+  // Para diagnóstico: mostrar también filas del sheet que NO matchearon contra la flota
+  // (esto vive dentro de readSupervisiones; lo replicamos aquí sin re-leer)
+  const ss = SpreadsheetApp.openById(SHEETS.supervisiones);
+  const sheet = ss.getSheetByName(SUPERVISIONES_TAB);
+  const values = sheet.getDataRange().getValues();
+  Logger.log('Filas totales del sheet: ' + values.length);
+  Logger.log('Primera fila (headers): ' + JSON.stringify(values[0]));
+  if (values.length > 1) Logger.log('Segunda fila (datos): ' + JSON.stringify(values[1]));
+}

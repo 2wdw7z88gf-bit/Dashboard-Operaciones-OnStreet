@@ -1,0 +1,14 @@
+{
+  "buildCommand": "mkdir -p public && cp Index.html public/index.html",
+  "outputDirectory": "public",
+  "framework": null,
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Frame-Options", "value": "ALLOWALL" },
+        { "key": "Content-Security-Policy", "value": "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:;" }
+      ]
+    }
+  ]
+}
