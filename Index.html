@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=1280, initial-scale=1.0, user-scalable=yes">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -371,9 +371,6 @@ tr:hover td{background:var(--surface-2)}
   .topbar{position:sticky;top:0;z-index:50;background:var(--bg)}
   #bottom-nav{display:flex}
 }
-#pwa-banner{display:none;align-items:center;gap:10px;padding:12px 14px;margin-bottom:14px;background:var(--info-bg);color:var(--info-fg);border:0.5px solid var(--info-fg);border-radius:10px;font-size:14px;line-height:1.4}
-#pwa-banner b{font-weight:600}
-#pwa-banner .pwa-close{margin-left:auto;background:none;border:none;font-size:20px;color:var(--info-fg);cursor:pointer;padding:0 4px;line-height:1;font-family:inherit}
 #offline-banner{display:none;align-items:center;gap:10px;padding:12px 14px;margin-bottom:14px;background:var(--danger-bg);color:var(--danger-fg);border:0.5px solid var(--danger-fg);border-radius:10px;font-size:14px}
 
 /* ─── CLASE is-mobile (JS la agrega) — resiste modo escritorio ─── */
@@ -454,12 +451,6 @@ tr:hover td{background:var(--surface-2)}
     </div>
   </div>
 
-  <!-- BANNER PWA -->
-  <div id="pwa-banner">
-    <span>📱</span>
-    <span id="pwa-banner-txt"></span>
-    <button class="pwa-close" onclick="document.getElementById('pwa-banner').style.display='none';localStorage.setItem('pwaDismissed','1')">×</button>
-  </div>
 
   <!-- BANNER OFFLINE -->
   <div id="offline-banner">
@@ -2412,83 +2403,40 @@ function populateKamSelector(){
   window.addEventListener('offline', upd);
 })();
 
-// ── PWA INSTALL ────────────────────────────────────────────────────────────
-var _deferredInstall = null;
-
-function showPwaHint(){
-  var standalone = window.navigator.standalone || window.matchMedia('(display-mode:standalone)').matches;
-  if(standalone) return;
-  if(localStorage.getItem('pwaDismissed')) return;
-  var ua = navigator.userAgent;
-  var isIOS = /iPhone|iPod/.test(ua);
-  var isAndroid = /Android/.test(ua);
-  if(!isIOS && !isAndroid) return;
-  var banner = document.getElementById('pwa-banner');
-  var txt = document.getElementById('pwa-banner-txt');
-  if(isIOS){
-    txt.innerHTML = 'Instalá como app: tocá <b>Compartir ↑</b> → <b>"Agregar a inicio"</b>.';
-    banner.style.display = 'flex';
-  } else if(_deferredInstall) {
-    txt.innerHTML = '<b>Instalá como app</b> para acceso rápido desde tu pantalla de inicio.';
-    if(!document.getElementById('pwa-install-btn')){
-      var btn = document.createElement('button');
-      btn.id = 'pwa-install-btn';
-      btn.className = 'btn-refresh';
-      btn.style.cssText = 'font-size:13px;font-weight:500;background:var(--info-fg);color:#fff;border-color:var(--info-fg)';
-      btn.textContent = 'Instalar';
-      btn.onclick = function(){
-        _deferredInstall.prompt();
-        _deferredInstall.userChoice.then(function(){
-          banner.style.display = 'none';
-          _deferredInstall = null;
-        });
-      };
-      txt.after(btn);
-    }
-    banner.style.display = 'flex';
-  } else if(isAndroid) {
-    txt.innerHTML = 'Instalá como app: en el menú del browser → <b>"Agregar a pantalla de inicio"</b>.';
-    banner.style.display = 'flex';
-  }
-}
-
-window.addEventListener('beforeinstallprompt', function(e){
-  e.preventDefault();
-  _deferredInstall = e;
-  showPwaHint();
-});
-
-window.addEventListener('appinstalled', function(){
-  document.getElementById('pwa-banner').style.display = 'none';
-  _deferredInstall = null;
-});
-
-showPwaHint();
-
 // ─── KPI Tooltip ──────────────────────────────────────────────────────────
 (function(){
   var tip=document.getElementById('kpiTip');
-  if(!tip){tip=document.createElement('div');tip.id='kpiTip';tip.className='tooltip';tip.style.cssText='position:fixed;max-width:300px;line-height:1.6;font-size:12px;pointer-events:none;display:none;z-index:99';document.body.appendChild(tip);}
-  tip.style.maxHeight='70vh';tip.style.overflowY='auto';
+  if(!tip){tip=document.createElement('div');tip.id='kpiTip';tip.className='tooltip';tip.style.cssText='position:fixed;max-width:300px;line-height:1.6;font-size:12px;display:none;z-index:99';document.body.appendChild(tip);}
+  tip.style.maxHeight='70vh';tip.style.overflowY='auto';tip.style.pointerEvents='auto';
+  var _tipTarget=null;
   document.addEventListener('mouseover',function(e){
+    if(tip.contains(e.target)) return; // mouse dentro del tooltip → no ocultar
     const c=e.target.closest('[data-kpi]');
-    if(!c){tip.style.display='none';return;}
+    if(!c){tip.style.display='none';_tipTarget=null;return;}
     const html=kpiTooltipContent[c.dataset.kpi];
-    if(!html){tip.style.display='none';return;}
+    if(!html){tip.style.display='none';_tipTarget=null;return;}
+    if(_tipTarget===c) return; // mismo card, no redibujar
+    _tipTarget=c;
     tip.innerHTML=html;tip.style.display='block';
+    // Posicionar debajo del card (centrado), o arriba si no hay espacio
+    const rect=c.getBoundingClientRect();
+    const TW=300;
+    tip.style.width=TW+'px';
+    const left=Math.min(Math.max(8,rect.left+rect.width/2-TW/2),window.innerWidth-TW-8);
+    tip.style.left=left+'px';
+    const tipH=tip.offsetHeight;
+    const spaceBelow=window.innerHeight-rect.bottom-8;
+    const top=spaceBelow>=tipH ? rect.bottom+4 : Math.max(4,rect.top-tipH-4);
+    tip.style.top=top+'px';
   });
-  document.addEventListener('mousemove',function(e){
-    if(tip.style.display==='none') return;
-    const x=e.clientX+16,y=e.clientY;
-    const tipH=tip.offsetHeight,tipW=tip.offsetWidth;
-    const left=Math.min(x,window.innerWidth-tipW-8);
-    const topCentered=y-tipH/2;
-    const top=Math.min(Math.max(4,topCentered),window.innerHeight-tipH-8);
-    tip.style.left=left+'px';tip.style.top=top+'px';
+  tip.addEventListener('mouseleave',function(e){
+    if(e.relatedTarget&&e.relatedTarget.closest&&e.relatedTarget.closest('[data-kpi]')) return;
+    tip.style.display='none';_tipTarget=null;
   });
   document.addEventListener('mouseout',function(e){
+    if(tip.contains(e.relatedTarget)) return; // mouse va al tooltip → no ocultar
     const c=e.target.closest('[data-kpi]');
-    if(c&&!c.contains(e.relatedTarget)) tip.style.display='none';
+    if(c&&!c.contains(e.relatedTarget)){tip.style.display='none';_tipTarget=null;}
   });
 })();
 
