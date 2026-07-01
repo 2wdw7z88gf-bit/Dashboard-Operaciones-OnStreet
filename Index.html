@@ -523,7 +523,7 @@ tr:hover td{background:var(--surface-2)}
             <div class="kpi-sub" id="opTerminoSub">—</div>
           </div>
         </div>
-        <div class="kpi info" data-kpi="op-encurso"><div class="kpi-label">En curso</div><div class="kpi-val" id="opEnCurso">—</div><div class="kpi-sub" id="opEnCursoSub">rutas activas</div></div>
+        <div class="kpi info" id="cardSegundaRuta" data-kpi="op-encurso"><div class="kpi-label">Segunda ruta</div><div class="kpi-val" id="opEnCurso">—</div><div class="kpi-sub" id="opEnCursoSub">con segunda ruta hoy</div></div>
         <div class="kpi warn" data-kpi="op-reemplazo"><div class="kpi-label">Reemplazo conductores</div><div class="kpi-val" id="opReemplazo">—</div><div class="kpi-sub" id="opReemplazoSub">—</div></div>
         <div class="kpi ok" data-kpi="op-doble" id="kpiDobleCard"><div class="kpi-label">Doble inicio s/término</div><div class="kpi-val" id="opDoble">—</div><div class="kpi-sub" id="opDobleSub">—</div></div>
         <div class="kpi teal" data-kpi="op-atenc"><div class="kpi-label">Atenciones totales</div><div class="kpi-val" id="opAtenc">—</div><div class="kpi-sub" id="opAtencSub">—</div></div>
@@ -1362,8 +1362,15 @@ function renderOperacion(){
   document.getElementById('opIniSub').textContent=sinInicio>0?sinInicio+' sin inicio':'toda la flota inició';
   document.getElementById('opTermino').textContent=movsConTerm;
   document.getElementById('opTerminoSub').textContent=rutasEnCurso>0?rutasEnCurso+' pendientes':'todas cerradas';
-  document.getElementById('opEnCurso').textContent=rutasEnCurso;
-  document.getElementById('opEnCursoSub').textContent=rutasEnCurso===1?'ruta activa':rutasEnCurso+' rutas activas';
+  // Card Segunda Ruta
+  var srData=allData.segundaRuta,srMoviles=(srData&&srData.moviles)||[];
+  function hhmm2min_(s){var m=String(s||'').match(/^(\d{1,2}):(\d{2})/);return m?parseInt(m[1],10)*60+parseInt(m[2],10):null;}
+  var ahora=new Date(),minAhora=ahora.getHours()*60+ahora.getMinutes();
+  var srSinIniciar=srMoviles.filter(function(m){if(m.iniciada)return false;var t=hhmm2min_(m.horaInicio2);return t!==null&&minAhora>=t;});
+  var cardSR=document.getElementById('cardSegundaRuta');
+  if(cardSR) cardSR.className='kpi '+(srSinIniciar.length>0?'warn':'info');
+  document.getElementById('opEnCurso').textContent=srMoviles.length;
+  document.getElementById('opEnCursoSub').textContent=srMoviles.length===0?'sin segunda ruta hoy':srSinIniciar.length>0?srSinIniciar.length+' sin iniciar':rutasEnCurso+' rutas activas';
   document.getElementById('opReemplazo').textContent=movsConReemplazo;
   document.getElementById('opReemplazoSub').textContent=movsConReemplazo>0?movsConReemplazo+' con reemplazo':'sin reemplazos';
   const dobleCard=document.getElementById('kpiDobleCard');
@@ -1390,7 +1397,21 @@ function renderOperacion(){
   kpiTooltipContent['op-termino']=pendTerm.length>0
     ? tipList(pendTerm.length+' pendientes de cierre',pendTerm.map(function(m){return tipRow(m.cliente+' '+m.movil,'');}), '')
     : '<strong>Término</strong><br><span style="color:var(--ok-fg);font-size:12px">✓ Todas las rutas cerradas</span>';
-  kpiTooltipContent['op-encurso']=tipList(pendTerm.length+' rutas en curso',pendTerm.map(function(m){return tipRow(m.cliente+' '+m.movil,'');}), 'Sin rutas activas');
+  if(srMoviles.length===0){
+    kpiTooltipContent['op-encurso']='<strong>Segunda ruta</strong><br><em style="color:var(--text-3);font-size:11px">Ningún móvil tiene segunda ruta programada hoy</em>';
+  } else {
+    var srRows=srMoviles.map(function(m){
+      var t=hhmm2min_(m.horaInicio2),vencida=!m.iniciada&&t!==null&&minAhora>=t;
+      var estadoColor=m.iniciada?'var(--ok-fg)':vencida?'var(--danger-fg)':'var(--text-3)';
+      var estadoTxt=m.iniciada?'✓ Iniciada':vencida?'⚠ Sin inicio — pasó la hora':'Pendiente';
+      var hora=m.horaInicio2+(m.horaFin2?' – '+m.horaFin2:'');
+      return '<div style="padding:4px 0;border-bottom:0.5px solid var(--border);font-size:12px">'
+        +'<div><strong>'+escapeHtml(m.nombre)+'</strong> <span style="color:var(--text-3);font-size:11px">'+escapeHtml(hora)+'</span></div>'
+        +'<div style="color:'+estadoColor+';font-size:11px;margin-top:1px">'+estadoTxt+'</div>'
+        +'</div>';
+    });
+    kpiTooltipContent['op-encurso']='<strong style="display:block;margin-bottom:4px">'+srMoviles.length+' móvil'+(srMoviles.length!==1?'es':'')+' con segunda ruta hoy</strong>'+srRows.join('');
+  }
   kpiTooltipContent['op-reemplazo']='<strong>Reemplazo conductores</strong><br><em style="color:var(--text-3);font-size:11px">Sin reemplazos hoy</em>';
   try {
     var reempMoviles2=moviles.filter(function(m){return m.tieneReemplazo;});

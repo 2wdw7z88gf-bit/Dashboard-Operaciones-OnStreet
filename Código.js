@@ -88,6 +88,7 @@ function doGet(e) {
         historico:  safeRead(function() { return getCached('historico_' + fechaSuffix, function() { return readFinalizados(fechaParam); }, CACHE_DURATION_SECONDS); }, null),
         supervisiones: safeRead(function() { return getCached('supervisiones', function() { return readSupervisiones(flotaInfo); }, CACHE_DURATION_SECONDS); }, null),
         bitacora:   safeRead(function() { return getCached('bitacora_' + fechaSuffix, function() { return readBitacora(fechaParam); }, CACHE_DURATION_SECONDS); }, null),
+        segundaRuta: safeRead(function() { return getCached('segunda_ruta_' + fechaSuffix, function() { return readSegundaRuta(fechaParam); }, CACHE_DURATION_SECONDS); }, null),
         // kilómetros se carga bajo demanda vía source=kilometros para no ralentizar la carga inicial
         kams: flotaInfo.kams || [],
         fechaConsultada: fechaParam || formatDateISO(new Date()),
@@ -987,6 +988,67 @@ function readFinalizados(fechaFinParam) {
 }
 
 // ============================================================================
+// LECTOR: SEGUNDA RUTA
+// ============================================================================
+function readSegundaRuta(fechaParam) {
+  const fechaTarget = fechaParam ? parseFlexibleDate(fechaParam) : new Date();
+  if (!fechaTarget || isNaN(fechaTarget.getTime())) return { moviles: [], fecha: '' };
+  const fechaISO = formatDateISO(fechaTarget);
+
+  const ssGPS = SpreadsheetApp.openById(SHEETS.informesGPS);
+  const calSheet = ssGPS.getSheetByName('CalendarioTransformado');
+  if (!calSheet) return { moviles: [], fecha: fechaISO };
+
+  const calVals = calSheet.getDataRange().getValues();
+  if (calVals.length < 2) return { moviles: [], fecha: fechaISO };
+
+  const calHeaders = calVals[0].map(function(h) { return String(h).trim(); });
+  const calIdx = {};
+  calHeaders.forEach(function(h, i) { calIdx[h] = i; });
+
+  const conSegundaRuta = [];
+  for (let i = 1; i < calVals.length; i++) {
+    const row = calVals[i];
+    const fechaRaw = row[calIdx['Fecha']];
+    if (!fechaRaw) continue;
+    const fecha = parseFlexibleDate(fechaRaw);
+    if (!fecha || formatDateISO(fecha) !== fechaISO) continue;
+    const horaInicio2 = String(row[calIdx['Horario de Inicio 2']] || '').trim();
+    if (!horaInicio2) continue;
+    conSegundaRuta.push({
+      nombre: String(row[calIdx['Móvil']] || '').trim(),
+      horaInicio2: horaInicio2,
+      horaFin2: String(row[calIdx['Horario de Fin 2']] || '').trim()
+    });
+  }
+
+  if (conSegundaRuta.length === 0) return { moviles: [], fecha: fechaISO };
+
+  // Contar eventos de inicio por móvil para detectar si la 2da ruta fue iniciada (≥2 inicos)
+  const ssUni = SpreadsheetApp.openById(SHEETS.unificador);
+  const iniEvents = readRouteEvents(ssUni, 'Inicio de Ruta', fechaTarget, {
+    fecha: 'Fecha', cliente: 'Cliente', movil: 'Móvil'
+  });
+
+  const iniCount = {};
+  iniEvents.forEach(function(ev) {
+    const key = normalize_((ev.cliente || '') + ' ' + (ev.movil || ''));
+    iniCount[key] = (iniCount[key] || 0) + 1;
+  });
+
+  const moviles = conSegundaRuta.map(function(m) {
+    return {
+      nombre: m.nombre,
+      horaInicio2: m.horaInicio2,
+      horaFin2: m.horaFin2,
+      iniciada: (iniCount[normalize_(m.nombre)] || 0) >= 2
+    };
+  });
+
+  return { moviles: moviles, fecha: fechaISO };
+}
+
+// ============================================================================
 // LECTOR: SUPERVISIONES — v14
 //   Match por columnas "Concat" y "Cliente" del Sheet (verdad explícita).
 //   Fallback: estrategias antiguas (propagación de logos + normalización).
@@ -1606,6 +1668,17 @@ function clearCache() {
   Logger.log('Cache limpiado: ' + keys.length + ' keys');
 }
 
+function debugCalendario() {
+  const ss = SpreadsheetApp.openById(SHEETS.informesGPS);
+  const sheet = ss.getSheetByName('CalendarioTransformado');
+  if (!sheet) { Logger.log('ERROR: hoja CalendarioTransformado no encontrada en informesGPS'); return; }
+  Logger.log('Hoja: ' + sheet.getName() + ' | Filas: ' + sheet.getLastRow() + ' | Cols: ' + sheet.getLastColumn());
+  const vals = sheet.getRange(1, 1, Math.min(sheet.getLastRow(), 4), sheet.getLastColumn()).getValues();
+  Logger.log('Headers: ' + JSON.stringify(vals[0]));
+  if (vals.length > 1) Logger.log('Fila 2: ' + JSON.stringify(vals[1]));
+  if (vals.length > 2) Logger.log('Fila 3: ' + JSON.stringify(vals[2]));
+  if (vals.length > 3) Logger.log('Fila 4: ' + JSON.stringify(vals[3]));
+}
 function debugFinalizados() {
   const ss = SpreadsheetApp.openById(SHEETS.finalizados);
   const sheet = ss.getSheetByName('Finalizados') || ss.getSheets()[0];
