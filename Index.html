@@ -1902,9 +1902,9 @@ function renderSupervisiones(){
   const s=allData.supervisiones,data=s.moviles||[];
   populateSuKpiMesFilter();renderSuKpiMes(data,suKpiMesSeleccionado);
   const hoy=new Date(),mesIdxKpi=(suKpiMesSeleccionado!==null&&suKpiMesSeleccionado!==undefined)?suKpiMesSeleccionado:hoy.getMonth(),mesNombreKpi=meses[mesIdxKpi];
-  const movsSupervisadosAnio=data.filter(d=>d.total>0).length,movsSupervisadosMes=data.filter(d=>(d.meses[mesNombreKpi]||0)>0).length;
+  const movsSupervisadosAnio=data.reduce((x,d)=>x+(d.total||0),0),movsSupervisadosMes=data.filter(d=>(d.meses[mesNombreKpi]||0)>0).length;
   const sin=data.filter(d=>d.total===0).length,cumpls=data.filter(d=>d.meta>0).map(d=>Math.min(d.pctMovil,1.5)),prom=cumpls.length?cumpls.reduce((x,v)=>x+v,0)/cumpls.length:0;
-  document.getElementById('suTotal').textContent=movsSupervisadosAnio;if(s.anio) document.getElementById('suSub').textContent='al menos 1 vez · año '+s.anio;
+  document.getElementById('suTotal').textContent=movsSupervisadosAnio;if(s.anio) document.getElementById('suSub').textContent='supervisiones realizadas · año '+s.anio;
   document.getElementById('suSup').textContent=movsSupervisadosMes;document.getElementById('suSupSub').textContent=(mesNombreKpi.charAt(0).toUpperCase()+mesNombreKpi.slice(1))+(data.length>0?' · '+Math.round(movsSupervisadosMes/data.length*100)+'% del total':'');
   document.getElementById('suSinSup').textContent=sin;document.getElementById('suCumpl').textContent=Math.round(prom*100)+'%';
   const totales=meses.map(m=>data.reduce((x,d)=>x+(d.meses[m]||0),0)),max=Math.max(...totales,1);
