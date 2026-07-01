@@ -145,7 +145,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .faltantes-list li .pct-low{color:var(--danger-fg);font-weight:500}
 .no-recommend{color:var(--text-3);font-size:12px;font-style:italic}
 .row-sup-alerta td{background:color-mix(in srgb,var(--warn-bg) 25%,transparent)}
-.kpi[data-kpi]{cursor:help;transition:box-shadow 0.15s}.kpi[data-kpi]:hover{box-shadow:0 2px 10px rgba(0,0,0,0.1)}
+.kpi[data-kpi]{cursor:help;transition:box-shadow 0.15s}.kpi[data-kpi]:hover{box-shadow:0 2px 10px rgba(0,0,0,0.1)}.km-kpi[data-kpi]{cursor:help;transition:box-shadow 0.15s}.km-kpi[data-kpi]:hover{box-shadow:0 2px 10px rgba(0,0,0,0.1)}
 table tfoot td{font-weight:500;background:var(--surface-2);border-top:1px solid var(--border-2);padding:10px 6px}
 .client-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--border);font-size:14px}
 .client-row:last-child{border-bottom:none}
@@ -780,7 +780,7 @@ tr:hover td{background:var(--surface-2)}
           <div class="km-kpi-val" id="kmHoyTotal">—</div>
           <div class="km-kpi-sub" id="kmHoyTotalSub">—</div>
         </div>
-        <div class="km-kpi">
+        <div class="km-kpi" data-kpi="km-moviles-sin-km">
           <div class="km-kpi-accent" style="background:var(--info-fg)"></div>
           <div class="km-kpi-label">Móviles con km registrados</div>
           <div class="km-kpi-val" style="color:var(--info-fg)" id="kmHoyMoviles">—</div>
@@ -2038,6 +2038,16 @@ function renderKilometros(){
   document.getElementById('kmHoyTotalSub').textContent='incluye '+Math.round(sinAsignar.hoy||0)+' km sin asignar';
   document.getElementById('kmHoyMoviles').textContent=movsConKm;
   document.getElementById('kmHoyMovilesSub').textContent='de '+(moviles.length)+' móviles en la flota';
+  (function(){
+    const sinKmHoy=moviles.filter(m=>(m.kmHoy||0)===0).sort((a,b)=>(a.cliente||'').localeCompare(b.cliente||'')||(a.nombre||a.movil||'').localeCompare(b.nombre||b.movil||''));
+    if(sinKmHoy.length===0){
+      kpiTooltipContent['km-moviles-sin-km']='<strong>Todos los móviles tienen km registrados hoy</strong>';
+    } else {
+      const color=clientColors;
+      const rows=sinKmHoy.map(m=>'<div style="padding:3px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:12px"><span>'+escapeHtml(m.nombre||m.movil)+'</span><span style="color:'+(color[m.cliente]||'var(--text-3)')+';font-size:11px;white-space:nowrap">'+escapeHtml(m.cliente||'')+'</span></div>');
+      kpiTooltipContent['km-moviles-sin-km']='<strong style="display:block;margin-bottom:5px">'+sinKmHoy.length+' móvil'+(sinKmHoy.length!==1?'es':'')+' sin km hoy</strong>'+rows.join('');
+    }
+  })();
   document.getElementById('kmHoyProm').textContent=promHoy+' km';
   document.getElementById('kmHoySinAsignar').textContent=Math.round(sinAsignar.hoy||0)+' km';
   document.getElementById('kmHoySinAsignarSub').textContent=(sinAsignar.cantidadAgrupaciones||0)+' agrupaciones GPS sin match';
