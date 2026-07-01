@@ -1080,7 +1080,14 @@ function switchOpDay(ev,day){
   wrap.parentElement.querySelectorAll('.subtab-content').forEach(t=>t.classList.remove('active'));
   ev.target.classList.add('active');
   document.getElementById('sub-op-hoy').classList.add('active');
-  if(fechaGlobal!==prev) loadData();
+  if(fechaGlobal!==prev){
+    // Limpiar KPIs para evitar mostrar datos del día anterior mientras carga el nuevo
+    ['opTotal','opIni','opIniSub','opTermino','opTerminoSub','opEnCurso','opEnCursoSub',
+     'opReemplazo','opReemplazoSub','opDoble','opDobleSub','opAtenc','opAtencSub'].forEach(function(id){
+      var el=document.getElementById(id);if(el)el.textContent='—';
+    });
+    loadData();
+  }
 }
 
 // ============================================================================
