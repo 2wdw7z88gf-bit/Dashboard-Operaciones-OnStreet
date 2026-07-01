@@ -200,8 +200,6 @@ tr:hover td{background:var(--surface-2)}
 .eventos-list::-webkit-scrollbar{width:6px}.eventos-list::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:3px}
 .empty{text-align:center;padding:30px 20px;color:var(--text-3);font-size:13px}
 .footer{margin-top:20px;padding-top:14px;border-top:0.5px solid var(--border);font-size:11px;color:var(--text-3);text-align:center}
-.filtros-globales{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;padding:10px 14px;margin-bottom:14px;background:var(--surface);border:0.5px solid var(--border);border-radius:10px}
-.fg-grupo{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .fg-label{font-size:12px;color:var(--text-3);text-transform:uppercase;letter-spacing:.3px;font-weight:500;margin-right:2px}
 .fg-input{font-size:14px;padding:7px 11px;border-radius:6px;border:0.5px solid var(--border-2);background:var(--surface);color:var(--text);cursor:pointer;font-family:inherit;min-width:160px}
 .banner-alert{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;margin-bottom:14px;background:var(--warn-bg);color:var(--warn-fg);border:0.5px solid var(--warn-fg);border-radius:8px;font-size:14px}
@@ -271,7 +269,7 @@ tr:hover td{background:var(--surface-2)}
 .km-rank-num{font-weight:500;font-size:15px;flex-shrink:0;font-variant-numeric:tabular-nums;min-width:60px;text-align:right;color:var(--teal-fg)}
 .km-diagnostico{background:var(--surface-2);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--text-2);margin-top:10px}
 .km-diagnostico summary{cursor:pointer;font-weight:500;color:var(--text-3)}
-@media (max-width:900px){.body-grid{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(2,1fr)}.tend-grid{grid-template-columns:1fr}.filtros-globales{padding:8px 10px;gap:10px}}
+@media (max-width:900px){.body-grid{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(2,1fr)}.tend-grid{grid-template-columns:1fr}}
 @media (max-width:1100px){.day-grid{grid-template-columns:1fr 1fr}}
 @media (max-width:760px){.day-grid{grid-template-columns:1fr}}
 
@@ -286,8 +284,6 @@ tr:hover td{background:var(--surface-2)}
   .status{width:100%;justify-content:space-between}
 
   /* filtros globales: fila compacta */
-  .filtros-globales{flex-direction:row;gap:8px;padding:8px 10px;align-items:center;flex-wrap:nowrap}
-  .fg-grupo{width:auto;flex:1 1 0;min-width:0;flex-wrap:nowrap}
   .fg-label{display:none}
   .fg-input{flex:1;min-width:0;width:auto !important;font-size:13px;padding:6px 8px}
 
@@ -379,8 +375,6 @@ tr:hover td{background:var(--surface-2)}
 .is-mobile .topbar h1{font-size:18px !important}
 .is-mobile .topbar .meta{font-size:11px !important}
 .is-mobile .status{width:100% !important;justify-content:space-between !important}
-.is-mobile .filtros-globales{flex-direction:row !important;gap:8px !important;padding:8px 10px !important;align-items:center !important;flex-wrap:nowrap !important}
-.is-mobile .fg-grupo{width:auto !important;flex:1 1 0 !important;min-width:0 !important;flex-wrap:nowrap !important}
 .is-mobile .fg-label{display:none !important}
 .is-mobile .fg-input{flex:1 !important;min-width:0 !important;width:auto !important;font-size:13px !important;padding:6px 8px !important;box-sizing:border-box !important}
 .is-mobile .kpi-grid{grid-template-columns:1fr !important;gap:8px !important;margin-bottom:12px !important}
@@ -456,21 +450,6 @@ tr:hover td{background:var(--surface-2)}
   <div id="offline-banner">
     <span>📵</span>
     <span>Sin conexión — los datos pueden estar desactualizados.</span>
-  </div>
-
-  <!-- FILTROS GLOBALES -->
-  <div class="filtros-globales">
-    <div class="fg-grupo">
-      <label class="fg-label" for="fechaGlobal">Fecha del dashboard</label>
-      <input type="date" id="fechaGlobal" class="fg-input">
-      <button class="btn-refresh" id="fgBtnHoy" type="button" style="font-size:11px">Hoy</button>
-      <span id="fgBadgeHistorico" style="display:none;font-size:11px;padding:3px 8px;border-radius:5px;background:var(--info-bg);color:var(--info-fg);align-self:center">Viendo fecha histórica</span>
-    </div>
-    <div class="fg-grupo">
-      <label class="fg-label" for="kamGlobal">KAM</label>
-      <select id="kamGlobal" class="fg-input"><option value="">Todos los KAM</option></select>
-      <span id="fgBadgeKam" style="display:none;font-size:11px;padding:3px 8px;border-radius:5px;background:var(--purple-bg);color:var(--purple-fg);align-self:center"></span>
-    </div>
   </div>
 
   <!-- BANNER DORMIDOS -->
@@ -2327,13 +2306,8 @@ function populateKamSelector(){
 }
 
 (function initGlobalFilters(){
-  const fechaInput=document.getElementById('fechaGlobal'),kamSel=document.getElementById('kamGlobal');
-  const btnHoy=document.getElementById('fgBtnHoy'),badgeHist=document.getElementById('fgBadgeHistorico'),badgeKam=document.getElementById('fgBadgeKam'),bannerBtn=document.getElementById('bannerDormidosBtn');
-  fechaInput.value=getTodayISO();fechaInput.max=getTodayISO();
-  fechaInput.addEventListener('change',function(){const v=fechaInput.value,hoy=getTodayISO();if(!v||v===hoy){fechaGlobal=null;badgeHist.style.display='none';}else{fechaGlobal=v;badgeHist.style.display='inline-block';}loadData();});
-  btnHoy.addEventListener('click',function(){fechaInput.value=getTodayISO();fechaGlobal=null;badgeHist.style.display='none';loadData();});
-  kamSel.addEventListener('change',function(){kamGlobal=kamSel.value||'';if(kamGlobal){badgeKam.style.display='inline-block';badgeKam.textContent='Filtrando por '+kamGlobal;}else{badgeKam.style.display='none';}if(allData) renderAll();});
-  bannerBtn.addEventListener('click',function(){const det=document.getElementById('dormidosDetalle');det.style.display=det.style.display==='none'?'block':'none';});
+  const bannerBtn=document.getElementById('bannerDormidosBtn');
+  if(bannerBtn) bannerBtn.addEventListener('click',function(){const det=document.getElementById('dormidosDetalle');det.style.display=det.style.display==='none'?'block':'none';});
 })();
 
 // ── LISTENERS ──────────────────────────────────────────────────────────────
@@ -2360,8 +2334,6 @@ function populateKamSelector(){
     '.topbar .meta{font-size:13px!important}',
     '.status{width:100%!important;justify-content:space-between!important;font-size:14px!important}',
     /* filtros globales */
-    '.filtros-globales{flex-direction:column!important;gap:10px!important;padding:14px!important}',
-    '.fg-grupo{width:100%!important;gap:8px!important;flex-direction:column!important;align-items:flex-start!important}',
     '.fg-label{font-size:13px!important;text-transform:uppercase!important;letter-spacing:.3px!important}',
     '.fg-input{width:100%!important;min-width:0!important;font-size:16px!important;padding:12px 14px!important;box-sizing:border-box!important;border-radius:8px!important}',
     '#fgBtnHoy{font-size:14px!important;padding:10px 16px!important;min-height:40px!important}',
