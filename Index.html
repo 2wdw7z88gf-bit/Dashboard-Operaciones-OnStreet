@@ -1936,8 +1936,8 @@ function renderSuKpiMes(data,mesIdxOverride){
       return{nombre:m.movil||m.nombre,cubierto,supThisMes,supRate};
     });
     const cubiertos=vehiculos.filter(v=>v.cubierto).length;
-    const noRequiere=cubiertos>0&&supEsteMes===0;
     const metaAlcanzada=supEsteMes>=metaCount;
+    const noRequiere=metaAlcanzada&&metaCount>0;
     const cumpl=noRequiere?100:(metaCount>0?Math.round(supEsteMes/metaCount*100):0);
     const falt=noRequiere?0:Math.max(0,metaCount-supEsteMes);
     const recomVehiculos=vehiculos.filter(v=>!v.cubierto||v.supRate<=50).sort((a,b)=>a.supRate-b.supRate).slice(0,5);
