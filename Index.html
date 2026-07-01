@@ -482,7 +482,8 @@ tr:hover td{background:var(--surface-2)}
   <!-- ============= TAB: OPERACIÓN ============= -->
   <div class="tab-content active" id="tab-operacion">
     <div class="subtabs">
-      <button class="subtab active" onclick="switchSubtab(event,'op-hoy')">Hoy</button>
+      <button class="subtab active" onclick="switchOpDay(event,'hoy')">Hoy</button>
+      <button class="subtab" onclick="switchOpDay(event,'ayer')">Ayer</button>
       <button class="subtab" onclick="switchSubtab(event,'op-historico')">Histórico 30 días</button>
       <button class="subtab" onclick="switchSubtab(event,'op-detalle')">Detalle</button>
     </div>
@@ -1069,6 +1070,17 @@ function switchSubtab(ev,name){
   wrap.parentElement.querySelectorAll('.subtab-content').forEach(t=>t.classList.remove('active'));
   ev.target.classList.add('active');
   document.getElementById('sub-'+name).classList.add('active');
+}
+function switchOpDay(ev,day){
+  const prev=fechaGlobal;
+  if(day==='ayer'){const d=new Date();d.setDate(d.getDate()-1);fechaGlobal=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  else fechaGlobal=null;
+  const wrap=ev.target.parentElement;
+  wrap.querySelectorAll('.subtab').forEach(t=>t.classList.remove('active'));
+  wrap.parentElement.querySelectorAll('.subtab-content').forEach(t=>t.classList.remove('active'));
+  ev.target.classList.add('active');
+  document.getElementById('sub-op-hoy').classList.add('active');
+  if(fechaGlobal!==prev) loadData();
 }
 
 // ============================================================================
