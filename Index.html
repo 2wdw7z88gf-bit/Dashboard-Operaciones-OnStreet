@@ -1508,7 +1508,14 @@ function renderOpObs(moviles){
   });
   const filtrados=opObsFiltro==='all'?conTermino:conTermino.filter(m=>m._tipoObs===opObsFiltro);
   if(filtrados.length===0){cont.innerHTML='<div class="empty">Sin términos de ruta para este filtro</div>';return;}
-  filtrados.sort((a,b)=>{if(a._tipoObs!==b._tipoObs)return a._tipoObs==='inc'?-1:1;return(a.cliente||'').localeCompare(b.cliente||'');});
+  const OBS_TRIVIAL=/^(sin observaciones?|sin novedad(es)?|ninguna?|sin novedades|normal|sin comentarios?|inicio de ruta sin novedad|termino de ruta sin novedad|comentario inicio:inicio de ruta sin novedad|sin obs\.?)\s*$/i;
+  function esTrivial_(m){const t=(m.comentarioTermino||'').trim();return !t||OBS_TRIVIAL.test(t)||t.replace(/comentario (inicio|termino):[\w\s]*/gi,'').trim()==='';}
+  filtrados.sort((a,b)=>{
+    const ta=esTrivial_(a),tb=esTrivial_(b);
+    if(ta!==tb) return ta?1:-1; // triviales al final
+    if(a._tipoObs!==b._tipoObs) return a._tipoObs==='inc'?-1:1;
+    return(a.cliente||'').localeCompare(b.cliente||'');
+  });
   cont.innerHTML=filtrados.map(function(m){
     var esInc=m._tipoObs==='inc';
     var borderC=esInc?'#E24B4A':'#1D9E75';
