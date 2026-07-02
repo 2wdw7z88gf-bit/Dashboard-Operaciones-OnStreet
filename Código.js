@@ -619,6 +619,8 @@ function readRouteEvents(ss, sheetName, targetDate, colMap) {
         else evt[field] = String(v || '').trim();
       }
     });
+    // Si no hay columna Hora separada, extrae el tiempo del campo Fecha (datetime)
+    if (!evt.hora && fechaRaw instanceof Date) evt.hora = formatTime(fechaRaw);
     eventos.push(evt);
   }
   return eventos;
@@ -1668,6 +1670,16 @@ function clearCache() {
 
   cache.removeAll(keys);
   Logger.log('Cache limpiado: ' + keys.length + ' keys');
+}
+
+function debugTerminoRuta() {
+  const ss = SpreadsheetApp.openById(SHEETS.unificador);
+  const sheet = ss.getSheetByName('Termino de Ruta');
+  if (!sheet) { Logger.log('ERROR: hoja Termino de Ruta no encontrada'); return; }
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  Logger.log('Headers Termino de Ruta: ' + JSON.stringify(headers));
+  const sample = sheet.getRange(2, 1, Math.min(3, sheet.getLastRow()-1), sheet.getLastColumn()).getValues();
+  sample.forEach(function(row, i){ Logger.log('Fila '+(i+2)+': '+JSON.stringify(row)); });
 }
 
 function debugCalendario() {
