@@ -198,6 +198,7 @@ function getDashboardData(params) {
     historico:    safeRead(function() { return getCached('historico_'    + fechaSuffix, function() { return readFinalizados(fechaParam); },              CACHE_DURATION_SECONDS); }, null),
     supervisiones:safeRead(function() { return getCached('supervisiones',               function() { return readSupervisiones(flotaInfo); },             CACHE_DURATION_SECONDS); }, null),
     bitacora:     safeRead(function() { return getCached('bitacora_'     + fechaSuffix, function() { return readBitacora(fechaParam); },                 CACHE_DURATION_SECONDS); }, null),
+    segundaRuta:  safeRead(function() { return getCached('segunda_ruta_' + fechaSuffix, function() { return readSegundaRuta(fechaParam); },              CACHE_DURATION_SECONDS); }, null),
     kams: flotaInfo.kams || [],
     fechaConsultada: fechaParam || formatDateISO(new Date()),
     lastUpdated: new Date().toISOString()
@@ -447,6 +448,7 @@ function readUnificador(flotaInfo, fechaParam) {
       indicadoresRaw: cantTerminos > 0 ? String(tersArr[cantTerminos - 1].indicadores || '').slice(0, 300) : '',
       comentarioInicio: cantInicios > 0 ? String(inisArr[0].comentario || '').slice(0, 150) : '',
       comentarioTermino: cantTerminos > 0 ? String(tersArr[cantTerminos - 1].comentario || '').slice(0, 150) : '',
+      horaTermino: cantTerminos > 0 ? (tersArr[cantTerminos - 1].hora || '') : '',
       lastInicioRowIdx: cantInicios > 0 ? (inisArr[cantInicios - 1].rowIdx || 0) : 0,
       lastInicioIdItem: cantInicios > 0 ? (inisArr[cantInicios - 1].idItem || '') : '',
       esMovilDeReemplazo: false,

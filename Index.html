@@ -1529,7 +1529,7 @@ function renderOpObs(moviles){
       '<div class="obs-head"><div><span class="obs-mv">'+escapeHtml(m.cliente)+'</span> <span class="obs-cl" style="color:'+clColor+'">· '+escapeHtml(m.movil||m.nombre||'')+'</span></div>'+
       '<div><span class="obs-tag" style="background:'+tagBg+';color:'+tagFg+'">'+(esInc?'Incidencia':'Operativa')+'</span></div></div>'+
       '<p class="obs-txt">'+escapeHtml(texto)+'</p>'+
-      '<p class="obs-foot">'+(m.conductor?'Conductor: '+escapeHtml(m.conductor):'')+(kamShort?(m.conductor?' · ':'')+'KAM: '+escapeHtml(kamShort):'')+(m.hora?' · '+m.hora:'')+'</p></div>';
+      '<p class="obs-foot">'+(m.conductor?'Conductor: '+escapeHtml(m.conductor):'')+(kamShort?(m.conductor?' · ':'')+'KAM: '+escapeHtml(kamShort):'')+(m.horaTermino?' · '+m.horaTermino:'')+'</p></div>';
   }).join('');
 }
 
