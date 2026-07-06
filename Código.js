@@ -1346,10 +1346,22 @@ function updateFlotaConductor(cliente, movil, newConductor) {
   if (!sheet) throw new Error('Hoja "Flota" no encontrada');
   const values = sheet.getDataRange().getValues();
   const headers = values[0].map(function(h){ return String(h || '').trim(); });
-  const idxC = headers.indexOf('Cliente'), idxM = headers.indexOf('Móvil'), idxK = headers.indexOf('Conductor');
-  if (idxK < 0) throw new Error('Columna "Conductor" no encontrada en Flota');
+  const headersN = headers.map(function(h){ return normalize_(h); });
+  function colIdx(names) {
+    for (var i = 0; i < names.length; i++) {
+      var idx = headersN.indexOf(normalize_(names[i]));
+      if (idx >= 0) return idx;
+    }
+    return -1;
+  }
+  const idxC = colIdx(['Cliente', 'CLIENTE']);
+  const idxM = colIdx(['Móvil', 'MÓVIL', 'Movil', 'MOVIL']);
+  const idxK = colIdx(['Conductor', 'CONDUCTOR', 'Nombre Conductor']);
+  if (idxC < 0) throw new Error('Columna "Cliente" no encontrada en Flota');
+  if (idxM < 0) throw new Error('Columna "Móvil" no encontrada en Flota');
+  if (idxK < 0) throw new Error('Columna "Conductor" no encontrada en Flota. Headers: ' + headers.slice(0,10).join(', '));
   const nc = normalize_(cliente), nm = normalize_(movil);
-  for (let i = 1; i < values.length; i++) {
+  for (var i = 1; i < values.length; i++) {
     if (normalize_(String(values[i][idxC] || '')) === nc && normalize_(String(values[i][idxM] || '')) === nm) {
       sheet.getRange(i + 1, idxK + 1).setValue(newConductor);
       clearWriteCaches_();

@@ -1245,8 +1245,8 @@ function openDetEdit(idx) {
   // Checkbox "actualizar Flota" — solo aparece cuando el conductor difiere del titular
   const conductorDifiere = (m.conductor||'').toLowerCase() !== (m.conductorTitular||'').toLowerCase();
   const fReemplazo = document.getElementById('detFReemplazo');
-  fReemplazo.style.display = (conductorDifiere && m._canEditFlota) ? '' : 'none';
-  document.getElementById('detEditActFlota').checked = false;
+  fReemplazo.style.display = m._canEditFlota ? '' : 'none';
+  document.getElementById('detEditActFlota').checked = conductorDifiere;
   document.getElementById('detFlotaHint').textContent = 'titular actual: '+(m.conductorTitular||'—');
   const btn = document.getElementById('detBtnGuardar');
   btn.textContent = 'Guardar'; btn.disabled = false;
