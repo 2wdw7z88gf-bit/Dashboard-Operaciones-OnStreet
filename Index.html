@@ -1258,8 +1258,24 @@ function closeDetModal() {
   _detEditIdx = null;
 }
 
+function _gasAction_(source, params) {
+  return new Promise(function(resolve, reject) {
+    if (IS_GAS) {
+      var fn = source === 'update_inicio' ? 'updateInicioRuta' : 'updateFlotaConductor';
+      var runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+      if (source === 'update_inicio') runner.updateInicioRuta(params.rowIdx, params.conductor, params.comuna, params.lugar);
+      else runner.updateFlotaConductor(params.cliente, params.movil, params.conductor);
+    } else {
+      var url = GAS_API_URL + '?source=' + source;
+      Object.keys(params).forEach(function(k){ url += '&' + k + '=' + encodeURIComponent(params[k] != null ? params[k] : ''); });
+      fetch(url).then(function(r){ return r.json(); }).then(function(d){
+        if (d && d.error) reject(new Error(d.error)); else resolve(d);
+      }).catch(reject);
+    }
+  });
+}
+
 function guardarDetEdit() {
-  if(!IS_GAS){alert('La edición de rutas solo está disponible en el entorno interno (GAS).');return;}
   const m = _detCurrentMoviles[_detEditIdx];
   if (!m) return;
   const conductor   = document.getElementById('detEditConductor').value.trim();
@@ -1271,22 +1287,20 @@ function guardarDetEdit() {
   const btn = document.getElementById('detBtnGuardar');
   btn.textContent = 'Guardando…'; btn.disabled = true;
 
-  google.script.run
-    .withSuccessHandler(function() {
+  _gasAction_('update_inicio', {rowIdx: rowIdx, conductor: conductor, comuna: comuna, lugar: lugar})
+    .then(function() {
       if (actFlota && conductor && m._canEditFlota) {
-        google.script.run
-          .withSuccessHandler(function() { _afterDetSave(m, conductor, comuna, lugar, false); })
-          .withFailureHandler(function(err) { alert('Inicio guardado. Error al actualizar Flota: '+err.message); _afterDetSave(m, conductor, comuna, lugar, true); })
-          .updateFlotaConductor(m.cliente, m.movil, conductor);
+        return _gasAction_('update_flota', {cliente: m.cliente, movil: m.movil, conductor: conductor})
+          .then(function() { _afterDetSave(m, conductor, comuna, lugar, false); })
+          .catch(function(err) { alert('Inicio guardado. Error al actualizar Flota: ' + (err.message||err)); _afterDetSave(m, conductor, comuna, lugar, true); });
       } else {
         _afterDetSave(m, conductor, comuna, lugar, actFlota ? false : m.tieneReemplazo);
       }
     })
-    .withFailureHandler(function(err) {
-      alert('Error al guardar: '+err.message);
+    .catch(function(err) {
+      alert('Error al guardar: ' + (err.message||err));
       btn.textContent = 'Guardar'; btn.disabled = false;
-    })
-    .updateInicioRuta(rowIdx, conductor, comuna, lugar);
+    });
 }
 
 function _afterDetSave(m, conductor, comuna, lugar, tieneReemplazo) {

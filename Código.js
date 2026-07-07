@@ -170,6 +170,19 @@ function doGet(e) {
         lastUpdated: new Date().toISOString()
       };
 
+    } else if (source === 'update_inicio') {
+      const rowIdx    = parseInt(e.parameter.rowIdx    || '0', 10);
+      const conductor = e.parameter.conductor != null ? String(e.parameter.conductor) : null;
+      const comuna    = e.parameter.comuna    != null ? String(e.parameter.comuna)    : null;
+      const lugar     = e.parameter.lugar     != null ? String(e.parameter.lugar)     : null;
+      result = updateInicioRuta(rowIdx, conductor, comuna, lugar);
+
+    } else if (source === 'update_flota') {
+      const cliente   = String(e.parameter.cliente   || '');
+      const movil     = String(e.parameter.movil     || '');
+      const conductor = String(e.parameter.conductor || '');
+      result = updateFlotaConductor(cliente, movil, conductor);
+
     } else {
       result = { error: 'source no reconocido' };
     }
