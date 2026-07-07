@@ -540,17 +540,17 @@ tr:hover td{background:var(--surface-2)}
           <div id="opRankingList" style="margin-top:6px"></div>
         </div>
         <div class="panel">
+          <h2>Inicios de ruta</h2>
+          <div id="opIniList" style="max-height:360px;overflow-y:auto;padding-right:4px"></div>
+        </div>
+        <div class="panel">
           <h2>⚠ Términos de ruta</h2>
           <div class="obs-filters">
             <button class="obs-btn active" data-obs="all" type="button">Todas</button>
             <button class="obs-btn" data-obs="inc" type="button">Incidencias</button>
             <button class="obs-btn" data-obs="op" type="button">Operativas</button>
           </div>
-          <div id="opObsList" style="max-height:360px;overflow-y:auto;padding-right:4px"></div>
-        </div>
-        <div class="panel">
-          <h2>Resumen por KAM</h2>
-          <div id="opKamList" style="margin-top:6px"></div>
+          <div id="opObsList" style="max-height:320px;overflow-y:auto;padding-right:4px"></div>
         </div>
       </div>
     </div>
@@ -1477,6 +1477,7 @@ function renderOperacion(){
   populateSelect('opFiltJefe',[...new Set(moviles.map(m=>m.jefeOperaciones).filter(Boolean))].sort(),'Todos los jefes');
   renderMap();
   renderOpRanking(moviles);
+  renderOpInicios(moviles);
   renderOpObs(moviles);
   renderOpKam(moviles);
 }
@@ -1554,6 +1555,27 @@ document.addEventListener('click',function(e){
   document.querySelectorAll('.obs-btn').forEach(b=>b.classList.toggle('active',b===btn));
   if(allData&&allData.unificador) renderOpObs(allData.unificador.moviles);
 });
+
+function renderOpInicios(moviles){
+  const cont=document.getElementById('opIniList');if(!cont) return;
+  const conInicio=moviles.filter(m=>(m.cantInicios||0)>0||m.inicio===1);
+  conInicio.sort((a,b)=>(a.hora||'').localeCompare(b.hora||''));
+  if(conInicio.length===0){cont.innerHTML='<div class="empty">Sin inicios de ruta registrados</div>';return;}
+  cont.innerHTML=conInicio.map(function(m){
+    const est=_detEstadoKey(m);
+    const borderC=est==='terminado'?'var(--ok-fg)':est==='encurso'?'var(--info-fg)':'var(--teal-fg)';
+    const bgC=est==='terminado'?'rgba(29,158,117,0.06)':est==='encurso'?'rgba(41,128,185,0.07)':'rgba(22,160,133,0.06)';
+    const clColor=clientColors[m.cliente]||'#888780';
+    const kamShort=(m.jefeOperaciones||'').split(' ')[0];
+    return '<div class="obs-card" style="background:'+bgC+';border-left-color:'+borderC+'">'
+      +'<div class="obs-head"><div><span class="obs-mv">'+escapeHtml(m.cliente)+'</span>'
+      +' <span class="obs-cl" style="color:'+clColor+'">· '+escapeHtml(m.movil||m.nombre||'')+'</span></div>'
+      +'<div>'+_detBadgesHtml(m)+'</div></div>'
+      +'<p class="obs-foot">'+(m.conductor?'Conductor: '+escapeHtml(m.conductor):'')+
+      (kamShort?(m.conductor?' · ':'')+'KAM: '+escapeHtml(kamShort):'')+
+      (m.hora?' · '+m.hora:'')+'</p></div>';
+  }).join('');
+}
 
 function renderOpKam(moviles){
   const cont=document.getElementById('opKamList');if(!cont) return;
