@@ -1261,16 +1261,17 @@ function closeDetModal() {
 function _gasAction_(source, params) {
   return new Promise(function(resolve, reject) {
     if (IS_GAS) {
-      var fn = source === 'update_inicio' ? 'updateInicioRuta' : 'updateFlotaConductor';
       var runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
       if (source === 'update_inicio') runner.updateInicioRuta(params.rowIdx, params.conductor, params.comuna, params.lugar);
       else runner.updateFlotaConductor(params.cliente, params.movil, params.conductor);
     } else {
+      // Desde Vercel: fetch con no-cors para evitar bloqueo CORS en escrituras.
+      // GAS ejecuta la operación aunque la respuesta sea opaca.
       var url = GAS_API_URL + '?source=' + source;
       Object.keys(params).forEach(function(k){ url += '&' + k + '=' + encodeURIComponent(params[k] != null ? params[k] : ''); });
-      fetch(url).then(function(r){ return r.json(); }).then(function(d){
-        if (d && d.error) reject(new Error(d.error)); else resolve(d);
-      }).catch(reject);
+      fetch(url, {mode: 'no-cors'})
+        .then(function() { resolve({ok: true}); })
+        .catch(reject);
     }
   });
 }
