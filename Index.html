@@ -345,7 +345,7 @@ tr:hover td{background:var(--surface-2)}
 
   .footer{font-size:10px}
   .tabs{display:none}
-  .container{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px))}
+  .container{padding-bottom:calc(62px + env(safe-area-inset-bottom,0px))}
   .topbar{position:sticky;top:0;z-index:50;background:var(--bg)}
   #bottom-nav{display:flex}
 }
@@ -367,7 +367,7 @@ tr:hover td{background:var(--surface-2)}
 @media (display-mode: standalone){
   body{padding-top:env(safe-area-inset-top,0px)}
   .tabs{display:none}
-  .container{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px))}
+  .container{padding-bottom:calc(62px + env(safe-area-inset-bottom,0px))}
   .topbar{position:sticky;top:0;z-index:50;background:var(--bg)}
   #bottom-nav{display:flex}
 }
@@ -384,6 +384,7 @@ tr:hover td{background:var(--surface-2)}
 .is-mobile .kpi-grid{grid-template-columns:repeat(2,1fr) !important;gap:6px !important;margin-bottom:10px !important}
 .is-mobile .km-kpi-grid{grid-template-columns:repeat(2,1fr) !important;gap:6px !important;margin-bottom:10px !important}
 .is-mobile .kpi{padding:10px 10px !important;border-radius:8px !important}
+.is-mobile .kpi-split-half{padding:10px 10px !important}
 .is-mobile .kpi-label{font-size:10px !important;letter-spacing:.04em !important}
 .is-mobile .kpi-val{font-size:20px !important;font-weight:600 !important}
 .is-mobile .kpi-sub{display:block !important;font-size:10px !important}
@@ -415,14 +416,14 @@ tr:hover td{background:var(--surface-2)}
 .is-mobile .obs-btn{padding:5px 8px !important;font-size:11px !important}
 .is-mobile .footer{font-size:10px !important}
 .is-mobile .tabs{display:none !important}
-.is-mobile .container{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px)) !important}
+.is-mobile .container{padding-bottom:calc(62px + env(safe-area-inset-bottom,0px)) !important}
 .is-mobile .topbar{position:sticky !important;top:0 !important;z-index:50 !important;background:var(--bg) !important}
 .is-mobile #bottom-nav{display:flex !important}
 /* ─── BOTTOM NAV ─────────────────────────────────────────────────────── */
 #bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:0.5px solid var(--border-2);padding-bottom:env(safe-area-inset-bottom,0px);z-index:100;box-shadow:0 -2px 12px rgba(0,0,0,0.06)}
-.bnav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:10px 4px;background:none;border:none;cursor:pointer;color:var(--text-3);font-family:inherit;font-size:13px;font-weight:500;line-height:1.2;min-height:72px;transition:color 0.15s;-webkit-tap-highlight-color:transparent}
+.bnav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 4px;background:none;border:none;cursor:pointer;color:var(--text-3);font-family:inherit;font-size:11px;font-weight:500;line-height:1.2;min-height:52px;transition:color 0.15s;-webkit-tap-highlight-color:transparent}
 .bnav-btn.active{color:var(--info-fg)}
-.bnav-btn svg{width:26px;height:26px;flex-shrink:0}
+.bnav-btn svg{width:20px;height:20px;flex-shrink:0}
 </style>
 <script>
 (function(){
