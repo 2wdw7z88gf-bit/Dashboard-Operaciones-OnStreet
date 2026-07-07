@@ -341,7 +341,7 @@ tr:hover td{background:var(--surface-2)}
   /* obs */
   .obs-filters{gap:4px}
   .obs-btn{padding:5px 8px;font-size:11px}
-  #opIniList,#opObsList{max-height:none !important}
+  #opRankingList,#opIniList,#opObsList{max-height:none !important}
 
   .footer{font-size:10px}
   .tabs{display:none}
@@ -389,7 +389,7 @@ tr:hover td{background:var(--surface-2)}
 .is-mobile .kpi-sub{display:block !important;font-size:10px !important}
 .is-mobile .km-kpi-val{font-size:20px !important;font-weight:600 !important}
 .is-mobile .km-kpi-sub{display:block !important;font-size:10px !important}
-.is-mobile #opIniList,.is-mobile #opObsList{max-height:260px !important;overflow-y:auto !important}
+.is-mobile #opRankingList,.is-mobile #opIniList,.is-mobile #opObsList{max-height:260px !important;overflow-y:auto !important}
 .is-mobile .body-grid{grid-template-columns:1fr !important;gap:10px !important}
 .is-mobile .day-grid{grid-template-columns:1fr !important;gap:10px !important}
 .is-mobile .tend-grid{grid-template-columns:1fr !important;gap:10px !important}
@@ -542,7 +542,7 @@ tr:hover td{background:var(--surface-2)}
       <div class="day-grid">
         <div class="panel">
           <h2>🏆 Ranking del día — top atenciones</h2>
-          <div id="opRankingList" style="margin-top:6px"></div>
+          <div id="opRankingList" style="margin-top:6px;max-height:360px;overflow-y:auto;padding-right:4px"></div>
         </div>
         <div class="panel">
           <h2>Inicios de ruta</h2>
