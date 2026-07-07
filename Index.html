@@ -287,14 +287,15 @@ tr:hover td{background:var(--surface-2)}
   .fg-label{display:none}
   .fg-input{flex:1;min-width:0;width:auto !important;font-size:13px;padding:6px 8px}
 
-  /* KPI: 2 columnas en tablets/pantallas medianas */
+  /* KPI: 2 columnas compactas, similar al escritorio */
   .kpi-grid{grid-template-columns:repeat(2,1fr) !important;gap:8px;margin-bottom:12px}
   .km-kpi-grid{grid-template-columns:repeat(2,1fr) !important;gap:8px;margin-bottom:12px}
   .kpi{padding:10px 12px;border-radius:8px}
-  .kpi-val{font-size:28px}
-  .kpi-sub{display:none}
-  .km-kpi-val{font-size:28px}
-  .km-kpi-sub{display:none}
+  .kpi-label{font-size:10px;letter-spacing:.04em}
+  .kpi-val{font-size:22px;font-weight:600}
+  .kpi-sub{font-size:11px;display:block}
+  .km-kpi-val{font-size:22px}
+  .km-kpi-sub{font-size:11px;display:block}
 
   /* layouts de 2 columnas → 1 columna */
   .body-grid{grid-template-columns:1fr !important;gap:10px}
@@ -340,6 +341,7 @@ tr:hover td{background:var(--surface-2)}
   /* obs */
   .obs-filters{gap:4px}
   .obs-btn{padding:5px 8px;font-size:11px}
+  #opIniList,#opObsList{max-height:none !important}
 
   .footer{font-size:10px}
   .tabs{display:none}
@@ -350,13 +352,15 @@ tr:hover td{background:var(--surface-2)}
 
 /* ─── PANTALLAS MUY PEQUEÑAS (< 430px: iPhone SE, 16 Pro, etc.) ──── */
 @media (max-width:430px){
-  /* KPI: 1 columna para que los números se vean grandes */
-  .kpi-grid{grid-template-columns:1fr !important;gap:8px}
-  .km-kpi-grid{grid-template-columns:1fr !important;gap:8px}
-  .kpi{padding:14px 16px !important}
-  .kpi-val{font-size:36px !important;font-weight:600 !important}
-  .km-kpi-val{font-size:36px !important;font-weight:600 !important}
-  .kpi-label{font-size:12px !important}
+  /* Mantener 2 columnas, proporciones compactas como en escritorio */
+  .kpi-grid{grid-template-columns:repeat(2,1fr) !important;gap:6px}
+  .km-kpi-grid{grid-template-columns:repeat(2,1fr) !important;gap:6px}
+  .kpi{padding:10px 10px !important}
+  .kpi-label{font-size:10px !important;letter-spacing:.04em}
+  .kpi-val{font-size:20px !important;font-weight:600 !important}
+  .kpi-sub{font-size:10px !important;display:block !important}
+  .km-kpi-val{font-size:20px !important;font-weight:600 !important}
+  .km-kpi-sub{font-size:10px !important;display:block !important}
 }
 
 /* ─── MODO STANDALONE (instalada como app) ────────────────────── */
