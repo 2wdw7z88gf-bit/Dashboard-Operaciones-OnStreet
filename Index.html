@@ -1567,10 +1567,12 @@ function renderOpInicios(moviles){
     const bgC=est==='terminado'?'rgba(29,158,117,0.06)':est==='encurso'?'rgba(41,128,185,0.07)':'rgba(22,160,133,0.06)';
     const clColor=clientColors[m.cliente]||'#888780';
     const kamShort=(m.jefeOperaciones||'').split(' ')[0];
+    const comentario=(m.comentarioInicio||'').trim();
     return '<div class="obs-card" style="background:'+bgC+';border-left-color:'+borderC+'">'
       +'<div class="obs-head"><div><span class="obs-mv">'+escapeHtml(m.cliente)+'</span>'
       +' <span class="obs-cl" style="color:'+clColor+'">· '+escapeHtml(m.movil||m.nombre||'')+'</span></div>'
       +'<div>'+_detBadgesHtml(m)+'</div></div>'
+      +(comentario?'<p class="obs-txt">'+escapeHtml(comentario)+'</p>':'')
       +'<p class="obs-foot">'+(m.conductor?'Conductor: '+escapeHtml(m.conductor):'')+
       (kamShort?(m.conductor?' · ':'')+'KAM: '+escapeHtml(kamShort):'')+
       (m.hora?' · '+m.hora:'')+'</p></div>';
