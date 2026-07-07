@@ -269,6 +269,9 @@ tr:hover td{background:var(--surface-2)}
 .km-rank-num{font-weight:500;font-size:15px;flex-shrink:0;font-variant-numeric:tabular-nums;min-width:60px;text-align:right;color:var(--teal-fg)}
 .km-diagnostico{background:var(--surface-2);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--text-2);margin-top:10px}
 .km-diagnostico summary{cursor:pointer;font-weight:500;color:var(--text-3)}
+#opBodyGrid{grid-template-columns:1fr 250px 250px}
+@media (max-width:1100px){#opBodyGrid{grid-template-columns:1fr 220px 220px}}
+@media (max-width:900px){#opBodyGrid{grid-template-columns:1fr}}
 @media (max-width:900px){.body-grid{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(2,1fr)}.tend-grid{grid-template-columns:1fr}}
 @media (max-width:1100px){.day-grid{grid-template-columns:1fr 1fr}}
 @media (max-width:760px){.day-grid{grid-template-columns:1fr}}
@@ -514,7 +517,7 @@ tr:hover td{background:var(--surface-2)}
         <div class="kpi ok" data-kpi="op-doble" id="kpiDobleCard"><div class="kpi-label">Doble inicio s/término</div><div class="kpi-val" id="opDoble">—</div><div class="kpi-sub" id="opDobleSub">—</div></div>
         <div class="kpi teal" data-kpi="op-atenc"><div class="kpi-label">Atenciones totales</div><div class="kpi-val" id="opAtenc">—</div><div class="kpi-sub" id="opAtencSub">—</div></div>
       </div>
-      <div class="body-grid">
+      <div class="body-grid" id="opBodyGrid">
         <div class="panel">
           <h2>Distribución geográfica</h2>
           <div class="filter-row">
@@ -535,10 +538,8 @@ tr:hover td{background:var(--surface-2)}
           </div>
           <div id="mapLeaflet" style="width:100%;height:540px;border-radius:8px;overflow:hidden"></div>
         </div>
-        <div>
-          <div class="panel" style="margin-bottom:14px"><h2>Resumen por cliente</h2><div id="opClientList"></div></div>
-          <div class="panel"><h2>Móviles con pendientes</h2><div class="mob-list" id="opMobList"></div></div>
-        </div>
+        <div class="panel" style="overflow-y:auto"><h2>Resumen por cliente</h2><div id="opClientList"></div></div>
+        <div class="panel" style="overflow-y:auto"><h2>Móviles con pendientes</h2><div class="mob-list" id="opMobList"></div></div>
       </div>
       <div class="day-grid">
         <div class="panel">
