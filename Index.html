@@ -1520,8 +1520,8 @@ function renderOpRanking(moviles){
 
 function renderOpObs(moviles){
   const cont=document.getElementById('opObsList');if(!cont) return;
-  // Solo móviles con término de ruta
-  const conTermino=moviles.filter(m=>(m.cantTerminos||0)>0||m.termino===1);
+  // Solo móviles con término de ruta Y que además hayan dejado comentario
+  const conTermino=moviles.filter(m=>((m.cantTerminos||0)>0||m.termino===1)&&(m.comentarioTermino||'').trim());
   // Clasificar basado solo en comentarioTermino
   conTermino.forEach(function(m){
     var txt=(m.comentarioTermino||'').toLowerCase().trim();
@@ -1530,7 +1530,7 @@ function renderOpObs(moviles){
     m._tipoObs='op';
   });
   const filtrados=opObsFiltro==='all'?conTermino:conTermino.filter(m=>m._tipoObs===opObsFiltro);
-  if(filtrados.length===0){cont.innerHTML='<div class="empty">Sin términos de ruta para este filtro</div>';return;}
+  if(filtrados.length===0){cont.innerHTML='<div class="empty">Sin comentarios en términos de ruta para este filtro</div>';return;}
   const OBS_TRIVIAL=/^(sin observaciones?|sin novedad(es)?|ninguna?|sin novedades|normal|sin comentarios?|inicio de ruta sin novedad|termino de ruta sin novedad|comentario inicio:inicio de ruta sin novedad|sin obs\.?)\s*$/i;
   function esTrivial_(m){const t=(m.comentarioTermino||'').trim();return !t||OBS_TRIVIAL.test(t)||t.replace(/comentario (inicio|termino):[\w\s]*/gi,'').trim()==='';}
   filtrados.sort((a,b)=>{
@@ -1565,9 +1565,10 @@ document.addEventListener('click',function(e){
 
 function renderOpInicios(moviles){
   const cont=document.getElementById('opIniList');if(!cont) return;
-  const conInicio=moviles.filter(m=>(m.cantInicios||0)>0||m.inicio===1);
+  // Solo móviles con inicio de ruta Y que además hayan dejado comentario
+  const conInicio=moviles.filter(m=>((m.cantInicios||0)>0||m.inicio===1)&&(m.comentarioInicio||'').trim());
   conInicio.sort((a,b)=>(a.hora||'').localeCompare(b.hora||''));
-  if(conInicio.length===0){cont.innerHTML='<div class="empty">Sin inicios de ruta registrados</div>';return;}
+  if(conInicio.length===0){cont.innerHTML='<div class="empty">Sin comentarios en inicios de ruta</div>';return;}
   cont.innerHTML=conInicio.map(function(m){
     const est=_detEstadoKey(m);
     const borderC=est==='terminado'?'var(--ok-fg)':est==='encurso'?'var(--info-fg)':'var(--teal-fg)';
