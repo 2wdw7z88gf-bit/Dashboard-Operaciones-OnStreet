@@ -370,6 +370,23 @@ function readUnificador(flotaInfo, fechaParam) {
     if (!terminosPorMovil[k]) terminosPorMovil[k] = [];
     terminosPorMovil[k].push(e);
   });
+  // Respaldo: para días ya cerrados, "Finalizados" se archiva 1 vez (trigger 1 AM) leyendo
+  // directamente "Termino de Ruta". Si un móvil no tiene término en la lectura en vivo pero
+  // sí quedó archivado ahí, se toma como confirmación de que la ruta sí se cerró.
+  const esConsultaHoy = formatDateISO(today) === formatDateISO(new Date());
+  if (!esConsultaHoy) {
+    const finalizadosPorMovil = readFinalizadosPorDia_(today);
+    Object.keys(finalizadosPorMovil).forEach(function(key){
+      if (!terminosPorMovil[key] || terminosPorMovil[key].length === 0) {
+        const fin = finalizadosPorMovil[key];
+        terminosPorMovil[key] = [{
+          cliente: fin.cliente, movil: fin.movil, conductor: fin.conductor,
+          hora: fin.horaTermino, comuna: fin.comuna, comentario: '', indicadores: '', rowIdx: 0
+        }];
+      }
+    });
+  }
+
   // Ordenar cronológicamente por hora dentro de cada móvil
   function sortByHora(arr){ arr.sort(function(a, b){ return String(a.hora || '').localeCompare(String(b.hora || '')); }); }
   Object.keys(iniciosPorMovil).forEach(function(k){ sortByHora(iniciosPorMovil[k]); });
@@ -929,6 +946,48 @@ function detectClienteFromMovil(nombreCompleto) {
 // ============================================================================
 // LECTOR: FINALIZADOS
 // ============================================================================
+
+// Lectura puntual de "Finalizados" para una sola fecha (usada como respaldo de
+// confirmación de término en readUnificador). Devuelve un mapa
+// normalize_(cliente)+'|'+normalize_(movil) -> { cliente, movil, conductor, comuna, horaInicio, horaTermino }
+function readFinalizadosPorDia_(targetDate) {
+  const targetDay = formatDateISO(targetDate);
+  const result = {};
+  const ss = SpreadsheetApp.openById(SHEETS.finalizados);
+  const sheet = ss.getSheetByName('Finalizados') || ss.getSheets()[0];
+  if (!sheet) return result;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return result;
+
+  const values = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
+  const headers = values[0].map(function(h){ return String(h || '').trim(); });
+  const idx = {};
+  headers.forEach(function(h, i){ idx[h] = i; });
+
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const fechaRaw = row[idx['Fecha']];
+    if (!fechaRaw) continue;
+    const fecha = parseFlexibleDate(fechaRaw);
+    if (!fecha || isNaN(fecha.getTime())) continue;
+    if (formatDateISO(fecha) !== targetDay) continue;
+
+    const cliente = String(row[idx['Cliente']] || '').trim();
+    const movil = String(row[idx['Notacion']] || '').trim();
+    if (!cliente || !movil) continue;
+
+    const key = normalize_(cliente) + '|' + normalize_(movil);
+    result[key] = {
+      cliente: cliente, movil: movil,
+      conductor: String(row[idx['Conductor']] || '').trim(),
+      comuna: String(row[idx['Comuna']] || '').trim(),
+      horaInicio: formatTime(row[idx['Hora Inicio']]),
+      horaTermino: formatTime(row[idx['Hora Termino']])
+    };
+  }
+  return result;
+}
+
 function readFinalizados(fechaFinParam) {
   const ss = SpreadsheetApp.openById(SHEETS.finalizados);
   const sheet = ss.getSheetByName('Finalizados') || ss.getSheets()[0];
