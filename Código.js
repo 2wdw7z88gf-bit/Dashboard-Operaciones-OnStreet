@@ -267,11 +267,19 @@ function readPerdidaRutaData(cliente, fechaInicio, fechaFin) {
       dbg.calTotalRows = calVals.length - 1;
       const idxFecha   = findIdx(calHeaders, 'Fecha');
       const idxCliente = findIdx(calHeaders, 'Cliente');
+      const idxMovil   = idxCliente >= 0 ? -1 : findIdx(calHeaders, 'Móvil');
       dbg.calIdxFecha   = idxFecha;
       dbg.calIdxCliente = idxCliente;
+      dbg.calIdxMovil   = idxMovil;
       for (var i = 1; i < calVals.length; i++) {
         var row = calVals[i];
-        if (nc && idxCliente >= 0 && normalize_(String(row[idxCliente] || '')) !== nc) continue;
+        if (nc) {
+          if (idxCliente >= 0) {
+            if (normalize_(String(row[idxCliente] || '')) !== nc) continue;
+          } else if (idxMovil >= 0) {
+            if (normalize_(String(row[idxMovil] || '')).indexOf(nc) === -1) continue;
+          }
+        }
         if (!enRango(row[idxFecha >= 0 ? idxFecha : 0])) continue;
         planificadas++;
       }
@@ -290,11 +298,18 @@ function readPerdidaRutaData(cliente, fechaInicio, fechaFin) {
       dbg.terTotalRows = terVals.length - 1;
       const idxFecha   = findIdx(terHeaders, 'Fecha');
       const idxCliente = findIdx(terHeaders, 'Cliente');
+      const idxMovilT  = idxCliente >= 0 ? -1 : findIdx(terHeaders, 'Móvil');
       dbg.terIdxFecha   = idxFecha;
       dbg.terIdxCliente = idxCliente;
       for (var i = 1; i < terVals.length; i++) {
         var row = terVals[i];
-        if (nc && idxCliente >= 0 && normalize_(String(row[idxCliente] || '')) !== nc) continue;
+        if (nc) {
+          if (idxCliente >= 0) {
+            if (normalize_(String(row[idxCliente] || '')) !== nc) continue;
+          } else if (idxMovilT >= 0) {
+            if (normalize_(String(row[idxMovilT] || '')).indexOf(nc) === -1) continue;
+          }
+        }
         if (!enRango(row[idxFecha >= 0 ? idxFecha : 0])) continue;
         ejecutadas++;
       }
