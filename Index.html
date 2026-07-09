@@ -974,8 +974,8 @@ tr:hover td{background:var(--surface-2)}
             </div>
           </div>
           <div class="inf-field">
-            <label>Margen contractual (n° rutas permitidas a On Street)</label>
-            <input id="infMargen" type="number" min="0" placeholder="ej: 5">
+            <label>Margen contractual (% mínimo de rutas a ejecutar)</label>
+            <input id="infMargen" type="number" min="0" max="100" value="80" placeholder="ej: 80">
           </div>
           <button class="inf-btn-load" id="infBtnLoad" onclick="cargarDatosInforme()">Cargar datos del período</button>
           <div class="inf-autodata" id="infAutoData">
@@ -992,8 +992,7 @@ tr:hover td{background:var(--surface-2)}
               <tbody>
                 <tr><td>Cliente</td><td><input id="infCausaCliente" type="number" min="0" value="0"></td></tr>
                 <tr><td>On Street</td><td><input id="infCausaOS" type="number" min="0" value="0"></td></tr>
-                <tr><td>Externo</td><td><input id="infCausaExterno" type="number" min="0" value="0"></td></tr>
-                <tr><td>No informado</td><td><input id="infCausaNI" type="number" min="0" value="0"></td></tr>
+                <tr><td>Fuerza mayor</td><td><input id="infCausaFM" type="number" min="0" value="0"></td></tr>
               </tbody>
             </table>
           </div>
@@ -2706,18 +2705,20 @@ function generarVistaPrevia() {
   var cliente      = document.getElementById('infCliente').value;
   var fechaInicio  = document.getElementById('infFechaInicio').value;
   var fechaFin     = document.getElementById('infFechaFin').value;
-  var margen       = parseInt(document.getElementById('infMargen').value, 10) || 0;
+  var margenPct    = parseInt(document.getElementById('infMargen').value, 10) || 80;
   var planificadas = parseInt(document.getElementById('infPlanificadas').value, 10) || 0;
   var ejecutadas   = parseInt(document.getElementById('infEjecutadas').value, 10) || 0;
   if (!cliente) { alert('Selecciona un cliente'); return; }
   if (!fechaInicio || !fechaFin) { alert('Ingresa el rango de fechas'); return; }
   var noEjec = Math.max(0, planificadas - ejecutadas);
   var pct    = planificadas > 0 ? (noEjec / planificadas * 100).toFixed(1) : '0.0';
+  var pctEjec = planificadas > 0 ? (ejecutadas / planificadas * 100).toFixed(1) : '0.0';
+  var minRequeridas = Math.round(planificadas * margenPct / 100);
+  var dentro = ejecutadas >= minRequeridas;
   var causas = [
     { nombre: 'Cliente',      count: parseInt(document.getElementById('infCausaCliente').value,10)||0 },
     { nombre: 'On Street',    count: parseInt(document.getElementById('infCausaOS').value,10)||0 },
-    { nombre: 'Externo',      count: parseInt(document.getElementById('infCausaExterno').value,10)||0 },
-    { nombre: 'No informado', count: parseInt(document.getElementById('infCausaNI').value,10)||0 }
+    { nombre: 'Fuerza mayor', count: parseInt(document.getElementById('infCausaFM').value,10)||0 }
   ];
   var gestion = (document.getElementById('infGestion').value||'').split('\n').filter(function(l){return l.trim();});
   var meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -2725,8 +2726,7 @@ function generarVistaPrevia() {
   var hoy = new Date();
   var emision  = hoy.getDate() + ' de ' + meses[hoy.getMonth()+1] + ' de ' + hoy.getFullYear();
   var osCount  = causas[1].count;
-  var dentro   = osCount <= margen;
-  var html = _buildReporteHTML({ cliente: cliente, periodo: periodo, emision: emision, planificadas: planificadas, ejecutadas: ejecutadas, noEjec: noEjec, pct: pct, margen: margen, osCount: osCount, dentro: dentro, causas: causas, gestion: gestion });
+  var html = _buildReporteHTML({ cliente: cliente, periodo: periodo, emision: emision, planificadas: planificadas, ejecutadas: ejecutadas, noEjec: noEjec, pct: pct, pctEjec: pctEjec, margenPct: margenPct, minRequeridas: minRequeridas, osCount: osCount, dentro: dentro, causas: causas, gestion: gestion });
   var pre = document.getElementById('infPreview');
   var emp = document.getElementById('infPreviewEmpty');
   pre.innerHTML = html; pre.style.display = 'block';
@@ -2741,10 +2741,11 @@ function _buildReporteHTML(d) {
   var resumen = 'Durante el período ' + d.periodo + ' se registraron ' + d.planificadas + ' rutas planificadas para el cliente ' + escapeHtml(d.cliente) +
     ', de las cuales ' + d.ejecutadas + ' fueron ejecutadas y ' + d.noEjec + ' no fueron ejecutadas, lo que representa una pérdida de ruta de ' + d.pct +
     '% sobre la planificación del período. El presente informe resume el impacto de dichas rutas no ejecutadas, su clasificación según causa y las acciones de gestión implementadas por On Street para mantener la continuidad del servicio.';
-  var conclusion = 'En conclusión, la pérdida de ruta registrada durante ' + d.periodo + ' representa un ' + d.pct + '% del total planificado. Del total de rutas no ejecutadas, ' +
-    d.osCount + ' caso' + (d.osCount !== 1 ? 's' : '') + ' se asocia' + (d.osCount !== 1 ? 'n' : '') + ' a causas atribuibles a On Street. ' +
-    'La mayor proporción de casos corresponde a causa atribuible a cliente. En términos contractuales, el resultado contractual se mantiene ' +
-    (d.dentro ? 'dentro del' : 'fuera del') + ' margen permitido. On Street continuará realizando seguimiento preventivo para reducir la recurrencia de este tipo de situaciones y asegurar la continuidad del servicio.';
+  var conclusion = 'En conclusión, la ejecución de rutas durante ' + d.periodo + ' alcanzó un ' + d.pctEjec + '% de lo planificado (' + d.ejecutadas + ' de ' + d.planificadas + ' rutas). ' +
+    'El margen contractual exige la ejecución de al menos el ' + d.margenPct + '% de las rutas planificadas (' + d.minRequeridas + ' rutas). ' +
+    'Del total de rutas no ejecutadas, ' + d.osCount + ' caso' + (d.osCount !== 1 ? 's' : '') + ' se asocia' + (d.osCount !== 1 ? 'n' : '') + ' a causas atribuibles a On Street. ' +
+    'En términos contractuales, el resultado se mantiene ' + (d.dentro ? 'dentro del' : 'fuera del') + ' margen permitido. ' +
+    'On Street continuará realizando seguimiento preventivo para reducir la recurrencia de este tipo de situaciones y asegurar la continuidad del servicio.';
 
   // Barras
   var maxB = Math.max(d.planificadas, d.ejecutadas, d.noEjec, 1);
@@ -2759,7 +2760,7 @@ function _buildReporteHTML(d) {
     bar(d.planificadas,'#888','Planificadas') + bar(d.ejecutadas,'#1D9E75','Ejecutadas') + bar(d.noEjec, O,'No ejecutadas') + '</div>';
 
   // Tabla causas
-  var consideraciones = { 'Cliente':'Cancelación o ajuste solicitado','On Street':'Dentro del margen contractual','Externo':'Contingencia operacional','No informado':'Sin casos' };
+  var consideraciones = { 'Cliente':'Cancelación o ajuste solicitado por cliente','On Street':'Responsabilidad operacional de On Street','Fuerza mayor':'Contingencia ajena a las partes (clima, accidente, etc.)' };
   var cauTotal = d.causas.reduce(function(s,c){return s+c.count;},0) || 1;
   var cauRows = d.causas.map(function(c,i){
     var bg = i%2===0?'#fff':'#fafafa';
@@ -2797,13 +2798,13 @@ function _buildReporteHTML(d) {
     sec('Indicadores principales',
       '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">' +
         kpi(d.planificadas,'Rutas planificadas') + kpi(d.ejecutadas,'Rutas ejecutadas','#1D9E75') + kpi(d.noEjec,'Rutas no ejecutadas',O) +
-        kpi(d.pct+'%','% pérdida de ruta',O) + kpi(d.margen+' rutas','Margen contractual') +
+        kpi(d.pctEjec+'%','% ejecución',d.dentro?'#1D9E75':O) + kpi(d.margenPct+'%','Margen mínimo contractual') +
         kpi(estadoTxt,'Estado contractual',estadoColor) +
       '</div>') +
     sec('Revisión contractual',
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:center">' +
-        '<div style="font-size:13px;line-height:1.6;color:#333">De acuerdo con el margen contractual informado, On Street puede registrar hasta <strong>'+d.margen+'</strong> rutas no ejecutadas atribuibles a la empresa durante el período. En '+escapeHtml(d.periodo)+' se identificaron <strong>'+d.osCount+'</strong> ruta'+(d.osCount!==1?'s':'')+' atribuible'+(d.osCount!==1?'s':'')+' a On Street, por lo que el resultado se mantiene <strong style="color:'+estadoColor+'">'+(d.dentro?'dentro del':'fuera del')+' margen contractual</strong>.<br><br>' +
-        '<span style="font-size:12px"><strong>Rutas permitidas (contrato):</strong> '+d.margen+'<br><strong style="color:'+estadoColor+'">Atribuibles a On Street: '+d.osCount+' ('+estadoTxt+')</strong></span></div>' +
+        '<div style="font-size:13px;line-height:1.6;color:#333">El margen contractual exige ejecutar al menos el <strong>'+d.margenPct+'%</strong> de las rutas planificadas. Para el período '+escapeHtml(d.periodo)+', esto equivale a <strong>'+d.minRequeridas+'</strong> de las '+d.planificadas+' rutas planificadas. Se ejecutaron <strong>'+d.ejecutadas+'</strong> rutas ('+d.pctEjec+'%), por lo que el resultado se mantiene <strong style="color:'+estadoColor+'">'+(d.dentro?'dentro del':'fuera del')+' margen contractual</strong>.<br><br>' +
+        '<span style="font-size:12px"><strong>Mínimo requerido ('+d.margenPct+'%):</strong> '+d.minRequeridas+' rutas<br><strong>Ejecutadas: '+d.ejecutadas+' ('+d.pctEjec+'%)</strong><br><strong style="color:'+estadoColor+'">Estado: '+estadoTxt+'</strong></span></div>' +
         '<div>'+barChart+'</div>' +
       '</div>') +
     sec('Clasificación de causas',
