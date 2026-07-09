@@ -2709,6 +2709,9 @@ function cargarDatosInforme() {
   });
 }
 
+function formatDateISO(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
 function _fmtFechaHumana(s) {
   if (!s) return '';
   var p = s.split('-'); return p[2]+'/'+p[1]+'/'+p[0];
