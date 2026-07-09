@@ -183,6 +183,11 @@ function doGet(e) {
       const conductor = String(e.parameter.conductor || '');
       result = updateFlotaConductor(cliente, movil, conductor);
 
+    } else if (source === 'reporte_perdida_ruta') {
+      const cliente = String(e.parameter.cliente || '');
+      const mesAnio = String(e.parameter.mesAnio || '');
+      result = readPerdidaRutaData(cliente, mesAnio);
+
     } else {
       result = { error: 'source no reconocido' };
     }
@@ -225,6 +230,57 @@ function getKilometrosData() {
   return {
     kilometros: safeRead(function() { return getCached('kilometros', function() { return readKilometros(flotaInfo); }, CACHE_DURATION_SECONDS); })
   };
+}
+
+// Callable desde google.script.run y desde doGet source=reporte_perdida_ruta
+function readPerdidaRutaData(cliente, mesAnio) {
+  const parts = (mesAnio || '').split('-');
+  const year  = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10);
+  if (!year || !month) throw new Error('Período inválido: ' + mesAnio);
+  const nc = normalize_(cliente || '');
+
+  var planificadas = 0;
+  try {
+    const ssGPS    = SpreadsheetApp.openById(SHEETS.informesGPS);
+    const calSheet = ssGPS.getSheetByName('CalendarioTransformado');
+    if (calSheet && calSheet.getLastRow() > 1) {
+      const calVals    = calSheet.getRange(1, 1, calSheet.getLastRow(), calSheet.getLastColumn()).getValues();
+      const calHeaders = calVals[0].map(function(h){ return String(h).trim(); });
+      const idxFecha   = calHeaders.indexOf('Fecha');
+      const idxCliente = calHeaders.indexOf('Cliente');
+      for (var i = 1; i < calVals.length; i++) {
+        var row = calVals[i];
+        if (nc && idxCliente >= 0 && normalize_(String(row[idxCliente] || '')) !== nc) continue;
+        var fecha = parseFlexibleDate(row[idxFecha >= 0 ? idxFecha : 0]);
+        if (!fecha || fecha.getFullYear() !== year || fecha.getMonth() + 1 !== month) continue;
+        planificadas++;
+      }
+    }
+  } catch(e) { Logger.log('readPerdidaRuta planificadas: ' + e); }
+
+  var ejecutadas = 0;
+  try {
+    const ssUni    = SpreadsheetApp.openById(SHEETS.unificador);
+    const terSheet = ssUni.getSheetByName('Termino de Ruta');
+    if (terSheet && terSheet.getLastRow() > 1) {
+      const terVals    = terSheet.getRange(1, 1, terSheet.getLastRow(), terSheet.getLastColumn()).getValues();
+      const terHeaders = terVals[0].map(function(h){ return String(h).trim(); });
+      const idxFecha   = terHeaders.indexOf('Fecha');
+      const idxCliente = terHeaders.indexOf('Cliente');
+      for (var i = 1; i < terVals.length; i++) {
+        var row = terVals[i];
+        if (nc && idxCliente >= 0 && normalize_(String(row[idxCliente] || '')) !== nc) continue;
+        var fecha = parseFlexibleDate(row[idxFecha >= 0 ? idxFecha : 0]);
+        if (!fecha || fecha.getFullYear() !== year || fecha.getMonth() + 1 !== month) continue;
+        ejecutadas++;
+      }
+    }
+  } catch(e) { Logger.log('readPerdidaRuta ejecutadas: ' + e); }
+
+  const noEjecutadas = Math.max(0, planificadas - ejecutadas);
+  const pct = planificadas > 0 ? (noEjecutadas / planificadas * 100).toFixed(1) : '0.0';
+  return { ok: true, planificadas: planificadas, ejecutadas: ejecutadas, noEjecutadas: noEjecutadas, porcentajePerdida: pct };
 }
 
 function respond(obj, callback) {

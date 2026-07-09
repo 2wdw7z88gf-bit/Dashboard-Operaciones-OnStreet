@@ -427,6 +427,28 @@ tr:hover td{background:var(--surface-2)}
 .bnav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 4px;background:none;border:none;cursor:pointer;color:var(--text-3);font-family:inherit;font-size:11px;font-weight:500;line-height:1.2;min-height:52px;transition:color 0.15s;-webkit-tap-highlight-color:transparent}
 .bnav-btn.active{color:var(--info-fg)}
 .bnav-btn svg{width:20px;height:20px;flex-shrink:0}
+
+/* ─── INFORMES EJECUTIVOS ─────────────────────────────────────────── */
+.inf-builder{display:grid;grid-template-columns:360px 1fr;gap:16px;align-items:start}
+.inf-field{margin-bottom:12px}
+.inf-field label{display:block;font-size:11px;color:var(--text-2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px;font-weight:500}
+.inf-field input,.inf-field select,.inf-field textarea{width:100%;padding:8px 10px;border:0.5px solid var(--border);border-radius:7px;font-size:13px;background:var(--surface);color:var(--text-1);font-family:inherit}
+.inf-field textarea{resize:vertical;min-height:90px;line-height:1.5}
+.inf-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.inf-btn-load{width:100%;padding:10px;background:var(--info-fg);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+.inf-btn-load:hover{filter:brightness(1.1)}
+.inf-btn-gen{width:100%;padding:11px;background:#E55A20;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-top:12px}
+.inf-btn-gen:hover{filter:brightness(1.08)}
+.inf-btn-pdf{width:100%;padding:9px;background:var(--surface-2);color:var(--text-1);border:0.5px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer;margin-top:8px}
+.inf-autodata{background:var(--surface-2);border-radius:8px;padding:12px 14px;margin-top:10px;display:none}
+.inf-autodata-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;color:var(--text-1);margin-bottom:6px}
+.inf-autodata input{width:80px;padding:3px 7px;border:0.5px solid var(--border);border-radius:4px;font-size:12px;background:var(--surface);color:var(--text-1)}
+.inf-causa-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.inf-causa-tbl th{background:var(--surface-2);padding:6px 8px;text-align:left;font-size:11px;color:var(--text-2);border-bottom:0.5px solid var(--border)}
+.inf-causa-tbl td{padding:5px 8px;border-bottom:0.5px solid var(--border);font-size:12px;color:var(--text-1)}
+.inf-causa-tbl input{width:62px;padding:3px 6px;border:0.5px solid var(--border);border-radius:4px;font-size:12px;text-align:center;background:var(--surface);color:var(--text-1)}
+.inf-preview-empty{text-align:center;padding:60px 20px;color:var(--text-3)}
+@media(max-width:900px){.inf-builder{grid-template-columns:1fr}}
 </style>
 <script>
 (function(){
@@ -486,6 +508,7 @@ tr:hover td{background:var(--surface-2)}
     <button class="tab" onclick="switchTab(event,'supervisiones')">Supervisiones</button>
     <button class="tab" onclick="switchTab(event,'kilometros')">Kilómetros</button>
     <button class="tab" onclick="switchTab(event,'tendencias')">Tendencias</button>
+    <button class="tab" onclick="switchTab(event,'informes')">Informes</button>
   </div>
 
   <!-- ============= TAB: OPERACIÓN ============= -->
@@ -923,6 +946,80 @@ tr:hover td{background:var(--surface-2)}
     </div>
   </div>
 
+  <!-- ============= TAB: INFORMES ============= -->
+  <div class="tab-content" id="tab-informes">
+    <div class="inf-builder">
+      <!-- FORMULARIO -->
+      <div class="panel">
+        <h2>📄 Informe de Pérdida de Ruta</h2>
+        <div style="margin-top:14px">
+          <div class="inf-field">
+            <label>Cliente</label>
+            <select id="infCliente"><option value="">Seleccionar cliente...</option></select>
+          </div>
+          <div class="inf-row2">
+            <div class="inf-field">
+              <label>Mes</label>
+              <select id="infMes">
+                <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+                <option value="4">Abril</option><option value="5">Mayo</option><option value="6" selected>Junio</option>
+                <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+                <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+              </select>
+            </div>
+            <div class="inf-field">
+              <label>Año</label>
+              <select id="infAnio">
+                <option value="2024">2024</option><option value="2025">2025</option><option value="2026" selected>2026</option>
+              </select>
+            </div>
+          </div>
+          <div class="inf-field">
+            <label>Margen contractual (n° rutas permitidas a On Street)</label>
+            <input id="infMargen" type="number" min="0" placeholder="ej: 5">
+          </div>
+          <button class="inf-btn-load" id="infBtnLoad" onclick="cargarDatosInforme()">Cargar datos del período</button>
+          <div class="inf-autodata" id="infAutoData">
+            <div style="font-size:11px;color:var(--text-2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.3px;font-weight:500">Datos cargados — ajusta si es necesario</div>
+            <div class="inf-autodata-row">
+              <div>Planificadas <input id="infPlanificadas" type="number" min="0" value="0"></div>
+              <div>Ejecutadas <input id="infEjecutadas" type="number" min="0" value="0"></div>
+            </div>
+          </div>
+          <div class="inf-field" style="margin-top:14px">
+            <label>Clasificación de causas</label>
+            <table class="inf-causa-tbl">
+              <thead><tr><th>Causa</th><th>N° rutas</th></tr></thead>
+              <tbody>
+                <tr><td>Cliente</td><td><input id="infCausaCliente" type="number" min="0" value="0"></td></tr>
+                <tr><td>On Street</td><td><input id="infCausaOS" type="number" min="0" value="0"></td></tr>
+                <tr><td>Externo</td><td><input id="infCausaExterno" type="number" min="0" value="0"></td></tr>
+                <tr><td>No informado</td><td><input id="infCausaNI" type="number" min="0" value="0"></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="inf-field">
+            <label>Gestión realizada (una acción por línea)</label>
+            <textarea id="infGestion" placeholder="Revisión y clasificación de las rutas no ejecutadas según causa y responsabilidad.
+Confirmación previa de rutas críticas para anticipar desviaciones.
+Seguimiento semanal de la planificación con el equipo operacional."></textarea>
+          </div>
+          <button class="inf-btn-gen" onclick="generarVistaPrevia()">Generar vista previa</button>
+          <button class="inf-btn-pdf" onclick="exportarInforme()">↗ Exportar / Imprimir PDF</button>
+        </div>
+      </div>
+      <!-- PREVIEW -->
+      <div>
+        <div id="infPreviewEmpty" class="panel inf-preview-empty">
+          <div style="font-size:36px;margin-bottom:12px">📄</div>
+          <div style="font-size:15px;font-weight:500;margin-bottom:6px">Vista previa del informe</div>
+          <div style="font-size:13px">Completa el formulario y haz clic en "Generar vista previa"</div>
+        </div>
+        <div id="infPreview" class="panel" style="display:none;background:#fff;color:#222"></div>
+      </div>
+    </div>
+  </div>
+
   <div class="footer">Dashboard conectado a Google Sheets vía Apps Script · Actualización automática cada 5 min</div>
 </div>
 
@@ -952,6 +1049,10 @@ tr:hover td{background:var(--surface-2)}
   <button class="bnav-btn" id="bnav-tendencias" onclick="switchTab(event,'tendencias')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
     <span>Tendencias</span>
+  </button>
+  <button class="bnav-btn" id="bnav-informes" onclick="switchTab(event,'informes')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="11" y2="17"/></svg>
+    <span>Informes</span>
   </button>
 </nav>
 
@@ -2544,6 +2645,189 @@ function populateKamSelector(){
 
 loadData();
 startAutoRefresh();
+
+// ============================================================================
+// INFORMES EJECUTIVOS — Pérdida de Ruta
+// ============================================================================
+(function initInformesTab(){
+  // Poblar select de clientes cuando la pestaña es visible
+  var populated = false;
+  document.querySelector('[onclick="switchTab(event,\'informes\')"]') &&
+  document.querySelector('[onclick="switchTab(event,\'informes\')"]').addEventListener('click', function(){
+    if (populated) return;
+    populated = true;
+    var sel = document.getElementById('infCliente');
+    if (!sel || !allData) return;
+    var kams = (allData.unificador && allData.unificador.moviles) ? allData.unificador.moviles : [];
+    var clientes = [...new Set(kams.map(m => m.cliente).filter(Boolean))].sort();
+    clientes.forEach(function(c){
+      var o = document.createElement('option');
+      o.value = c; o.textContent = c;
+      sel.appendChild(o);
+    });
+  });
+})();
+
+function cargarDatosInforme() {
+  var cliente = document.getElementById('infCliente').value;
+  var mes     = document.getElementById('infMes').value;
+  var anio    = document.getElementById('infAnio').value;
+  if (!cliente) { alert('Selecciona un cliente'); return; }
+  if (!mes || !anio) { alert('Selecciona mes y año'); return; }
+  var mesAnio = anio + '-' + String(mes).padStart(2,'0');
+  var btn = document.getElementById('infBtnLoad');
+  btn.textContent = 'Cargando...'; btn.disabled = true;
+
+  function doLoad() {
+    return new Promise(function(resolve, reject){
+      if (IS_GAS) {
+        google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)
+          .readPerdidaRutaData(cliente, mesAnio);
+      } else {
+        fetch(GAS_API_URL + '?source=reporte_perdida_ruta&cliente=' + encodeURIComponent(cliente) + '&mesAnio=' + encodeURIComponent(mesAnio))
+          .then(function(r){ return r.json(); }).then(resolve).catch(reject);
+      }
+    });
+  }
+
+  doLoad().then(function(data){
+    btn.textContent = 'Cargar datos del período'; btn.disabled = false;
+    if (data && data.error) { alert('Error GAS: ' + data.error); return; }
+    document.getElementById('infPlanificadas').value = data.planificadas || 0;
+    document.getElementById('infEjecutadas').value   = data.ejecutadas   || 0;
+    document.getElementById('infAutoData').style.display = 'block';
+  }).catch(function(err){
+    btn.textContent = 'Cargar datos del período'; btn.disabled = false;
+    alert('Error al cargar: ' + (err.message || err));
+  });
+}
+
+function generarVistaPrevia() {
+  var cliente      = document.getElementById('infCliente').value;
+  var mes          = parseInt(document.getElementById('infMes').value, 10);
+  var anio         = document.getElementById('infAnio').value;
+  var margen       = parseInt(document.getElementById('infMargen').value, 10) || 0;
+  var planificadas = parseInt(document.getElementById('infPlanificadas').value, 10) || 0;
+  var ejecutadas   = parseInt(document.getElementById('infEjecutadas').value, 10) || 0;
+  if (!cliente) { alert('Selecciona un cliente'); return; }
+  var noEjec = Math.max(0, planificadas - ejecutadas);
+  var pct    = planificadas > 0 ? (noEjec / planificadas * 100).toFixed(1) : '0.0';
+  var causas = [
+    { nombre: 'Cliente',      count: parseInt(document.getElementById('infCausaCliente').value,10)||0 },
+    { nombre: 'On Street',    count: parseInt(document.getElementById('infCausaOS').value,10)||0 },
+    { nombre: 'Externo',      count: parseInt(document.getElementById('infCausaExterno').value,10)||0 },
+    { nombre: 'No informado', count: parseInt(document.getElementById('infCausaNI').value,10)||0 }
+  ];
+  var gestion = (document.getElementById('infGestion').value||'').split('\n').filter(function(l){return l.trim();});
+  var meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  var periodo  = meses[mes] + ' ' + anio;
+  var hoy = new Date();
+  var emision  = hoy.getDate() + ' de ' + meses[hoy.getMonth()+1] + ' de ' + hoy.getFullYear();
+  var osCount  = causas[1].count;
+  var dentro   = osCount <= margen;
+  var html = _buildReporteHTML({ cliente, periodo, emision, planificadas, ejecutadas, noEjec, pct, margen, osCount, dentro, causas, gestion });
+  var pre = document.getElementById('infPreview');
+  var emp = document.getElementById('infPreviewEmpty');
+  pre.innerHTML = html; pre.style.display = 'block';
+  if (emp) emp.style.display = 'none';
+  pre.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function _buildReporteHTML(d) {
+  var O = '#E55A20';
+  var estadoTxt   = d.dentro ? 'Dentro de margen' : 'Fuera de margen';
+  var estadoColor = d.dentro ? '#1D9E75' : '#E24B4A';
+  var resumen = 'Durante el período ' + d.periodo + ' se registraron ' + d.planificadas + ' rutas planificadas para el cliente ' + escapeHtml(d.cliente) +
+    ', de las cuales ' + d.ejecutadas + ' fueron ejecutadas y ' + d.noEjec + ' no fueron ejecutadas, lo que representa una pérdida de ruta de ' + d.pct +
+    '% sobre la planificación del período. El presente informe resume el impacto de dichas rutas no ejecutadas, su clasificación según causa y las acciones de gestión implementadas por On Street para mantener la continuidad del servicio.';
+  var conclusion = 'En conclusión, la pérdida de ruta registrada durante ' + d.periodo + ' representa un ' + d.pct + '% del total planificado. Del total de rutas no ejecutadas, ' +
+    d.osCount + ' caso' + (d.osCount !== 1 ? 's' : '') + ' se asocia' + (d.osCount !== 1 ? 'n' : '') + ' a causas atribuibles a On Street. ' +
+    'La mayor proporción de casos corresponde a causa atribuible a cliente. En términos contractuales, el resultado contractual se mantiene ' +
+    (d.dentro ? 'dentro del' : 'fuera del') + ' margen permitido. On Street continuará realizando seguimiento preventivo para reducir la recurrencia de este tipo de situaciones y asegurar la continuidad del servicio.';
+
+  // Barras
+  var maxB = Math.max(d.planificadas, d.ejecutadas, d.noEjec, 1);
+  function bar(val, color, label) {
+    var h = Math.max(4, Math.round(val / maxB * 80));
+    return '<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1">' +
+      '<div style="font-size:12px;font-weight:600;color:#333">' + val + '</div>' +
+      '<div style="width:100%;height:' + h + 'px;background:' + color + ';border-radius:3px 3px 0 0"></div>' +
+      '<div style="font-size:10px;color:#888">' + label + '</div></div>';
+  }
+  var barChart = '<div style="display:flex;align-items:flex-end;gap:10px;height:110px;padding-top:20px">' +
+    bar(d.planificadas,'#888','Planificadas') + bar(d.ejecutadas,'#1D9E75','Ejecutadas') + bar(d.noEjec, O,'No ejecutadas') + '</div>';
+
+  // Tabla causas
+  var consideraciones = { 'Cliente':'Cancelación o ajuste solicitado','On Street':'Dentro del margen contractual','Externo':'Contingencia operacional','No informado':'Sin casos' };
+  var cauTotal = d.causas.reduce(function(s,c){return s+c.count;},0) || 1;
+  var cauRows = d.causas.map(function(c,i){
+    var bg = i%2===0?'#fff':'#fafafa';
+    return '<tr style="background:'+bg+'"><td style="padding:7px 10px;border-bottom:0.5px solid #eee">'+escapeHtml(c.nombre)+'</td>' +
+      '<td style="padding:7px 10px;border-bottom:0.5px solid #eee;text-align:center">'+c.count+'</td>' +
+      '<td style="padding:7px 10px;border-bottom:0.5px solid #eee;text-align:center">'+(c.count/cauTotal*100).toFixed(1)+'%</td>' +
+      '<td style="padding:7px 10px;border-bottom:0.5px solid #eee">'+escapeHtml(consideraciones[c.nombre]||'')+'</td></tr>';
+  }).join('');
+
+  // Gestión
+  var gestHTML = d.gestion.length > 0
+    ? '<ul style="padding-left:20px;font-size:13px;line-height:1.9;color:#333">'+d.gestion.map(function(l){return '<li>'+escapeHtml(l.trim())+'</li>';}).join('')+'</ul>'
+    : '<p style="font-size:13px;color:#888">Sin gestión registrada.</p>';
+
+  function sec(title, body) {
+    return '<div style="margin-bottom:22px">' +
+      '<div style="font-size:12px;font-weight:700;text-transform:uppercase;color:'+O+';letter-spacing:.5px;padding-bottom:5px;border-bottom:1.5px solid '+O+';margin-bottom:11px">'+title+'</div>' +
+      body + '</div>';
+  }
+  function box(txt) { return '<div style="background:#FFF8F5;border-left:3px solid '+O+';padding:12px 16px;font-size:13px;line-height:1.65;color:#333">'+txt+'</div>'; }
+  function kpi(val, label, color) {
+    return '<div style="border:1.5px solid #ccc;border-radius:6px;padding:14px 8px;text-align:center">' +
+      '<div style="font-size:24px;font-weight:700;color:'+(color||'#555')+'">'+val+'</div>' +
+      '<div style="font-size:9px;color:#999;margin-top:4px;text-transform:uppercase;letter-spacing:.3px">'+label+'</div></div>';
+  }
+
+  return '<div style="font-family:\'Helvetica Neue\',Arial,sans-serif;color:#222;font-size:13px">' +
+    // Header
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:2.5px solid '+O+';margin-bottom:22px">' +
+      '<div><div style="font-size:22px;font-weight:800;color:'+O+';line-height:1">On Street</div><div style="font-size:10px;color:#999;margin-top:2px">Tú nos mueves</div></div>' +
+      '<div style="text-align:right"><div style="font-size:17px;font-weight:700;color:'+O+'">Informe Ejecutivo de Pérdida de Ruta</div>' +
+      '<div style="font-size:11px;color:#666;margin-top:4px">Cliente: <strong>'+escapeHtml(d.cliente)+'</strong> &nbsp;|&nbsp; Período: '+escapeHtml(d.periodo)+' &nbsp;|&nbsp; Emisión: '+escapeHtml(d.emision)+'</div></div>' +
+    '</div>' +
+    sec('Resumen de la situación', box(resumen)) +
+    sec('Indicadores principales',
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">' +
+        kpi(d.planificadas,'Rutas planificadas') + kpi(d.ejecutadas,'Rutas ejecutadas','#1D9E75') + kpi(d.noEjec,'Rutas no ejecutadas',O) +
+        kpi(d.pct+'%','% pérdida de ruta',O) + kpi(d.margen+' rutas','Margen contractual') +
+        kpi(estadoTxt,'Estado contractual',estadoColor) +
+      '</div>') +
+    sec('Revisión contractual',
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:center">' +
+        '<div style="font-size:13px;line-height:1.6;color:#333">De acuerdo con el margen contractual informado, On Street puede registrar hasta <strong>'+d.margen+'</strong> rutas no ejecutadas atribuibles a la empresa durante el período. En '+escapeHtml(d.periodo)+' se identificaron <strong>'+d.osCount+'</strong> ruta'+(d.osCount!==1?'s':'')+' atribuible'+(d.osCount!==1?'s':'')+' a On Street, por lo que el resultado se mantiene <strong style="color:'+estadoColor+'">'+(d.dentro?'dentro del':'fuera del')+' margen contractual</strong>.<br><br>' +
+        '<span style="font-size:12px"><strong>Rutas permitidas (contrato):</strong> '+d.margen+'<br><strong style="color:'+estadoColor+'">Atribuibles a On Street: '+d.osCount+' ('+estadoTxt+')</strong></span></div>' +
+        '<div>'+barChart+'</div>' +
+      '</div>') +
+    sec('Clasificación de causas',
+      '<table style="width:100%;border-collapse:collapse;font-size:12px">' +
+        '<thead><tr style="background:'+O+';color:#fff"><th style="padding:8px 10px;text-align:left">Causa</th><th style="padding:8px 10px;text-align:center">Rutas no ejecutadas</th><th style="padding:8px 10px;text-align:center">% del total</th><th style="padding:8px 10px;text-align:left">Consideración</th></tr></thead>' +
+        '<tbody>'+cauRows+'</tbody></table>') +
+    sec('Gestión realizada', gestHTML) +
+    sec('Conclusión', box(conclusion)) +
+  '</div>';
+}
+
+function exportarInforme() {
+  var pre = document.getElementById('infPreview');
+  if (!pre || !pre.innerHTML.trim() || pre.style.display === 'none') {
+    alert('Primero genera la vista previa'); return;
+  }
+  var win = window.open('', '_blank');
+  win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Informe Pérdida de Ruta</title>' +
+    '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:\'Helvetica Neue\',Arial,sans-serif;padding:30px;background:#fff;color:#222}' +
+    '@media print{body{padding:15px}@page{size:A4;margin:20mm 15mm}}</style></head>' +
+    '<body>' + pre.innerHTML + '</body></html>');
+  win.document.close();
+  win.focus();
+  setTimeout(function(){ win.print(); }, 500);
+}
 </script>
 <div id="kpiTip" class="tooltip" style="max-width:300px;line-height:1.6;font-size:12px"></div>
 
