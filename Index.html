@@ -997,6 +997,10 @@ tr:hover td{background:var(--surface-2)}
             </table>
           </div>
           <div class="inf-field">
+            <label>¿Qué originó la pérdida de ruta?</label>
+            <textarea id="infSituacion" placeholder="Describe brevemente la causa principal de las rutas no ejecutadas en el período..."></textarea>
+          </div>
+          <div class="inf-field">
             <label>Gestión realizada (una acción por línea)</label>
             <textarea id="infGestion" placeholder="Revisión y clasificación de las rutas no ejecutadas según causa y responsabilidad.
 Confirmación previa de rutas críticas para anticipar desviaciones.
@@ -2687,9 +2691,18 @@ function cargarDatosInforme() {
   doLoad().then(function(data){
     btn.textContent = 'Cargar datos del período'; btn.disabled = false;
     if (data && data.error) { alert('Error: ' + data.error); return; }
+    if (data && data._dbg) { console.log('[InformesGPS debug]', data._dbg); }
     document.getElementById('infPlanificadas').value = data.planificadas || 0;
     document.getElementById('infEjecutadas').value   = data.ejecutadas   || 0;
     document.getElementById('infAutoData').style.display = 'block';
+    if ((data.planificadas || 0) === 0) {
+      var d = data._dbg || {};
+      var msg = 'No se encontraron rutas planificadas para el período seleccionado.';
+      if (d.calExiste === false) msg += '\n\nLa hoja CalendarioTransformado no existe en el spreadsheet de Informes GPS.';
+      else if (d.calTotalRows === 0) msg += '\n\nLa hoja CalendarioTransformado está vacía.';
+      else msg += '\n\nVerifica que haya datos para el rango ' + fechaInicio + ' → ' + fechaFin + ' en la hoja CalendarioTransformado.' + (d.calIdxFecha === -1 ? '\n\n⚠ No se encontró columna "Fecha" en CalendarioTransformado. Columnas disponibles: ' + (d.calHeaders||[]).join(', ') : '');
+      alert(msg);
+    }
   }).catch(function(err){
     btn.textContent = 'Cargar datos del período'; btn.disabled = false;
     alert('Error al cargar: ' + (err.message || err));
@@ -2720,13 +2733,14 @@ function generarVistaPrevia() {
     { nombre: 'On Street',    count: parseInt(document.getElementById('infCausaOS').value,10)||0 },
     { nombre: 'Fuerza mayor', count: parseInt(document.getElementById('infCausaFM').value,10)||0 }
   ];
+  var situacion = (document.getElementById('infSituacion').value||'').trim();
   var gestion = (document.getElementById('infGestion').value||'').split('\n').filter(function(l){return l.trim();});
   var meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   var periodo  = _fmtFechaHumana(fechaInicio) + ' al ' + _fmtFechaHumana(fechaFin);
   var hoy = new Date();
   var emision  = hoy.getDate() + ' de ' + meses[hoy.getMonth()+1] + ' de ' + hoy.getFullYear();
   var osCount  = causas[1].count;
-  var html = _buildReporteHTML({ cliente: cliente, periodo: periodo, emision: emision, planificadas: planificadas, ejecutadas: ejecutadas, noEjec: noEjec, pct: pct, pctEjec: pctEjec, margenPct: margenPct, minRequeridas: minRequeridas, osCount: osCount, dentro: dentro, causas: causas, gestion: gestion });
+  var html = _buildReporteHTML({ cliente: cliente, periodo: periodo, emision: emision, planificadas: planificadas, ejecutadas: ejecutadas, noEjec: noEjec, pct: pct, pctEjec: pctEjec, margenPct: margenPct, minRequeridas: minRequeridas, osCount: osCount, dentro: dentro, causas: causas, gestion: gestion, situacion: situacion });
   var pre = document.getElementById('infPreview');
   var emp = document.getElementById('infPreviewEmpty');
   pre.innerHTML = html; pre.style.display = 'block';
@@ -2738,9 +2752,13 @@ function _buildReporteHTML(d) {
   var O = '#E55A20';
   var estadoTxt   = d.dentro ? 'Dentro de margen' : 'Fuera de margen';
   var estadoColor = d.dentro ? '#1D9E75' : '#E24B4A';
-  var resumen = 'Durante el período ' + d.periodo + ' se registraron ' + d.planificadas + ' rutas planificadas para el cliente ' + escapeHtml(d.cliente) +
+  var resumenStats = 'Durante el período ' + d.periodo + ' se registraron ' + d.planificadas + ' rutas planificadas para el cliente ' + escapeHtml(d.cliente) +
     ', de las cuales ' + d.ejecutadas + ' fueron ejecutadas y ' + d.noEjec + ' no fueron ejecutadas, lo que representa una pérdida de ruta de ' + d.pct +
     '% sobre la planificación del período. El presente informe resume el impacto de dichas rutas no ejecutadas, su clasificación según causa y las acciones de gestión implementadas por On Street para mantener la continuidad del servicio.';
+  var resumenHTML = d.situacion
+    ? '<p style="margin:0 0 10px 0;font-size:13px;line-height:1.65;color:#333"><strong>Contexto:</strong> ' + escapeHtml(d.situacion) + '</p>' +
+      '<p style="margin:0;font-size:13px;line-height:1.65;color:#333">' + resumenStats + '</p>'
+    : '<p style="margin:0;font-size:13px;line-height:1.65;color:#333">' + resumenStats + '</p>';
   var conclusion = 'En conclusión, la ejecución de rutas durante ' + d.periodo + ' alcanzó un ' + d.pctEjec + '% de lo planificado (' + d.ejecutadas + ' de ' + d.planificadas + ' rutas). ' +
     'El margen contractual exige la ejecución de al menos el ' + d.margenPct + '% de las rutas planificadas (' + d.minRequeridas + ' rutas). ' +
     'Del total de rutas no ejecutadas, ' + d.osCount + ' caso' + (d.osCount !== 1 ? 's' : '') + ' se asocia' + (d.osCount !== 1 ? 'n' : '') + ' a causas atribuibles a On Street. ' +
@@ -2794,7 +2812,7 @@ function _buildReporteHTML(d) {
       '<div style="text-align:right"><div style="font-size:17px;font-weight:700;color:'+O+'">Informe Ejecutivo de Pérdida de Ruta</div>' +
       '<div style="font-size:11px;color:#666;margin-top:4px">Cliente: <strong>'+escapeHtml(d.cliente)+'</strong> &nbsp;|&nbsp; Período: '+escapeHtml(d.periodo)+' &nbsp;|&nbsp; Emisión: '+escapeHtml(d.emision)+'</div></div>' +
     '</div>' +
-    sec('Resumen de la situación', box(resumen)) +
+    sec('Resumen de la situación', '<div style="background:#FFF8F5;border-left:3px solid '+O+';padding:12px 16px">' + resumenHTML + '</div>') +
     sec('Indicadores principales',
       '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">' +
         kpi(d.planificadas,'Rutas planificadas') + kpi(d.ejecutadas,'Rutas ejecutadas','#1D9E75') + kpi(d.noEjec,'Rutas no ejecutadas',O) +

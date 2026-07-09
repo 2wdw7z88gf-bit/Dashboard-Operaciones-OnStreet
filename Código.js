@@ -246,15 +246,29 @@ function readPerdidaRutaData(cliente, fechaInicio, fechaFin) {
     return s >= fechaInicio && s <= fechaFin;
   }
 
+  function findIdx(headers, name) {
+    var n = name.toLowerCase();
+    for (var j = 0; j < headers.length; j++) {
+      if (headers[j].toLowerCase() === n) return j;
+    }
+    return -1;
+  }
+
+  var dbg = {};
   var planificadas = 0;
   try {
     const ssGPS    = SpreadsheetApp.openById(SHEETS.informesGPS);
     const calSheet = ssGPS.getSheetByName('CalendarioTransformado');
+    dbg.calExiste = !!calSheet;
     if (calSheet && calSheet.getLastRow() > 1) {
       const calVals    = calSheet.getRange(1, 1, calSheet.getLastRow(), calSheet.getLastColumn()).getValues();
       const calHeaders = calVals[0].map(function(h){ return String(h).trim(); });
-      const idxFecha   = calHeaders.indexOf('Fecha');
-      const idxCliente = calHeaders.indexOf('Cliente');
+      dbg.calHeaders   = calHeaders;
+      dbg.calTotalRows = calVals.length - 1;
+      const idxFecha   = findIdx(calHeaders, 'Fecha');
+      const idxCliente = findIdx(calHeaders, 'Cliente');
+      dbg.calIdxFecha   = idxFecha;
+      dbg.calIdxCliente = idxCliente;
       for (var i = 1; i < calVals.length; i++) {
         var row = calVals[i];
         if (nc && idxCliente >= 0 && normalize_(String(row[idxCliente] || '')) !== nc) continue;
@@ -262,17 +276,22 @@ function readPerdidaRutaData(cliente, fechaInicio, fechaFin) {
         planificadas++;
       }
     }
-  } catch(e) { Logger.log('readPerdidaRuta planificadas: ' + e); }
+  } catch(e) { Logger.log('readPerdidaRuta planificadas: ' + e); dbg.calError = String(e); }
 
   var ejecutadas = 0;
   try {
     const ssUni    = SpreadsheetApp.openById(SHEETS.unificador);
     const terSheet = ssUni.getSheetByName('Termino de Ruta');
+    dbg.terExiste = !!terSheet;
     if (terSheet && terSheet.getLastRow() > 1) {
       const terVals    = terSheet.getRange(1, 1, terSheet.getLastRow(), terSheet.getLastColumn()).getValues();
       const terHeaders = terVals[0].map(function(h){ return String(h).trim(); });
-      const idxFecha   = terHeaders.indexOf('Fecha');
-      const idxCliente = terHeaders.indexOf('Cliente');
+      dbg.terHeaders   = terHeaders;
+      dbg.terTotalRows = terVals.length - 1;
+      const idxFecha   = findIdx(terHeaders, 'Fecha');
+      const idxCliente = findIdx(terHeaders, 'Cliente');
+      dbg.terIdxFecha   = idxFecha;
+      dbg.terIdxCliente = idxCliente;
       for (var i = 1; i < terVals.length; i++) {
         var row = terVals[i];
         if (nc && idxCliente >= 0 && normalize_(String(row[idxCliente] || '')) !== nc) continue;
@@ -280,11 +299,11 @@ function readPerdidaRutaData(cliente, fechaInicio, fechaFin) {
         ejecutadas++;
       }
     }
-  } catch(e) { Logger.log('readPerdidaRuta ejecutadas: ' + e); }
+  } catch(e) { Logger.log('readPerdidaRuta ejecutadas: ' + e); dbg.terError = String(e); }
 
   const noEjecutadas = Math.max(0, planificadas - ejecutadas);
   const pct = planificadas > 0 ? (noEjecutadas / planificadas * 100).toFixed(1) : '0.0';
-  return { ok: true, planificadas: planificadas, ejecutadas: ejecutadas, noEjecutadas: noEjecutadas, porcentajePerdida: pct };
+  return { ok: true, planificadas: planificadas, ejecutadas: ejecutadas, noEjecutadas: noEjecutadas, porcentajePerdida: pct, _dbg: dbg };
 }
 
 function respond(obj, callback) {
