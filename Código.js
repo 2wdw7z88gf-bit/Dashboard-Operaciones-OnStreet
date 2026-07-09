@@ -265,6 +265,7 @@ function readPerdidaRutaData(cliente, fechaInicio, fechaFin) {
   }
 
   var dbg = {};
+  var dbgRows = []; // muestra las primeras filas que pasaron los filtros
   var planificadas = 0;
   try {
     const ssGPS    = SpreadsheetApp.openById(SHEETS.informesGPS);
@@ -278,10 +279,18 @@ function readPerdidaRutaData(cliente, fechaInicio, fechaFin) {
       const idxFecha    = findIdx(calHeaders, 'Fecha');
       const idxCliente  = findIdx(calHeaders, 'Cliente');
       const idxMovil    = idxCliente >= 0 ? -1 : findIdx(calHeaders, 'Móvil');
-      const idxIni1     = findIdx(calHeaders, 'Horario de Inicio');
-      const idxFin1     = findIdx(calHeaders, 'Horario de Fin');
-      const idxIni2     = findIdx(calHeaders, 'Horario de Inicio 2');
-      const idxFin2     = findIdx(calHeaders, 'Horario de Fin 2');
+      // Buscar columna de horario principal con varios nombres posibles
+      function findHorario(headers, candidates) {
+        for (var c = 0; c < candidates.length; c++) {
+          var idx = findIdx(headers, candidates[c]);
+          if (idx >= 0) return idx;
+        }
+        return -1;
+      }
+      const idxIni1 = findHorario(calHeaders, ['Horario de Inicio','Hora de Inicio','Horario Inicio','Hora Inicio','Inicio']);
+      const idxFin1 = findHorario(calHeaders, ['Horario de Fin','Hora de Fin','Horario Fin','Hora Fin','Fin']);
+      const idxIni2 = findIdx(calHeaders, 'Horario de Inicio 2');
+      const idxFin2 = findIdx(calHeaders, 'Horario de Fin 2');
       dbg.calIdxFecha   = idxFecha;
       dbg.calIdxCliente = idxCliente;
       dbg.calIdxMovil   = idxMovil;
@@ -310,7 +319,20 @@ function readPerdidaRutaData(cliente, fechaInicio, fechaFin) {
           var dentroDelPrimero = ini1 !== null && fin1 !== null && ini2 >= ini1 && fin2 <= fin1;
           if (!dentroDelPrimero) planificadas++;
         }
+        // Guardar muestra de las primeras 5 filas para diagnóstico
+        if (dbgRows.length < 5) {
+          dbgRows.push({
+            i: i,
+            fecha: String(row[idxFecha >= 0 ? idxFecha : 0]),
+            cliente: idxCliente >= 0 ? String(row[idxCliente]) : (idxMovil >= 0 ? String(row[idxMovil]) : '?'),
+            ini1: idxIni1 >= 0 ? String(row[idxIni1]) : 'N/A',
+            fin1: idxFin1 >= 0 ? String(row[idxFin1]) : 'N/A',
+            ini2: idxIni2 >= 0 ? String(row[idxIni2]) : '',
+            fin2: idxFin2 >= 0 ? String(row[idxFin2]) : ''
+          });
+        }
       }
+      dbg.calSampleRows = dbgRows;
     }
   } catch(e) { Logger.log('readPerdidaRuta planificadas: ' + e); dbg.calError = String(e); }
 
