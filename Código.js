@@ -254,6 +254,16 @@ function readPerdidaRutaData(cliente, fechaInicio, fechaFin) {
     return -1;
   }
 
+  // Convierte "HH:MM" o "HH:MM:SS" o Date a minutos desde medianoche. null si no parseable.
+  function parseHHMM(v) {
+    if (!v && v !== 0) return null;
+    if (v instanceof Date) return v.getHours() * 60 + v.getMinutes();
+    var s = String(v).trim();
+    var m = s.match(/^(\d{1,2}):(\d{2})/);
+    if (!m) return null;
+    return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  }
+
   var dbg = {};
   var planificadas = 0;
   try {
@@ -265,12 +275,20 @@ function readPerdidaRutaData(cliente, fechaInicio, fechaFin) {
       const calHeaders = calVals[0].map(function(h){ return String(h).trim(); });
       dbg.calHeaders   = calHeaders;
       dbg.calTotalRows = calVals.length - 1;
-      const idxFecha   = findIdx(calHeaders, 'Fecha');
-      const idxCliente = findIdx(calHeaders, 'Cliente');
-      const idxMovil   = idxCliente >= 0 ? -1 : findIdx(calHeaders, 'Móvil');
+      const idxFecha    = findIdx(calHeaders, 'Fecha');
+      const idxCliente  = findIdx(calHeaders, 'Cliente');
+      const idxMovil    = idxCliente >= 0 ? -1 : findIdx(calHeaders, 'Móvil');
+      const idxIni1     = findIdx(calHeaders, 'Horario de Inicio');
+      const idxFin1     = findIdx(calHeaders, 'Horario de Fin');
+      const idxIni2     = findIdx(calHeaders, 'Horario de Inicio 2');
+      const idxFin2     = findIdx(calHeaders, 'Horario de Fin 2');
       dbg.calIdxFecha   = idxFecha;
       dbg.calIdxCliente = idxCliente;
       dbg.calIdxMovil   = idxMovil;
+      dbg.calIdxIni1    = idxIni1;
+      dbg.calIdxFin1    = idxFin1;
+      dbg.calIdxIni2    = idxIni2;
+      dbg.calIdxFin2    = idxFin2;
       for (var i = 1; i < calVals.length; i++) {
         var row = calVals[i];
         if (nc) {
@@ -281,7 +299,17 @@ function readPerdidaRutaData(cliente, fechaInicio, fechaFin) {
           }
         }
         if (!enRango(row[idxFecha >= 0 ? idxFecha : 0])) continue;
+        // Ruta principal
         planificadas++;
+        // Segunda ruta: contar solo si existe y NO está contenida en el horario de la primera
+        var ini2 = idxIni2 >= 0 ? parseHHMM(row[idxIni2]) : null;
+        var fin2 = idxFin2 >= 0 ? parseHHMM(row[idxFin2]) : null;
+        if (ini2 !== null && fin2 !== null) {
+          var ini1 = idxIni1 >= 0 ? parseHHMM(row[idxIni1]) : null;
+          var fin1 = idxFin1 >= 0 ? parseHHMM(row[idxFin1]) : null;
+          var dentroDelPrimero = ini1 !== null && fin1 !== null && ini2 >= ini1 && fin2 <= fin1;
+          if (!dentroDelPrimero) planificadas++;
+        }
       }
     }
   } catch(e) { Logger.log('readPerdidaRuta planificadas: ' + e); dbg.calError = String(e); }
