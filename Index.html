@@ -951,27 +951,26 @@ tr:hover td{background:var(--surface-2)}
     <div class="inf-builder">
       <!-- FORMULARIO -->
       <div class="panel">
-        <h2>📄 Informe de Pérdida de Ruta</h2>
+        <h2>📄 Generador de Informes</h2>
         <div style="margin-top:14px">
+          <div class="inf-field">
+            <label>Tipo de informe</label>
+            <select id="infTipo">
+              <option value="perdida_ruta">Informe de Pérdida de Ruta</option>
+            </select>
+          </div>
           <div class="inf-field">
             <label>Cliente</label>
             <select id="infCliente"><option value="">Seleccionar cliente...</option></select>
           </div>
           <div class="inf-row2">
             <div class="inf-field">
-              <label>Mes</label>
-              <select id="infMes">
-                <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
-                <option value="4">Abril</option><option value="5">Mayo</option><option value="6" selected>Junio</option>
-                <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
-                <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
-              </select>
+              <label>Fecha inicio del período</label>
+              <input id="infFechaInicio" type="date">
             </div>
             <div class="inf-field">
-              <label>Año</label>
-              <select id="infAnio">
-                <option value="2024">2024</option><option value="2025">2025</option><option value="2026" selected>2026</option>
-              </select>
+              <label>Fecha fin del período</label>
+              <input id="infFechaFin" type="date">
             </div>
           </div>
           <div class="inf-field">
@@ -1435,6 +1434,21 @@ function renderAll(){
   if(allData.unificador) renderDetalleOperacion();
   renderBannerDormidos();
   renderTendencias();
+  renderInformes();
+}
+function renderInformes(){
+  if(!allData||!allData.unificador) return;
+  var moviles=(allData.unificador.moviles||[]);
+  var clientes=[...new Set(moviles.map(function(m){return m.cliente;}).filter(Boolean))].sort();
+  populateSelect('infCliente',clientes,'Seleccionar cliente...');
+  // Defaults de fechas: mes anterior completo
+  var fi=document.getElementById('infFechaInicio'),ff=document.getElementById('infFechaFin');
+  if(fi&&!fi.value){
+    var hoy=new Date();
+    var primerDia=new Date(hoy.getFullYear(),hoy.getMonth()-1,1);
+    var ultimoDia=new Date(hoy.getFullYear(),hoy.getMonth(),0);
+    fi.value=formatDateISO(primerDia);ff.value=formatDateISO(ultimoDia);
+  }
 }
 
 // ── OPERACIÓN ──────────────────────────────────────────────────────────────
@@ -2649,32 +2663,13 @@ startAutoRefresh();
 // ============================================================================
 // INFORMES EJECUTIVOS — Pérdida de Ruta
 // ============================================================================
-(function initInformesTab(){
-  // Poblar select de clientes cuando la pestaña es visible
-  var populated = false;
-  document.querySelector('[onclick="switchTab(event,\'informes\')"]') &&
-  document.querySelector('[onclick="switchTab(event,\'informes\')"]').addEventListener('click', function(){
-    if (populated) return;
-    populated = true;
-    var sel = document.getElementById('infCliente');
-    if (!sel || !allData) return;
-    var kams = (allData.unificador && allData.unificador.moviles) ? allData.unificador.moviles : [];
-    var clientes = [...new Set(kams.map(m => m.cliente).filter(Boolean))].sort();
-    clientes.forEach(function(c){
-      var o = document.createElement('option');
-      o.value = c; o.textContent = c;
-      sel.appendChild(o);
-    });
-  });
-})();
-
 function cargarDatosInforme() {
-  var cliente = document.getElementById('infCliente').value;
-  var mes     = document.getElementById('infMes').value;
-  var anio    = document.getElementById('infAnio').value;
+  var cliente     = document.getElementById('infCliente').value;
+  var fechaInicio = document.getElementById('infFechaInicio').value;
+  var fechaFin    = document.getElementById('infFechaFin').value;
   if (!cliente) { alert('Selecciona un cliente'); return; }
-  if (!mes || !anio) { alert('Selecciona mes y año'); return; }
-  var mesAnio = anio + '-' + String(mes).padStart(2,'0');
+  if (!fechaInicio || !fechaFin) { alert('Ingresa el rango de fechas del período'); return; }
+  if (fechaInicio > fechaFin) { alert('La fecha inicio debe ser anterior a la fecha fin'); return; }
   var btn = document.getElementById('infBtnLoad');
   btn.textContent = 'Cargando...'; btn.disabled = true;
 
@@ -2682,17 +2677,17 @@ function cargarDatosInforme() {
     return new Promise(function(resolve, reject){
       if (IS_GAS) {
         google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)
-          .readPerdidaRutaData(cliente, mesAnio);
+          .readPerdidaRutaData(cliente, fechaInicio, fechaFin);
       } else {
-        fetch(GAS_API_URL + '?source=reporte_perdida_ruta&cliente=' + encodeURIComponent(cliente) + '&mesAnio=' + encodeURIComponent(mesAnio))
+        fetch(GAS_API_URL + '?source=reporte_perdida_ruta&cliente=' + encodeURIComponent(cliente) +
+          '&fechaInicio=' + encodeURIComponent(fechaInicio) + '&fechaFin=' + encodeURIComponent(fechaFin))
           .then(function(r){ return r.json(); }).then(resolve).catch(reject);
       }
     });
   }
-
   doLoad().then(function(data){
     btn.textContent = 'Cargar datos del período'; btn.disabled = false;
-    if (data && data.error) { alert('Error GAS: ' + data.error); return; }
+    if (data && data.error) { alert('Error: ' + data.error); return; }
     document.getElementById('infPlanificadas').value = data.planificadas || 0;
     document.getElementById('infEjecutadas').value   = data.ejecutadas   || 0;
     document.getElementById('infAutoData').style.display = 'block';
@@ -2702,14 +2697,20 @@ function cargarDatosInforme() {
   });
 }
 
+function _fmtFechaHumana(s) {
+  if (!s) return '';
+  var p = s.split('-'); return p[2]+'/'+p[1]+'/'+p[0];
+}
+
 function generarVistaPrevia() {
   var cliente      = document.getElementById('infCliente').value;
-  var mes          = parseInt(document.getElementById('infMes').value, 10);
-  var anio         = document.getElementById('infAnio').value;
+  var fechaInicio  = document.getElementById('infFechaInicio').value;
+  var fechaFin     = document.getElementById('infFechaFin').value;
   var margen       = parseInt(document.getElementById('infMargen').value, 10) || 0;
   var planificadas = parseInt(document.getElementById('infPlanificadas').value, 10) || 0;
   var ejecutadas   = parseInt(document.getElementById('infEjecutadas').value, 10) || 0;
   if (!cliente) { alert('Selecciona un cliente'); return; }
+  if (!fechaInicio || !fechaFin) { alert('Ingresa el rango de fechas'); return; }
   var noEjec = Math.max(0, planificadas - ejecutadas);
   var pct    = planificadas > 0 ? (noEjec / planificadas * 100).toFixed(1) : '0.0';
   var causas = [
@@ -2720,12 +2721,12 @@ function generarVistaPrevia() {
   ];
   var gestion = (document.getElementById('infGestion').value||'').split('\n').filter(function(l){return l.trim();});
   var meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  var periodo  = meses[mes] + ' ' + anio;
+  var periodo  = _fmtFechaHumana(fechaInicio) + ' al ' + _fmtFechaHumana(fechaFin);
   var hoy = new Date();
   var emision  = hoy.getDate() + ' de ' + meses[hoy.getMonth()+1] + ' de ' + hoy.getFullYear();
   var osCount  = causas[1].count;
   var dentro   = osCount <= margen;
-  var html = _buildReporteHTML({ cliente, periodo, emision, planificadas, ejecutadas, noEjec, pct, margen, osCount, dentro, causas, gestion });
+  var html = _buildReporteHTML({ cliente: cliente, periodo: periodo, emision: emision, planificadas: planificadas, ejecutadas: ejecutadas, noEjec: noEjec, pct: pct, margen: margen, osCount: osCount, dentro: dentro, causas: causas, gestion: gestion });
   var pre = document.getElementById('infPreview');
   var emp = document.getElementById('infPreviewEmpty');
   pre.innerHTML = html; pre.style.display = 'block';

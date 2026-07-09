@@ -184,9 +184,10 @@ function doGet(e) {
       result = updateFlotaConductor(cliente, movil, conductor);
 
     } else if (source === 'reporte_perdida_ruta') {
-      const cliente = String(e.parameter.cliente || '');
-      const mesAnio = String(e.parameter.mesAnio || '');
-      result = readPerdidaRutaData(cliente, mesAnio);
+      const cliente     = String(e.parameter.cliente     || '');
+      const fechaInicio = String(e.parameter.fechaInicio || '');
+      const fechaFin    = String(e.parameter.fechaFin    || '');
+      result = readPerdidaRutaData(cliente, fechaInicio, fechaFin);
 
     } else {
       result = { error: 'source no reconocido' };
@@ -233,12 +234,17 @@ function getKilometrosData() {
 }
 
 // Callable desde google.script.run y desde doGet source=reporte_perdida_ruta
-function readPerdidaRutaData(cliente, mesAnio) {
-  const parts = (mesAnio || '').split('-');
-  const year  = parseInt(parts[0], 10);
-  const month = parseInt(parts[1], 10);
-  if (!year || !month) throw new Error('Período inválido: ' + mesAnio);
+// fechaInicio / fechaFin: "YYYY-MM-DD"
+function readPerdidaRutaData(cliente, fechaInicio, fechaFin) {
+  if (!fechaInicio || !fechaFin) throw new Error('Rango de fechas inválido');
   const nc = normalize_(cliente || '');
+
+  function enRango(fechaRaw) {
+    var f = parseFlexibleDate(fechaRaw);
+    if (!f) return false;
+    var s = formatDateISO(f);
+    return s >= fechaInicio && s <= fechaFin;
+  }
 
   var planificadas = 0;
   try {
@@ -252,8 +258,7 @@ function readPerdidaRutaData(cliente, mesAnio) {
       for (var i = 1; i < calVals.length; i++) {
         var row = calVals[i];
         if (nc && idxCliente >= 0 && normalize_(String(row[idxCliente] || '')) !== nc) continue;
-        var fecha = parseFlexibleDate(row[idxFecha >= 0 ? idxFecha : 0]);
-        if (!fecha || fecha.getFullYear() !== year || fecha.getMonth() + 1 !== month) continue;
+        if (!enRango(row[idxFecha >= 0 ? idxFecha : 0])) continue;
         planificadas++;
       }
     }
@@ -271,8 +276,7 @@ function readPerdidaRutaData(cliente, mesAnio) {
       for (var i = 1; i < terVals.length; i++) {
         var row = terVals[i];
         if (nc && idxCliente >= 0 && normalize_(String(row[idxCliente] || '')) !== nc) continue;
-        var fecha = parseFlexibleDate(row[idxFecha >= 0 ? idxFecha : 0]);
-        if (!fecha || fecha.getFullYear() !== year || fecha.getMonth() + 1 !== month) continue;
+        if (!enRango(row[idxFecha >= 0 ? idxFecha : 0])) continue;
         ejecutadas++;
       }
     }
