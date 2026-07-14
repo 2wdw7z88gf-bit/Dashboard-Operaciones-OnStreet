@@ -338,32 +338,25 @@ function readPerdidaRutaData(cliente, fechaInicio, fechaFin) {
 
   var ejecutadas = 0;
   try {
-    const ssUni    = SpreadsheetApp.openById(SHEETS.unificador);
-    const terSheet = ssUni.getSheetByName('Termino de Ruta');
-    dbg.terExiste = !!terSheet;
-    if (terSheet && terSheet.getLastRow() > 1) {
-      const terVals    = terSheet.getRange(1, 1, terSheet.getLastRow(), terSheet.getLastColumn()).getValues();
-      const terHeaders = terVals[0].map(function(h){ return String(h).trim(); });
-      dbg.terHeaders   = terHeaders;
-      dbg.terTotalRows = terVals.length - 1;
-      const idxFecha   = findIdx(terHeaders, 'Fecha');
-      const idxCliente = findIdx(terHeaders, 'Cliente');
-      const idxMovilT  = idxCliente >= 0 ? -1 : findIdx(terHeaders, 'Móvil');
+    const ssFin   = SpreadsheetApp.openById(SHEETS.finalizados);
+    const finSheet = ssFin.getSheetByName('Finalizados') || ssFin.getSheets()[0];
+    dbg.terExiste = !!finSheet;
+    dbg.terNombre = finSheet ? finSheet.getName() : 'N/A';
+    if (finSheet && finSheet.getLastRow() > 1) {
+      const finVals    = finSheet.getRange(1, 1, finSheet.getLastRow(), finSheet.getLastColumn()).getValues();
+      const finHeaders = finVals[0].map(function(h){ return String(h).trim(); });
+      dbg.terHeaders   = finHeaders;
+      dbg.terTotalRows = finVals.length - 1;
+      const idxFecha   = findIdx(finHeaders, 'Fecha');
+      const idxCliente = findIdx(finHeaders, 'Cliente');
       dbg.terIdxFecha   = idxFecha;
       dbg.terIdxCliente = idxCliente;
       var terClientesUnicos = {};
       var terSample = [];
-      for (var i = 1; i < terVals.length; i++) {
-        var row = terVals[i];
-        // Registrar clientes únicos (para debug)
+      for (var i = 1; i < finVals.length; i++) {
+        var row = finVals[i];
         if (idxCliente >= 0) { var cv = String(row[idxCliente] || '').trim(); if (cv) terClientesUnicos[cv] = (terClientesUnicos[cv]||0)+1; }
-        if (nc) {
-          if (idxCliente >= 0) {
-            if (normalize_(String(row[idxCliente] || '')) !== nc) continue;
-          } else if (idxMovilT >= 0) {
-            if (normalize_(String(row[idxMovilT] || '')).indexOf(nc) === -1) continue;
-          }
-        }
+        if (nc && idxCliente >= 0 && normalize_(String(row[idxCliente] || '')) !== nc) continue;
         if (!enRango(row[idxFecha >= 0 ? idxFecha : 0])) continue;
         ejecutadas++;
         if (terSample.length < 3) terSample.push({ fecha: String(row[idxFecha >= 0 ? idxFecha : 0]), cliente: idxCliente >= 0 ? String(row[idxCliente]) : '?' });

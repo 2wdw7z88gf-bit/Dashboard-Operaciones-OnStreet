@@ -2701,9 +2701,9 @@ function cargarDatosInforme() {
       'CalendarioTransformado — headers: ' + (dbg.calHeaders||[]).join(' | '),
       'Cols → Fecha:'+dbg.calIdxFecha+' Cliente:'+dbg.calIdxCliente+' Móvil:'+dbg.calIdxMovil+' Ini1:'+dbg.calIdxIni1+' Fin1:'+dbg.calIdxFin1+' Ini2:'+dbg.calIdxIni2+' Fin2:'+dbg.calIdxFin2+' | Filas totales:'+dbg.calTotalRows,
       '',
-      'Termino de Ruta — headers: ' + (dbg.terHeaders||[]).join(' | '),
+      'Finalizados (hoja: '+dbg.terNombre+') — headers: ' + (dbg.terHeaders||[]).join(' | '),
       'Cols → Fecha:'+dbg.terIdxFecha+' Cliente:'+dbg.terIdxCliente+' | Filas totales:'+dbg.terTotalRows,
-      'Clientes en Termino de Ruta: ' + JSON.stringify(dbg.terClientesUnicos||{})
+      'Clientes en Finalizados: ' + JSON.stringify(dbg.terClientesUnicos||{})
     ];
     if (dbg.calSampleRows && dbg.calSampleRows.length) {
       dbgLines.push('');
