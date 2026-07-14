@@ -2699,13 +2699,21 @@ function cargarDatosInforme() {
     // Mostrar diagnóstico visible siempre
     var dbgLines = [
       'CalendarioTransformado — headers: ' + (dbg.calHeaders||[]).join(' | '),
-      'Cols encontradas → Fecha:'+dbg.calIdxFecha+' Cliente:'+dbg.calIdxCliente+' Móvil:'+dbg.calIdxMovil+' Ini1:'+dbg.calIdxIni1+' Fin1:'+dbg.calIdxFin1+' Ini2:'+dbg.calIdxIni2+' Fin2:'+dbg.calIdxFin2+' | Total filas:'+dbg.calTotalRows,
+      'Cols → Fecha:'+dbg.calIdxFecha+' Cliente:'+dbg.calIdxCliente+' Móvil:'+dbg.calIdxMovil+' Ini1:'+dbg.calIdxIni1+' Fin1:'+dbg.calIdxFin1+' Ini2:'+dbg.calIdxIni2+' Fin2:'+dbg.calIdxFin2+' | Filas totales:'+dbg.calTotalRows,
+      '',
       'Termino de Ruta — headers: ' + (dbg.terHeaders||[]).join(' | '),
-      'Cols encontradas → Fecha:'+dbg.terIdxFecha+' Cliente:'+dbg.terIdxCliente+' | Total filas:'+dbg.terTotalRows
+      'Cols → Fecha:'+dbg.terIdxFecha+' Cliente:'+dbg.terIdxCliente+' | Filas totales:'+dbg.terTotalRows,
+      'Clientes en Termino de Ruta: ' + JSON.stringify(dbg.terClientesUnicos||{})
     ];
     if (dbg.calSampleRows && dbg.calSampleRows.length) {
-      dbgLines.push('Muestra filas CalendarioTransformado:');
-      dbg.calSampleRows.forEach(function(r,i){ dbgLines.push('  ['+r.i+'] Fecha:'+r.fecha+' Cliente/Móvil:'+r.cliente+' Ini1:'+r.ini1+' Fin1:'+r.fin1+' Ini2:'+r.ini2+' Fin2:'+r.fin2); });
+      dbgLines.push('');
+      dbgLines.push('Muestra CalendarioTransformado (filas que pasaron filtros):');
+      dbg.calSampleRows.forEach(function(r){ dbgLines.push('  ['+r.i+'] '+r.fecha.slice(0,15)+' | '+r.cliente+' | Ini1:'+r.ini1+' Fin1:'+r.fin1+' Ini2:'+r.ini2+' Fin2:'+r.fin2); });
+    }
+    if (dbg.terSample && dbg.terSample.length) {
+      dbgLines.push('');
+      dbgLines.push('Muestra Termino de Ruta (filas contadas):');
+      dbg.terSample.forEach(function(r){ dbgLines.push('  '+r.fecha.slice(0,15)+' | '+r.cliente); });
     }
     var dbgEl = document.getElementById('infDbgPanel');
     if (!dbgEl) {

@@ -287,8 +287,8 @@ function readPerdidaRutaData(cliente, fechaInicio, fechaFin) {
         }
         return -1;
       }
-      const idxIni1 = findHorario(calHeaders, ['Horario de Inicio','Hora de Inicio','Horario Inicio','Hora Inicio','Inicio']);
-      const idxFin1 = findHorario(calHeaders, ['Horario de Fin','Hora de Fin','Horario Fin','Hora Fin','Fin']);
+      const idxIni1 = findHorario(calHeaders, ['Horario de Inicio 1','Horario de Inicio','Hora de Inicio 1','Hora de Inicio','Inicio 1','Inicio']);
+      const idxFin1 = findHorario(calHeaders, ['Horario de Fin 1','Horario de Fin','Hora de Fin 1','Hora de Fin','Fin 1','Fin']);
       const idxIni2 = findIdx(calHeaders, 'Horario de Inicio 2');
       const idxFin2 = findIdx(calHeaders, 'Horario de Fin 2');
       dbg.calIdxFecha   = idxFecha;
@@ -351,8 +351,12 @@ function readPerdidaRutaData(cliente, fechaInicio, fechaFin) {
       const idxMovilT  = idxCliente >= 0 ? -1 : findIdx(terHeaders, 'Móvil');
       dbg.terIdxFecha   = idxFecha;
       dbg.terIdxCliente = idxCliente;
+      var terClientesUnicos = {};
+      var terSample = [];
       for (var i = 1; i < terVals.length; i++) {
         var row = terVals[i];
+        // Registrar clientes únicos (para debug)
+        if (idxCliente >= 0) { var cv = String(row[idxCliente] || '').trim(); if (cv) terClientesUnicos[cv] = (terClientesUnicos[cv]||0)+1; }
         if (nc) {
           if (idxCliente >= 0) {
             if (normalize_(String(row[idxCliente] || '')) !== nc) continue;
@@ -362,7 +366,10 @@ function readPerdidaRutaData(cliente, fechaInicio, fechaFin) {
         }
         if (!enRango(row[idxFecha >= 0 ? idxFecha : 0])) continue;
         ejecutadas++;
+        if (terSample.length < 3) terSample.push({ fecha: String(row[idxFecha >= 0 ? idxFecha : 0]), cliente: idxCliente >= 0 ? String(row[idxCliente]) : '?' });
       }
+      dbg.terClientesUnicos = terClientesUnicos;
+      dbg.terSample = terSample;
     }
   } catch(e) { Logger.log('readPerdidaRuta ejecutadas: ' + e); dbg.terError = String(e); }
 
