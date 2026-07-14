@@ -265,7 +265,9 @@ function readPerdidaRutaData(cliente, fechaInicio, fechaFin) {
   }
 
   var dbg = {};
-  var dbgRows = []; // muestra las primeras filas que pasaron los filtros
+
+  // ── Fase 1: CalendarioTransformado → calMap[normalize(movil)+"|"+fechaISO] = maxPermitidas
+  var calMap = {}; // key → { maxPermitidas, movilRaw }
   var planificadas = 0;
   try {
     const ssGPS    = SpreadsheetApp.openById(SHEETS.informesGPS);
@@ -276,99 +278,100 @@ function readPerdidaRutaData(cliente, fechaInicio, fechaFin) {
       const calHeaders = calVals[0].map(function(h){ return String(h).trim(); });
       dbg.calHeaders   = calHeaders;
       dbg.calTotalRows = calVals.length - 1;
-      const idxFecha    = findIdx(calHeaders, 'Fecha');
-      const idxCliente  = findIdx(calHeaders, 'Cliente');
-      const idxMovil    = idxCliente >= 0 ? -1 : findIdx(calHeaders, 'Móvil');
-      // Buscar columna de horario principal con varios nombres posibles
+      const idxFecha   = findIdx(calHeaders, 'Fecha');
+      const idxCliente = findIdx(calHeaders, 'Cliente');
+      const idxMovil   = idxCliente >= 0 ? -1 : findIdx(calHeaders, 'Móvil');
       function findHorario(headers, candidates) {
-        for (var c = 0; c < candidates.length; c++) {
-          var idx = findIdx(headers, candidates[c]);
-          if (idx >= 0) return idx;
-        }
+        for (var c = 0; c < candidates.length; c++) { var ix = findIdx(headers, candidates[c]); if (ix >= 0) return ix; }
         return -1;
       }
       const idxIni1 = findHorario(calHeaders, ['Horario de Inicio 1','Horario de Inicio','Hora de Inicio 1','Hora de Inicio','Inicio 1','Inicio']);
       const idxFin1 = findHorario(calHeaders, ['Horario de Fin 1','Horario de Fin','Hora de Fin 1','Hora de Fin','Fin 1','Fin']);
       const idxIni2 = findIdx(calHeaders, 'Horario de Inicio 2');
       const idxFin2 = findIdx(calHeaders, 'Horario de Fin 2');
-      dbg.calIdxFecha   = idxFecha;
-      dbg.calIdxCliente = idxCliente;
-      dbg.calIdxMovil   = idxMovil;
-      dbg.calIdxIni1    = idxIni1;
-      dbg.calIdxFin1    = idxFin1;
-      dbg.calIdxIni2    = idxIni2;
-      dbg.calIdxFin2    = idxFin2;
+      dbg.calIdxFecha = idxFecha; dbg.calIdxMovil = idxMovil;
+      dbg.calIdxIni1 = idxIni1; dbg.calIdxFin1 = idxFin1;
+      dbg.calIdxIni2 = idxIni2; dbg.calIdxFin2 = idxFin2;
+
       for (var i = 1; i < calVals.length; i++) {
         var row = calVals[i];
         if (nc) {
-          if (idxCliente >= 0) {
-            if (normalize_(String(row[idxCliente] || '')) !== nc) continue;
-          } else if (idxMovil >= 0) {
-            if (normalize_(String(row[idxMovil] || '')).indexOf(nc) === -1) continue;
-          }
+          if (idxCliente >= 0) { if (normalize_(String(row[idxCliente]||'')) !== nc) continue; }
+          else if (idxMovil >= 0) { if (normalize_(String(row[idxMovil]||'')).indexOf(nc) === -1) continue; }
         }
-        if (!enRango(row[idxFecha >= 0 ? idxFecha : 0])) continue;
-        // Ruta principal
+        var fechaRawCal = row[idxFecha >= 0 ? idxFecha : 0];
+        if (!enRango(fechaRawCal)) continue;
+        var fechaISOCal = formatDateISO(parseFlexibleDate(fechaRawCal));
+        var movilRaw    = idxMovil >= 0 ? String(row[idxMovil]||'').trim() : (idxCliente >= 0 ? String(row[idxCliente]||'').trim() : '');
+        var calKey      = normalize_(movilRaw) + '|' + fechaISOCal;
+        var entry = calMap[calKey] || { maxPermitidas: 0, movilRaw: movilRaw };
+        entry.maxPermitidas++;
         planificadas++;
-        // Segunda ruta: contar solo si existe y NO está contenida en el horario de la primera
+        // Segunda ruta fuera del horario de la primera → una más
         var ini2 = idxIni2 >= 0 ? parseHHMM(row[idxIni2]) : null;
         var fin2 = idxFin2 >= 0 ? parseHHMM(row[idxFin2]) : null;
         if (ini2 !== null && fin2 !== null) {
           var ini1 = idxIni1 >= 0 ? parseHHMM(row[idxIni1]) : null;
           var fin1 = idxFin1 >= 0 ? parseHHMM(row[idxFin1]) : null;
-          var dentroDelPrimero = ini1 !== null && fin1 !== null && ini2 >= ini1 && fin2 <= fin1;
-          if (!dentroDelPrimero) planificadas++;
+          var dentro = ini1 !== null && fin1 !== null && ini2 >= ini1 && fin2 <= fin1;
+          if (!dentro) { entry.maxPermitidas++; planificadas++; }
         }
-        // Guardar muestra de las primeras 5 filas para diagnóstico
-        if (dbgRows.length < 5) {
-          dbgRows.push({
-            i: i,
-            fecha: String(row[idxFecha >= 0 ? idxFecha : 0]),
-            cliente: idxCliente >= 0 ? String(row[idxCliente]) : (idxMovil >= 0 ? String(row[idxMovil]) : '?'),
-            ini1: idxIni1 >= 0 ? String(row[idxIni1]) : 'N/A',
-            fin1: idxFin1 >= 0 ? String(row[idxFin1]) : 'N/A',
-            ini2: idxIni2 >= 0 ? String(row[idxIni2]) : '',
-            fin2: idxFin2 >= 0 ? String(row[idxFin2]) : ''
-          });
-        }
+        calMap[calKey] = entry;
       }
-      dbg.calSampleRows = dbgRows;
     }
-  } catch(e) { Logger.log('readPerdidaRuta planificadas: ' + e); dbg.calError = String(e); }
+  } catch(e) { Logger.log('readPerdidaRuta calMap: ' + e); dbg.calError = String(e); }
 
+  // ── Fase 2: Finalizados → finMap[normalize(cliente+" "+notacion)+"|"+fechaISO] = { count, movilRaw, fechaISO }
+  var finMap = {}; // key → { count, movilRaw, fechaISO }
   var ejecutadas = 0;
   try {
-    const ssFin   = SpreadsheetApp.openById(SHEETS.finalizados);
+    const ssFin    = SpreadsheetApp.openById(SHEETS.finalizados);
     const finSheet = ssFin.getSheetByName('Finalizados') || ssFin.getSheets()[0];
-    dbg.terExiste = !!finSheet;
-    dbg.terNombre = finSheet ? finSheet.getName() : 'N/A';
+    dbg.finExiste  = !!finSheet;
     if (finSheet && finSheet.getLastRow() > 1) {
       const finVals    = finSheet.getRange(1, 1, finSheet.getLastRow(), finSheet.getLastColumn()).getValues();
       const finHeaders = finVals[0].map(function(h){ return String(h).trim(); });
-      dbg.terHeaders   = finHeaders;
-      dbg.terTotalRows = finVals.length - 1;
-      const idxFecha   = findIdx(finHeaders, 'Fecha');
-      const idxCliente = findIdx(finHeaders, 'Cliente');
-      dbg.terIdxFecha   = idxFecha;
-      dbg.terIdxCliente = idxCliente;
-      var terClientesUnicos = {};
-      var terSample = [];
+      dbg.finHeaders   = finHeaders;
+      dbg.finTotalRows = finVals.length - 1;
+      const idxFecha    = findIdx(finHeaders, 'Fecha');
+      const idxCliente  = findIdx(finHeaders, 'Cliente');
+      const idxNotacion = findIdx(finHeaders, 'Notacion');
+      dbg.finIdxFecha = idxFecha; dbg.finIdxCliente = idxCliente; dbg.finIdxNotacion = idxNotacion;
+
       for (var i = 1; i < finVals.length; i++) {
         var row = finVals[i];
-        if (idxCliente >= 0) { var cv = String(row[idxCliente] || '').trim(); if (cv) terClientesUnicos[cv] = (terClientesUnicos[cv]||0)+1; }
-        if (nc && idxCliente >= 0 && normalize_(String(row[idxCliente] || '')) !== nc) continue;
-        if (!enRango(row[idxFecha >= 0 ? idxFecha : 0])) continue;
+        if (nc && idxCliente >= 0 && normalize_(String(row[idxCliente]||'')) !== nc) continue;
+        var fechaRawFin = row[idxFecha >= 0 ? idxFecha : 0];
+        if (!enRango(fechaRawFin)) continue;
+        var fechaISOFin  = formatDateISO(parseFlexibleDate(fechaRawFin));
+        var clienteVal   = idxCliente  >= 0 ? String(row[idxCliente] ||'').trim() : '';
+        var notacionVal  = idxNotacion >= 0 ? String(row[idxNotacion]||'').trim() : '';
+        var movilFull    = (clienteVal + (notacionVal ? ' ' + notacionVal : '')).trim();
+        var finKey       = normalize_(movilFull) + '|' + fechaISOFin;
+        var fe = finMap[finKey] || { count: 0, movilRaw: movilFull, fechaISO: fechaISOFin };
+        fe.count++;
+        finMap[finKey] = fe;
         ejecutadas++;
-        if (terSample.length < 3) terSample.push({ fecha: String(row[idxFecha >= 0 ? idxFecha : 0]), cliente: idxCliente >= 0 ? String(row[idxCliente]) : '?' });
       }
-      dbg.terClientesUnicos = terClientesUnicos;
-      dbg.terSample = terSample;
     }
-  } catch(e) { Logger.log('readPerdidaRuta ejecutadas: ' + e); dbg.terError = String(e); }
+  } catch(e) { Logger.log('readPerdidaRuta finMap: ' + e); dbg.finError = String(e); }
+
+  // ── Fase 3: cruzar para encontrar rutas demás
+  var rutasExtra = [];
+  Object.keys(finMap).forEach(function(key) {
+    var fin = finMap[key];
+    var cal = calMap[key];
+    var maxPermitidas = cal ? cal.maxPermitidas : 0;
+    var extra = fin.count - maxPermitidas;
+    if (extra > 0) {
+      rutasExtra.push({ fecha: fin.fechaISO, movil: fin.movilRaw, planificadas: maxPermitidas, ejecutadas: fin.count, extra: extra });
+    }
+  });
+  rutasExtra.sort(function(a, b) { return a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0; });
 
   const noEjecutadas = Math.max(0, planificadas - ejecutadas);
   const pct = planificadas > 0 ? (noEjecutadas / planificadas * 100).toFixed(1) : '0.0';
-  return { ok: true, planificadas: planificadas, ejecutadas: ejecutadas, noEjecutadas: noEjecutadas, porcentajePerdida: pct, _dbg: dbg };
+  return { ok: true, planificadas: planificadas, ejecutadas: ejecutadas, noEjecutadas: noEjecutadas, porcentajePerdida: pct, rutasExtra: rutasExtra, _dbg: dbg };
 }
 
 function respond(obj, callback) {

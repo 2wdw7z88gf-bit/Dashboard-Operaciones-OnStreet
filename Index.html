@@ -2696,39 +2696,43 @@ function cargarDatosInforme() {
     document.getElementById('infPlanificadas').value = data.planificadas || 0;
     document.getElementById('infEjecutadas').value   = data.ejecutadas   || 0;
     document.getElementById('infAutoData').style.display = 'block';
-    // Mostrar diagnóstico visible siempre
-    var dbgLines = [
-      'CalendarioTransformado — headers: ' + (dbg.calHeaders||[]).join(' | '),
-      'Cols → Fecha:'+dbg.calIdxFecha+' Cliente:'+dbg.calIdxCliente+' Móvil:'+dbg.calIdxMovil+' Ini1:'+dbg.calIdxIni1+' Fin1:'+dbg.calIdxFin1+' Ini2:'+dbg.calIdxIni2+' Fin2:'+dbg.calIdxFin2+' | Filas totales:'+dbg.calTotalRows,
-      '',
-      'Finalizados (hoja: '+dbg.terNombre+') — headers: ' + (dbg.terHeaders||[]).join(' | '),
-      'Cols → Fecha:'+dbg.terIdxFecha+' Cliente:'+dbg.terIdxCliente+' | Filas totales:'+dbg.terTotalRows,
-      'Clientes en Finalizados: ' + JSON.stringify(dbg.terClientesUnicos||{})
-    ];
-    if (dbg.calSampleRows && dbg.calSampleRows.length) {
-      dbgLines.push('');
-      dbgLines.push('Muestra CalendarioTransformado (filas que pasaron filtros):');
-      dbg.calSampleRows.forEach(function(r){ dbgLines.push('  ['+r.i+'] '+r.fecha.slice(0,15)+' | '+r.cliente+' | Ini1:'+r.ini1+' Fin1:'+r.fin1+' Ini2:'+r.ini2+' Fin2:'+r.fin2); });
+
+    // Tabla de rutas demás
+    var extras = data.rutasExtra || [];
+    var extraEl = document.getElementById('infExtrasPanel');
+    if (!extraEl) {
+      extraEl = document.createElement('div');
+      extraEl.id = 'infExtrasPanel';
+      extraEl.style.cssText = 'margin-top:14px';
+      document.getElementById('infAutoData').after(extraEl);
     }
-    if (dbg.terSample && dbg.terSample.length) {
-      dbgLines.push('');
-      dbgLines.push('Muestra Termino de Ruta (filas contadas):');
-      dbg.terSample.forEach(function(r){ dbgLines.push('  '+r.fecha.slice(0,15)+' | '+r.cliente); });
+    if (extras.length > 0) {
+      var rows = extras.map(function(r) {
+        return '<tr><td style="padding:5px 8px;border-bottom:1px solid var(--border)">' + r.fecha + '</td>' +
+          '<td style="padding:5px 8px;border-bottom:1px solid var(--border)">' + escapeHtml(r.movil) + '</td>' +
+          '<td style="padding:5px 8px;border-bottom:1px solid var(--border);text-align:center">' + r.planificadas + '</td>' +
+          '<td style="padding:5px 8px;border-bottom:1px solid var(--border);text-align:center">' + r.ejecutadas + '</td>' +
+          '<td style="padding:5px 8px;border-bottom:1px solid var(--border);text-align:center;color:#E55A20;font-weight:600">+' + r.extra + '</td></tr>';
+      }).join('');
+      extraEl.innerHTML = '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-2);margin-bottom:8px">Rutas demás (' + extras.length + ' móviles afectados)</div>' +
+        '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">' +
+        '<thead><tr style="background:var(--bg-2)">' +
+        '<th style="padding:6px 8px;text-align:left;font-weight:600">Fecha</th>' +
+        '<th style="padding:6px 8px;text-align:left;font-weight:600">Móvil</th>' +
+        '<th style="padding:6px 8px;text-align:center;font-weight:600">Planif.</th>' +
+        '<th style="padding:6px 8px;text-align:center;font-weight:600">Ejec.</th>' +
+        '<th style="padding:6px 8px;text-align:center;font-weight:600">Extra</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+    } else {
+      extraEl.innerHTML = '<div style="font-size:12px;color:var(--text-2);padding:8px 0">✓ Sin rutas demás — todas las ejecuciones tienen correspondencia en CalendarioTransformado.</div>';
     }
-    var dbgEl = document.getElementById('infDbgPanel');
-    if (!dbgEl) {
-      dbgEl = document.createElement('pre');
-      dbgEl.id = 'infDbgPanel';
-      dbgEl.style.cssText = 'background:#1e1e2e;color:#cdd6f4;font-size:10px;padding:10px;border-radius:6px;overflow-x:auto;margin-top:12px;white-space:pre-wrap;word-break:break-all';
-      document.getElementById('infAutoData').after(dbgEl);
-    }
-    dbgEl.textContent = dbgLines.join('\n');
+
     if ((data.planificadas || 0) === 0) {
-      var d = data._dbg || {};
+      var d = dbg;
       var msg = 'No se encontraron rutas planificadas para el período seleccionado.';
-      if (d.calExiste === false) msg += '\n\nLa hoja CalendarioTransformado no existe en el spreadsheet de Informes GPS.';
-      else if (d.calTotalRows === 0) msg += '\n\nLa hoja CalendarioTransformado está vacía.';
-      else msg += '\n\nVerifica que haya datos para el rango ' + fechaInicio + ' → ' + fechaFin + ' en la hoja CalendarioTransformado.' + (d.calIdxFecha === -1 ? '\n\n⚠ No se encontró columna "Fecha" en CalendarioTransformado. Columnas disponibles: ' + (d.calHeaders||[]).join(', ') : '');
+      if (d.calExiste === false) msg += '\n\nLa hoja CalendarioTransformado no existe.';
+      else if (d.calTotalRows === 0) msg += '\n\nCalendarioTransformado está vacía.';
+      else msg += '\n\nVerifica el rango ' + fechaInicio + ' → ' + fechaFin + '.' + (d.calIdxFecha === -1 ? '\n\n⚠ No se encontró columna "Fecha". Columnas: ' + (d.calHeaders||[]).join(', ') : '');
       alert(msg);
     }
   }).catch(function(err){
