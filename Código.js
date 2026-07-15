@@ -254,16 +254,6 @@ function readPerdidaRutaData(cliente, fechaInicio, fechaFin) {
     return -1;
   }
 
-  // Convierte "HH:MM" o "HH:MM:SS" o Date a minutos desde medianoche. null si no parseable.
-  function parseHHMM(v) {
-    if (!v && v !== 0) return null;
-    if (v instanceof Date) return v.getHours() * 60 + v.getMinutes();
-    var s = String(v).trim();
-    var m = s.match(/^(\d{1,2}):(\d{2})/);
-    if (!m) return null;
-    return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
-  }
-
   var dbg = {};
 
   // ── Fase 1: CalendarioTransformado → calMap[normalize(movil)+"|"+fechaISO] = maxPermitidas
@@ -1238,10 +1228,20 @@ function readSegundaRuta(fechaParam) {
     if (!fecha || formatDateISO(fecha) !== fechaISO) continue;
     const horaInicio2 = String(row[calIdx['Horario de Inicio 2']] || '').trim();
     if (!horaInicio2) continue;
+    const horaFin2 = String(row[calIdx['Horario de Fin 2']] || '').trim();
+    // Verificar si la 2ª ruta está dentro del horario de la 1ª → si es así, no es segunda ruta real
+    const ini1 = parseHHMM(row[calIdx['Horario de Inicio 1']]);
+    const fin1 = parseHHMM(row[calIdx['Horario de Fin 1']]);
+    const ini2 = parseHHMM(horaInicio2);
+    const fin2 = parseHHMM(horaFin2);
+    // Si faltan horarios de la 1ª ruta → tratar como 1ª ruta solamente (no agregar)
+    if (ini1 === null || fin1 === null) continue;
+    // Si la 2ª está completamente dentro de la 1ª → no es segunda ruta real
+    if (ini2 !== null && fin2 !== null && ini2 >= ini1 && fin2 <= fin1) continue;
     conSegundaRuta.push({
       nombre: String(row[calIdx['Móvil']] || '').trim(),
       horaInicio2: horaInicio2,
-      horaFin2: String(row[calIdx['Horario de Fin 2']] || '').trim()
+      horaFin2: horaFin2
     });
   }
 
@@ -1838,6 +1838,15 @@ function stripPlate_(agrupacion) {
 // ============================================================================
 function formatDateDDMMYYYY(d) {
   return String(d.getDate()).padStart(2, '0') + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + d.getFullYear();
+}
+// Convierte "HH:MM", "HH:MM:SS" o Date a minutos desde medianoche. null si no parseable.
+function parseHHMM(v) {
+  if (!v && v !== 0) return null;
+  if (v instanceof Date) return v.getHours() * 60 + v.getMinutes();
+  var s = String(v).trim();
+  var m = s.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
 }
 function formatDateISO(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
