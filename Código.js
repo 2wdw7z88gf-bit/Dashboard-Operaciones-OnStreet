@@ -918,12 +918,13 @@ function readGPS(flotaInfo) {
       const fp = fingerprintGPS_(r.nombre);
       const a = alertMap[fp];
       if (a) {
-        r.tipoAlerta       = a.tipoAlerta;
-        r.sinMovimiento    = a.sinMovimiento;
-        r.alejandose       = a.alejandose;
-        r.distanciaMetros  = a.distanciaMetros;
-        r.puntoPlanificado = a.puntoPlanificado;
-        r.atrasoMinutos    = a.atrasoMinutos;
+        r.tipoAlerta          = a.tipoAlerta;
+        r.sinMovimiento       = a.sinMovimiento;
+        r.alejandose          = a.alejandose;
+        r.distanciaMetros     = a.distanciaMetros;
+        r.puntoPlanificado    = a.puntoPlanificado;
+        r.atrasoMinutos       = a.atrasoMinutos;
+        r.tieneRutaCalendario = true;
       }
     });
   } catch (e) { /* alertas opcionales, no bloquear */ }

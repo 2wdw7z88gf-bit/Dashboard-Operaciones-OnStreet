@@ -1813,7 +1813,7 @@ function renderGPSMap(){
   if(fa==='sinmov')     movsFilt=movsFilt.filter(m=>{const g=findGPS_(m,gpsMap);return g&&g.sinMovimiento;});
   if(fa==='alejandose') movsFilt=movsFilt.filter(m=>{const g=findGPS_(m,gpsMap);return g&&g.alejandose;});
   if(fa==='lejos')      movsFilt=movsFilt.filter(m=>{const g=findGPS_(m,gpsMap);return g&&g.distanciaMetros>200;});
-  if(gpsListFiltroRuta) movsFilt=movsFilt.filter(m=>{const g=findGPS_(m,gpsMap);return g&&g.puntoPlanificado;});
+  if(gpsListFiltroRuta) movsFilt=movsFilt.filter(m=>{const g=findGPS_(m,gpsMap);return g&&(g.tieneRutaCalendario||g.puntoPlanificado);});
   gpsMarkersLayer.clearLayers();
   const jitter=0.018,rutasParaAlertas=[];
   movsFilt.forEach(function(m){
@@ -1888,7 +1888,7 @@ function renderGPSVehicleList(){
   const gpsMap={};
   rutasGPS.forEach(function(r){ if(r.nombre) gpsMap[r.nombre]=r; });
   let todos=applyKamFilter(moviles);
-  if(gpsListFiltroRuta) todos=todos.filter(function(m){ const g=findGPS_(m,gpsMap); return g&&g.puntoPlanificado; });
+  if(gpsListFiltroRuta) todos=todos.filter(function(m){ const g=findGPS_(m,gpsMap); return g&&(g.tieneRutaCalendario||g.puntoPlanificado); });
   const tbody=document.getElementById('gpsVehicleTbody');
   if(!tbody) return;
   tbody.innerHTML=todos.map(function(m){
