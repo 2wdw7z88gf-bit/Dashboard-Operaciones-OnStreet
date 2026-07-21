@@ -76,7 +76,21 @@ function doGet(e) {
         user: Session.getActiveUser().getEmail() || '(sin email)'
       };
 
+    } else if (source === 'login') {
+      result = iniciarSesion(params.email || '', params.password || '');
+
+    } else if (source === 'register') {
+      result = registrarUsuario(params.nombre || '', params.email || '', params.password || '');
+
+    } else if (source === 'logout') {
+      result = cerrarSesion(params.token || null);
+
     } else if (source === 'all') {
+      const tokenParam = params.token || null;
+      const usuario = verificarToken_(tokenParam);
+      if (!usuario) {
+        result = { authError: 'token_invalido' };
+      } else {
       function safeRead(fn, fallback) {
         try { return fn(); } catch (e) { return fallback !== undefined ? fallback : { error: e.toString() }; }
       }
@@ -91,9 +105,11 @@ function doGet(e) {
         segundaRuta: safeRead(function() { return getCached('segunda_ruta_' + fechaSuffix, function() { return readSegundaRuta(fechaParam); }, CACHE_DURATION_SECONDS); }, null),
         // kilómetros se carga bajo demanda vía source=kilometros para no ralentizar la carga inicial
         kams: flotaInfo.kams || [],
+        usuario: usuario,
         fechaConsultada: fechaParam || formatDateISO(new Date()),
         lastUpdated: new Date().toISOString()
       };
+      }
 
     } else if (source === 'unificador') {
       result = {
@@ -205,6 +221,10 @@ function doGet(e) {
 
 // Callable desde el HTML via google.script.run.getDashboardData(params)
 function getDashboardData(params) {
+  const token = (params && params.token) || null;
+  const usuario = verificarToken_(token);
+  if (!usuario) return { authError: 'token_invalido' };
+
   const fechaParam = (params && params.fecha) || null;
   const fechaSuffix = fechaParam || 'today';
   function safeRead(fn, fallback) {
@@ -219,6 +239,7 @@ function getDashboardData(params) {
     bitacora:     safeRead(function() { return getCached('bitacora_'     + fechaSuffix, function() { return readBitacora(fechaParam); },                 CACHE_DURATION_SECONDS); }, null),
     segundaRuta:  safeRead(function() { return getCached('segunda_ruta_' + fechaSuffix, function() { return readSegundaRuta(fechaParam); },              CACHE_DURATION_SECONDS); }, null),
     kams: flotaInfo.kams || [],
+    usuario: usuario,
     fechaConsultada: fechaParam || formatDateISO(new Date()),
     lastUpdated: new Date().toISOString()
   };
@@ -2095,4 +2116,96 @@ function crearTriggerArchivar() {
     .atHour(1)
     .create();
   Logger.log('Trigger creado: archivarFinalizados correrá cada día a la 1 AM.');
+}
+
+// ============================================================
+// AUTH — email + contraseña (SHA-256), tokens en CacheService
+// ============================================================
+
+function hashPassword_(password) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, password, Utilities.Charset.UTF_8);
+  return bytes.map(function(b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('');
+}
+
+function generarToken_() {
+  var seed = Math.random().toString() + new Date().getTime().toString() + Math.random().toString();
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, seed);
+  return bytes.map(function(b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('');
+}
+
+function getUsuariosSheet_() {
+  return SpreadsheetApp.openById(SHEETS.dashboardApi).getSheetByName('Usuarios');
+}
+
+// Callable desde google.script.run
+function registrarUsuario(nombre, email, password) {
+  var sheet = getUsuariosSheet_();
+  if (!sheet) return { ok: false, error: 'Hoja Usuarios no encontrada' };
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (normalize_(String(data[i][0])) === normalize_(email)) {
+      return { ok: false, error: 'Este email ya está registrado' };
+    }
+  }
+  sheet.appendRow([email, nombre, 'viewer', hashPassword_(password), 'pendiente']);
+  return { ok: true };
+}
+
+// Callable desde google.script.run
+function iniciarSesion(email, password) {
+  var sheet = getUsuariosSheet_();
+  if (!sheet) return { ok: false, error: 'Hoja Usuarios no encontrada' };
+  var data = sheet.getDataRange().getValues();
+  var hash = hashPassword_(password);
+  for (var i = 1; i < data.length; i++) {
+    var rowEmail  = String(data[i][0]);
+    var rowNombre = String(data[i][1]);
+    var rowRol    = String(data[i][2]);
+    var rowHash   = String(data[i][3]);
+    var rowEstado = String(data[i][4]);
+    if (normalize_(rowEmail) !== normalize_(email)) continue;
+    if (rowHash !== hash) return { ok: false, error: 'Contraseña incorrecta' };
+    if (rowEstado === 'pendiente') return { ok: false, pendiente: true };
+    if (rowEstado !== 'activo') return { ok: false, error: 'Cuenta inactiva o rechazada' };
+    var token = generarToken_();
+    CacheService.getScriptCache().put(
+      'tok_' + token,
+      JSON.stringify({ email: rowEmail, nombre: rowNombre, rol: rowRol }),
+      28800 // 8 horas
+    );
+    return { ok: true, token: token, nombre: rowNombre, rol: rowRol };
+  }
+  return { ok: false, error: 'Email no encontrado' };
+}
+
+function verificarToken_(token) {
+  if (!token) return null;
+  var val = CacheService.getScriptCache().get('tok_' + token);
+  if (!val) return null;
+  try { return JSON.parse(val); } catch(e) { return null; }
+}
+
+// Callable desde google.script.run
+function cerrarSesion(token) {
+  if (token) CacheService.getScriptCache().remove('tok_' + token);
+  return { ok: true };
+}
+
+// Corre UNA VEZ desde el editor de Apps Script para crear la hoja Usuarios
+function inicializarHojaUsuarios() {
+  var ss = SpreadsheetApp.openById(SHEETS.dashboardApi);
+  var sheet = ss.getSheetByName('Usuarios');
+  if (!sheet) {
+    sheet = ss.insertSheet('Usuarios');
+    Logger.log('Hoja Usuarios creada.');
+  } else {
+    Logger.log('Hoja Usuarios ya existe.');
+  }
+  // Escribir cabeceras si la hoja está vacía
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['Email', 'Nombre', 'Rol', 'PasswordHash', 'Estado']);
+    sheet.getRange(1, 1, 1, 5).setFontWeight('bold');
+    Logger.log('Cabeceras escritas.');
+  }
+  Logger.log('Listo. Agrega tu usuario admin directamente en la hoja con Estado = activo y Rol = admin.');
 }

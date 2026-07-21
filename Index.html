@@ -429,6 +429,37 @@ tr:hover td{background:var(--surface-2)}
 .bnav-btn.active{color:var(--info-fg)}
 .bnav-btn svg{width:20px;height:20px;flex-shrink:0}
 
+/* ── AUTH SCREENS ─────────────────────────────────────────── */
+#auth-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:20px}
+#auth-overlay.hidden{display:none}
+.auth-card{background:var(--surface);border:0.5px solid var(--border-2);border-radius:16px;padding:36px 32px;width:100%;max-width:400px;box-shadow:0 4px 24px rgba(0,0,0,0.08)}
+.auth-logo{display:flex;align-items:center;gap:10px;margin-bottom:28px}
+.auth-logo-text{font-size:18px;font-weight:500;color:var(--text)}
+.auth-logo-sub{font-size:12px;color:var(--text-2)}
+.auth-title{font-size:20px;font-weight:500;margin-bottom:6px}
+.auth-sub{font-size:13px;color:var(--text-2);margin-bottom:24px}
+.auth-field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.auth-field label{font-size:12px;font-weight:500;color:var(--text-2);text-transform:uppercase;letter-spacing:0.3px}
+.auth-field input{padding:10px 12px;border:0.5px solid var(--border-2);border-radius:8px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--text);outline:none;transition:border-color 0.15s}
+.auth-field input:focus{border-color:var(--info-fg)}
+.auth-btn{width:100%;padding:12px;border:none;border-radius:8px;background:#185FA5;color:#fff;font-size:14px;font-weight:500;font-family:inherit;cursor:pointer;margin-top:6px;transition:background 0.15s}
+.auth-btn:hover{background:#1471bd}
+.auth-btn:disabled{background:#b0c4d8;cursor:not-allowed}
+.auth-link{text-align:center;font-size:13px;color:var(--text-2);margin-top:16px}
+.auth-link a{color:var(--info-fg);cursor:pointer;text-decoration:none;font-weight:500}
+.auth-link a:hover{text-decoration:underline}
+.auth-error{background:var(--danger-bg);color:var(--danger-fg);border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px;display:none}
+.auth-error.visible{display:block}
+.auth-pending{text-align:center;padding:12px 0}
+.auth-pending-icon{font-size:40px;margin-bottom:12px}
+.auth-pending p{font-size:14px;color:var(--text-2);line-height:1.6}
+/* user chip in topbar */
+.user-chip{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2)}
+.user-chip-name{font-weight:500;color:var(--text)}
+.user-chip-rol{font-size:11px;background:var(--info-bg);color:var(--info-fg);padding:2px 8px;border-radius:12px;text-transform:capitalize}
+.btn-logout{font-size:12px;padding:5px 12px;border-radius:6px;border:0.5px solid var(--border-2);background:var(--surface);color:var(--text-2);cursor:pointer;font-family:inherit}
+.btn-logout:hover{background:var(--danger-bg);color:var(--danger-fg);border-color:var(--danger-fg)}
+
 </style>
 <script>
 (function(){
@@ -443,16 +474,96 @@ tr:hover td{background:var(--surface-2)}
 </script>
 </head>
 <body>
-<div class="container">
+
+<!-- ============ AUTH OVERLAY ============ -->
+<div id="auth-overlay">
+  <!-- LOGIN -->
+  <div class="auth-card" id="auth-login">
+    <div class="auth-logo">
+      <div>
+        <div class="auth-logo-text">Dashboard On Street</div>
+        <div class="auth-logo-sub">Operación · Bitácora · Supervisiones · Kilómetros</div>
+      </div>
+    </div>
+    <div class="auth-title">Iniciar sesión</div>
+    <div class="auth-sub">Ingresa con tu cuenta para continuar</div>
+    <div class="auth-error" id="login-error"></div>
+    <div class="auth-field">
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="tu@email.com" autocomplete="email" />
+    </div>
+    <div class="auth-field">
+      <label>Contraseña</label>
+      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+    <button class="auth-btn" id="login-btn" onclick="doLogin()">Entrar</button>
+    <div class="auth-link">¿No tienes cuenta? <a onclick="showAuthScreen('register')">Solicitar acceso</a></div>
+  </div>
+
+  <!-- REGISTER -->
+  <div class="auth-card" id="auth-register" style="display:none">
+    <div class="auth-title">Solicitar acceso</div>
+    <div class="auth-sub">Tu solicitud quedará pendiente hasta que un administrador la apruebe.</div>
+    <div class="auth-error" id="register-error"></div>
+    <div class="auth-field">
+      <label>Nombre completo</label>
+      <input type="text" id="reg-nombre" placeholder="Tu nombre" autocomplete="name" />
+    </div>
+    <div class="auth-field">
+      <label>Email</label>
+      <input type="email" id="reg-email" placeholder="tu@email.com" autocomplete="email" />
+    </div>
+    <div class="auth-field">
+      <label>Contraseña</label>
+      <input type="password" id="reg-password" placeholder="Mínimo 8 caracteres" autocomplete="new-password" />
+    </div>
+    <div class="auth-field">
+      <label>Confirmar contraseña</label>
+      <input type="password" id="reg-password2" placeholder="Repite la contraseña" autocomplete="new-password" />
+    </div>
+    <button class="auth-btn" id="register-btn" onclick="doRegister()">Solicitar acceso</button>
+    <div class="auth-link"><a onclick="showAuthScreen('login')">Volver al inicio de sesión</a></div>
+  </div>
+
+  <!-- REGISTER SUCCESS -->
+  <div class="auth-card" id="auth-register-ok" style="display:none">
+    <div class="auth-pending">
+      <div class="auth-pending-icon">✉</div>
+      <div class="auth-title" style="text-align:center">Solicitud enviada</div>
+      <div class="auth-sub" style="text-align:center;margin-top:8px">Tu cuenta está pendiente de aprobación. Un administrador revisará tu solicitud pronto.</div>
+    </div>
+    <div class="auth-link" style="margin-top:24px"><a onclick="showAuthScreen('login')">Volver al inicio de sesión</a></div>
+  </div>
+
+  <!-- PENDING -->
+  <div class="auth-card" id="auth-pending" style="display:none">
+    <div class="auth-pending">
+      <div class="auth-pending-icon">⏳</div>
+      <div class="auth-title" style="text-align:center">Solicitud en revisión</div>
+      <div class="auth-sub" style="text-align:center;margin-top:8px">Tu cuenta aún no ha sido aprobada. Cuando un administrador la apruebe, podrás ingresar.</div>
+    </div>
+    <div class="auth-link" style="margin-top:24px"><a onclick="showAuthScreen('login')">Volver al inicio de sesión</a></div>
+  </div>
+</div>
+<!-- ======================================= -->
+
+<div class="container" id="app-container" style="display:none">
   <div class="topbar">
     <div>
       <h1>Dashboard On Street</h1>
       <div class="meta">Operación · Bitácora · Supervisiones · Kilómetros — datos en vivo desde Google Sheets</div>
     </div>
-    <div class="status">
-      <div class="status-dot loading" id="statusDot"></div>
-      <span id="statusText">Cargando...</span>
-      <button class="btn-refresh" onclick="loadData()">Actualizar ahora</button>
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <div class="user-chip" id="user-chip" style="display:none">
+        <span class="user-chip-name" id="user-chip-name"></span>
+        <span class="user-chip-rol" id="user-chip-rol"></span>
+      </div>
+      <div class="status">
+        <div class="status-dot loading" id="statusDot"></div>
+        <span id="statusText">Cargando...</span>
+        <button class="btn-refresh" onclick="loadData()">Actualizar ahora</button>
+        <button class="btn-logout" onclick="doLogout()">Cerrar sesión</button>
+      </div>
     </div>
   </div>
 
@@ -1025,8 +1136,10 @@ function loadData(){
   setStatus('loading','Cargando datos...');
   const onOk=function(d){
     if(!d){setStatus('error','Sin datos recibidos');return;}
+    if(d.authError){sessionToken=null;sessionStorage.removeItem('os_token');showAuthScreen('login');return;}
     if(d.error){setStatus('error','Error: '+d.error);console.error(d);return;}
     allData=d;
+    if(d.usuario){var chip=document.getElementById('user-chip');document.getElementById('user-chip-name').textContent=d.usuario.nombre;document.getElementById('user-chip-rol').textContent=d.usuario.rol;chip.style.display='flex';}
     populateKamSelector();
     renderAll();
     const ts=new Date(d.lastUpdated||Date.now());
@@ -1036,10 +1149,11 @@ function loadData(){
   };
   const onErr=function(err){setStatus('error','Error al cargar: '+(err&&err.message?err.message:String(err)));};
   if(IS_GAS){
-    google.script.run.withSuccessHandler(onOk).withFailureHandler(onErr).getDashboardData({fecha:fechaGlobal||null});
+    google.script.run.withSuccessHandler(onOk).withFailureHandler(onErr).getDashboardData({token:sessionToken||null,fecha:fechaGlobal||null});
   } else {
-    fetch(GAS_API_URL+'?source=all'+(fechaGlobal?'&fecha='+fechaGlobal:''))
-      .then(function(r){return r.json();}).then(onOk).catch(onErr);
+    var params={token:sessionToken||''};
+    if(fechaGlobal) params.fecha=fechaGlobal;
+    authFetch('all',params).then(onOk).catch(onErr);
   }
 }
 
@@ -2546,8 +2660,145 @@ function populateKamSelector(){
   });
 })();
 
-loadData();
-startAutoRefresh();
+// ── AUTH ──────────────────────────────────────────────────────
+var sessionToken = sessionStorage.getItem('os_token') || null;
+
+function showAuthScreen(screen) {
+  ['auth-login','auth-register','auth-register-ok','auth-pending'].forEach(function(id){
+    document.getElementById(id).style.display = 'none';
+  });
+  document.getElementById('auth-' + screen).style.display = '';
+  document.getElementById('auth-overlay').classList.remove('hidden');
+  document.getElementById('app-container').style.display = 'none';
+}
+
+function hideAuthOverlay(usuario) {
+  document.getElementById('auth-overlay').classList.add('hidden');
+  document.getElementById('app-container').style.display = '';
+  if (usuario) {
+    var chip = document.getElementById('user-chip');
+    document.getElementById('user-chip-name').textContent = usuario.nombre;
+    document.getElementById('user-chip-rol').textContent = usuario.rol;
+    chip.style.display = 'flex';
+  }
+}
+
+function authSetError(prefix, msg) {
+  var el = document.getElementById(prefix + '-error');
+  el.textContent = msg;
+  el.classList.add('visible');
+}
+function authClearError(prefix) {
+  var el = document.getElementById(prefix + '-error');
+  el.textContent = '';
+  el.classList.remove('visible');
+}
+
+function authFetch(source, queryParams) {
+  var url = GAS_API_URL + '?source=' + source;
+  Object.keys(queryParams).forEach(function(k) { url += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(queryParams[k]); });
+  return fetch(url).then(function(r) { return r.json(); });
+}
+
+function doLogin() {
+  authClearError('login');
+  var email = document.getElementById('login-email').value.trim();
+  var pass  = document.getElementById('login-password').value;
+  if (!email || !pass) { authSetError('login','Completa todos los campos'); return; }
+  var btn = document.getElementById('login-btn');
+  btn.disabled = true; btn.textContent = 'Ingresando...';
+  var onOk = function(res) {
+    btn.disabled = false; btn.textContent = 'Entrar';
+    if (!res) { authSetError('login','Error de servidor'); return; }
+    if (res.pendiente) { showAuthScreen('pending'); return; }
+    if (!res.ok) { authSetError('login', res.error || 'Error al ingresar'); return; }
+    sessionToken = res.token;
+    sessionStorage.setItem('os_token', res.token);
+    hideAuthOverlay({ nombre: res.nombre, rol: res.rol });
+    loadData();
+    startAutoRefresh();
+  };
+  var onErr = function(err) {
+    btn.disabled = false; btn.textContent = 'Entrar';
+    authSetError('login', 'Error: ' + (err && err.message ? err.message : String(err)));
+  };
+  if (IS_GAS) {
+    google.script.run.withSuccessHandler(onOk).withFailureHandler(onErr).iniciarSesion(email, pass);
+  } else {
+    authFetch('login', { email: email, password: pass }).then(onOk).catch(onErr);
+  }
+}
+
+function doRegister() {
+  authClearError('register');
+  var nombre = document.getElementById('reg-nombre').value.trim();
+  var email  = document.getElementById('reg-email').value.trim();
+  var pass   = document.getElementById('reg-password').value;
+  var pass2  = document.getElementById('reg-password2').value;
+  if (!nombre || !email || !pass || !pass2) { authSetError('register','Completa todos los campos'); return; }
+  if (pass.length < 8) { authSetError('register','La contraseña debe tener al menos 8 caracteres'); return; }
+  if (pass !== pass2) { authSetError('register','Las contraseñas no coinciden'); return; }
+  var btn = document.getElementById('register-btn');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  var onOk = function(res) {
+    btn.disabled = false; btn.textContent = 'Solicitar acceso';
+    if (!res || !res.ok) { authSetError('register', res ? (res.error || 'Error') : 'Error de servidor'); return; }
+    showAuthScreen('register-ok');
+  };
+  var onErr = function(err) {
+    btn.disabled = false; btn.textContent = 'Solicitar acceso';
+    authSetError('register', 'Error: ' + (err && err.message ? err.message : String(err)));
+  };
+  if (IS_GAS) {
+    google.script.run.withSuccessHandler(onOk).withFailureHandler(onErr).registrarUsuario(nombre, email, pass);
+  } else {
+    authFetch('register', { nombre: nombre, email: email, password: pass }).then(onOk).catch(onErr);
+  }
+}
+
+function doLogout() {
+  if (sessionToken) {
+    if (IS_GAS) { google.script.run.cerrarSesion(sessionToken); }
+    else { authFetch('logout', { token: sessionToken }).catch(function(){}); }
+  }
+  sessionToken = null;
+  sessionStorage.removeItem('os_token');
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = null;
+  showAuthScreen('login');
+}
+
+// Enter key support for auth forms
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter') return;
+  var overlay = document.getElementById('auth-overlay');
+  if (!overlay || overlay.classList.contains('hidden')) return;
+  var loginVisible = document.getElementById('auth-login').style.display !== 'none';
+  var regVisible = document.getElementById('auth-register').style.display !== 'none';
+  if (loginVisible) doLogin();
+  else if (regVisible) doRegister();
+});
+
+// ── INIT ──────────────────────────────────────────────────────
+(function initAuth() {
+  if (!sessionToken) { showAuthScreen('login'); return; }
+  var onOk = function(d) {
+    if (!d || d.authError) { sessionToken = null; sessionStorage.removeItem('os_token'); showAuthScreen('login'); return; }
+    hideAuthOverlay(d.usuario || null);
+    allData = d;
+    populateKamSelector();
+    renderAll();
+    var ts = new Date(d.lastUpdated || Date.now());
+    setStatus('ok', 'Actualizado a las ' + ts.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}));
+    startAutoRefresh();
+  };
+  var onErr = function() { sessionToken = null; sessionStorage.removeItem('os_token'); showAuthScreen('login'); };
+  if (IS_GAS) {
+    google.script.run.withSuccessHandler(onOk).withFailureHandler(onErr).getDashboardData({ token: sessionToken, fecha: fechaGlobal || null });
+  } else {
+    authFetch('all', { token: sessionToken, ...(fechaGlobal ? { fecha: fechaGlobal } : {}) }).then(onOk).catch(onErr);
+  }
+})();
 
 </script>
 <div id="kpiTip" class="tooltip" style="max-width:300px;line-height:1.6;font-size:12px"></div>
