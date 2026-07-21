@@ -111,6 +111,18 @@ function doGet(e) {
       };
       }
 
+    } else if (source === 'tab_operacion') {
+      result = getTabOperacion({ token: params.token || null, fecha: params.fecha || null });
+
+    } else if (source === 'tab_gps') {
+      result = getTabGps({ token: params.token || null });
+
+    } else if (source === 'tab_bitacora') {
+      result = getTabBitacora({ token: params.token || null, fecha: params.fecha || null });
+
+    } else if (source === 'tab_supervisiones') {
+      result = getTabSupervisiones({ token: params.token || null });
+
     } else if (source === 'unificador') {
       result = {
         unificador: getCached(
@@ -251,6 +263,64 @@ function getKilometrosData() {
   const flotaInfo = safeRead(function() { return getCached('flota', readFlota, CACHE_DURATION_SECONDS); });
   return {
     kilometros: safeRead(function() { return getCached('kilometros', function() { return readKilometros(flotaInfo); }, CACHE_DURATION_SECONDS); })
+  };
+}
+
+// ── Tab loaders — callable via google.script.run (carga progresiva por pestaña) ──
+
+function getTabOperacion(params) {
+  var token = (params && params.token) || null;
+  var usuario = verificarToken_(token);
+  if (!usuario) return { authError: 'token_invalido' };
+  var fechaParam = (params && params.fecha) || null;
+  var fechaSuffix = fechaParam || 'today';
+  function safeRead(fn) { try { return fn(); } catch(e) { return null; } }
+  var flotaInfo = safeRead(function() { return getCached('flota', readFlota, CACHE_DURATION_SECONDS); }) || { flota: [], jefePorMovil: {}, jefePorNombre: {}, kams: [] };
+  return {
+    unificador:  safeRead(function() { return getCached('unificador_'   + fechaSuffix, function() { return readUnificador(flotaInfo, fechaParam); }, CACHE_DURATION_SECONDS); }),
+    historico:   safeRead(function() { return getCached('historico_'    + fechaSuffix, function() { return readFinalizados(fechaParam); },           CACHE_DURATION_SECONDS); }),
+    segundaRuta: safeRead(function() { return getCached('segunda_ruta_' + fechaSuffix, function() { return readSegundaRuta(fechaParam); },           CACHE_DURATION_SECONDS); }),
+    kams: flotaInfo.kams || [],
+    usuario: usuario,
+    fechaConsultada: fechaParam || formatDateISO(new Date()),
+    lastUpdated: new Date().toISOString()
+  };
+}
+
+function getTabGps(params) {
+  var token = (params && params.token) || null;
+  var usuario = verificarToken_(token);
+  if (!usuario) return { authError: 'token_invalido' };
+  function safeRead(fn) { try { return fn(); } catch(e) { return null; } }
+  var flotaInfo = safeRead(function() { return getCached('flota', readFlota, CACHE_DURATION_SECONDS); }) || { flota: [], jefePorMovil: {}, jefePorNombre: {}, kams: [] };
+  return {
+    gps: safeRead(function() { return getCached('gps', function() { return readGPS(flotaInfo); }, CACHE_GPS_SECONDS); }),
+    lastUpdated: new Date().toISOString()
+  };
+}
+
+function getTabBitacora(params) {
+  var token = (params && params.token) || null;
+  var usuario = verificarToken_(token);
+  if (!usuario) return { authError: 'token_invalido' };
+  var fechaParam = (params && params.fecha) || null;
+  var fechaSuffix = fechaParam || 'today';
+  function safeRead(fn) { try { return fn(); } catch(e) { return null; } }
+  return {
+    bitacora: safeRead(function() { return getCached('bitacora_' + fechaSuffix, function() { return readBitacora(fechaParam); }, CACHE_DURATION_SECONDS); }),
+    lastUpdated: new Date().toISOString()
+  };
+}
+
+function getTabSupervisiones(params) {
+  var token = (params && params.token) || null;
+  var usuario = verificarToken_(token);
+  if (!usuario) return { authError: 'token_invalido' };
+  function safeRead(fn) { try { return fn(); } catch(e) { return null; } }
+  var flotaInfo = safeRead(function() { return getCached('flota', readFlota, CACHE_DURATION_SECONDS); }) || { flota: [], jefePorMovil: {}, jefePorNombre: {}, kams: [] };
+  return {
+    supervisiones: safeRead(function() { return getCached('supervisiones', function() { return readSupervisiones(flotaInfo); }, CACHE_DURATION_SECONDS); }),
+    lastUpdated: new Date().toISOString()
   };
 }
 

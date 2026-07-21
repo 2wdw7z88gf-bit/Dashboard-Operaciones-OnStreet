@@ -1130,28 +1130,93 @@ function applyKamFilter(arr){
 }
 
 function loadData(){
-  setStatus('loading','Cargando datos...');
-  const onOk=function(d){
-    if(!d){setStatus('error','Sin datos recibidos');return;}
-    if(d.authError){sessionToken=null;sessionStorage.removeItem('os_token');showAuthScreen('login');return;}
-    if(d.error){setStatus('error','Error: '+d.error);console.error(d);return;}
-    allData=d;
-    if(d.usuario){var chip=document.getElementById('user-chip');document.getElementById('user-chip-name').textContent=d.usuario.nombre;document.getElementById('user-chip-rol').textContent=d.usuario.rol;chip.style.display='flex';}
-    populateKamSelector();
-    renderAll();
-    const ts=new Date(d.lastUpdated||Date.now());
-    let msg='Actualizado a las '+ts.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
-    if(fechaGlobal) msg+=' · viendo '+formatDate(fechaGlobal);
-    setStatus('ok',msg);
-  };
-  const onErr=function(err){setStatus('error','Error al cargar: '+(err&&err.message?err.message:String(err)));};
-  if(IS_GAS){
-    google.script.run.withSuccessHandler(onOk).withFailureHandler(onErr).getDashboardData({token:sessionToken||null,fecha:fechaGlobal||null});
-  } else {
-    var params={token:sessionToken||''};
-    if(fechaGlobal) params.fecha=fechaGlobal;
-    authFetch('all',params).then(onOk).catch(onErr);
+  allData={};
+  setStatus('loading','Cargando Operación...');
+  var p={token:sessionToken||null,fecha:fechaGlobal||null};
+
+  function onAuthError(){sessionToken=null;sessionStorage.removeItem('os_token');showAuthScreen('login');}
+
+  function merge(d){
+    if(!d) return false;
+    if(d.authError){onAuthError();return false;}
+    if(d.error){console.error(d);return false;}
+    Object.assign(allData,d);
+    if(d.usuario){document.getElementById('user-chip-name').textContent=d.usuario.nombre;document.getElementById('user-chip-rol').textContent=d.usuario.rol;document.getElementById('user-chip').style.display='flex';}
+    return true;
   }
+
+  function step1(){
+    var onOk=function(d){
+      if(!d){setStatus('error','Sin datos recibidos');return;}
+      if(!merge(d)){setStatus('error','Error de autenticación');return;}
+      populateKamSelector();
+      renderOperacion();
+      renderHistorico();
+      renderTendencias();
+      if(allData.unificador) renderDetalleOperacion();
+      renderBannerDormidos();
+      setStatus('loading','Cargando GPS/Alertas...');
+      step2();
+    };
+    var onErr=function(err){setStatus('error','Error al cargar: '+(err&&err.message?err.message:String(err)));};
+    if(IS_GAS){
+      google.script.run.withSuccessHandler(onOk).withFailureHandler(onErr).getTabOperacion(p);
+    } else {
+      authFetch('tab_operacion',p).then(onOk).catch(onErr);
+    }
+  }
+
+  function step2(){
+    var onOk=function(d){
+      merge(d);
+      if(allData.gps) renderGPS();
+      setStatus('loading','Cargando Bitácora...');
+      step3();
+    };
+    var onErr=function(){step3();};
+    if(IS_GAS){
+      google.script.run.withSuccessHandler(onOk).withFailureHandler(onErr).getTabGps(p);
+    } else {
+      authFetch('tab_gps',p).then(onOk).catch(function(){step3();});
+    }
+  }
+
+  function step3(){
+    var onOk=function(d){
+      merge(d);
+      if(allData.bitacora) renderBitacora();
+      setStatus('loading','Cargando Supervisiones...');
+      step4();
+    };
+    var onErr=function(){step4();};
+    if(IS_GAS){
+      google.script.run.withSuccessHandler(onOk).withFailureHandler(onErr).getTabBitacora(p);
+    } else {
+      authFetch('tab_bitacora',p).then(onOk).catch(function(){step4();});
+    }
+  }
+
+  function step4(){
+    var onOk=function(d){
+      merge(d);
+      if(allData.supervisiones) renderSupervisiones();
+      var ts=new Date(allData.lastUpdated||Date.now());
+      var msg='Actualizado a las '+ts.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+      if(fechaGlobal) msg+=' · viendo '+formatDate(fechaGlobal);
+      setStatus('ok',msg);
+    };
+    var onErr=function(){
+      var ts=new Date(allData.lastUpdated||Date.now());
+      setStatus('ok','Actualizado a las '+ts.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}));
+    };
+    if(IS_GAS){
+      google.script.run.withSuccessHandler(onOk).withFailureHandler(onErr).getTabSupervisiones(p);
+    } else {
+      authFetch('tab_supervisiones',p).then(onOk).catch(onErr);
+    }
+  }
+
+  step1();
 }
 
 function setStatus(state,msg){
