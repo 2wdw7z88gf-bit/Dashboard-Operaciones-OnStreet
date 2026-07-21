@@ -1134,7 +1134,7 @@ function loadData(){
   setStatus('loading','Cargando Operación...');
   var p={token:sessionToken||null,fecha:fechaGlobal||null};
 
-  function onAuthError(){sessionToken=null;sessionStorage.removeItem('os_token');showAuthScreen('login');}
+  function onAuthError(){sessionToken=null;localStorage.removeItem('os_token');showAuthScreen('login');}
 
   function merge(d){
     if(!d) return false;
@@ -1150,9 +1150,9 @@ function loadData(){
       if(!d){setStatus('error','Sin datos recibidos');return;}
       if(!merge(d)){setStatus('error','Error de autenticación');return;}
       populateKamSelector();
-      renderOperacion();
-      renderHistorico();
-      renderTendencias();
+      if(allData.unificador) renderOperacion();
+      if(allData.historico) renderHistorico();
+      if(allData.unificador||allData.historico) renderTendencias();
       if(allData.unificador) renderDetalleOperacion();
       renderBannerDormidos();
       setStatus('loading','Cargando GPS/Alertas...');
@@ -2723,7 +2723,7 @@ function populateKamSelector(){
 })();
 
 // ── AUTH ──────────────────────────────────────────────────────
-var sessionToken = sessionStorage.getItem('os_token') || null;
+var sessionToken = localStorage.getItem('os_token') || null;
 
 function showAuthScreen(screen) {
   ['auth-login','auth-register','auth-register-ok','auth-pending'].forEach(function(id){
@@ -2775,7 +2775,7 @@ function doLogin() {
     if (res.pendiente) { showAuthScreen('pending'); return; }
     if (!res.ok) { authSetError('login', res.error || 'Error al ingresar'); return; }
     sessionToken = res.token;
-    sessionStorage.setItem('os_token', res.token);
+    localStorage.setItem('os_token', res.token);
     hideAuthOverlay({ nombre: res.nombre, rol: res.rol });
     loadData();
     startAutoRefresh();
@@ -2825,7 +2825,7 @@ function doLogout() {
     else { authFetch('logout', { token: sessionToken }).catch(function(){}); }
   }
   sessionToken = null;
-  sessionStorage.removeItem('os_token');
+  localStorage.removeItem('os_token');
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = null;
   showAuthScreen('login');
@@ -2845,22 +2845,9 @@ document.addEventListener('keydown', function(e) {
 // ── INIT ──────────────────────────────────────────────────────
 (function initAuth() {
   if (!sessionToken) { showAuthScreen('login'); return; }
-  var onOk = function(d) {
-    if (!d || d.authError) { sessionToken = null; sessionStorage.removeItem('os_token'); showAuthScreen('login'); return; }
-    hideAuthOverlay(d.usuario || null);
-    allData = d;
-    populateKamSelector();
-    renderAll();
-    var ts = new Date(d.lastUpdated || Date.now());
-    setStatus('ok', 'Actualizado a las ' + ts.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}));
-    startAutoRefresh();
-  };
-  var onErr = function() { sessionToken = null; sessionStorage.removeItem('os_token'); showAuthScreen('login'); };
-  if (IS_GAS) {
-    google.script.run.withSuccessHandler(onOk).withFailureHandler(onErr).getDashboardData({ token: sessionToken, fecha: fechaGlobal || null });
-  } else {
-    authFetch('all', { token: sessionToken, ...(fechaGlobal ? { fecha: fechaGlobal } : {}) }).then(onOk).catch(onErr);
-  }
+  hideAuthOverlay(null);
+  loadData();
+  startAutoRefresh();
 })();
 
 </script>
