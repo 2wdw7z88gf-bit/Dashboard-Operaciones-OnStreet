@@ -519,6 +519,20 @@ tr:hover td{background:var(--surface-2)}
         <div class="kpi ok" data-kpi="op-doble" id="kpiDobleCard"><div class="kpi-label">Doble inicio s/término</div><div class="kpi-val" id="opDoble">—</div><div class="kpi-sub" id="opDobleSub">—</div></div>
         <div class="kpi teal" data-kpi="op-atenc"><div class="kpi-label">Atenciones totales</div><div class="kpi-val" id="opAtenc">—</div><div class="kpi-sub" id="opAtencSub">—</div></div>
       </div>
+      <div class="day-grid">
+        <div class="panel">
+          <h2>🏆 Ranking del día — top atenciones</h2>
+          <div id="opRankingList" style="margin-top:6px;max-height:360px;overflow-y:auto;padding-right:4px"></div>
+        </div>
+        <div class="panel">
+          <h2>Inicios de ruta</h2>
+          <div id="opIniList" style="max-height:360px;overflow-y:auto;padding-right:4px"></div>
+        </div>
+        <div class="panel">
+          <h2>⚠ Términos de ruta</h2>
+          <div id="opObsList" style="max-height:320px;overflow-y:auto;padding-right:4px"></div>
+        </div>
+      </div>
       <div class="body-grid" id="opBodyGrid">
         <div class="panel">
           <h2>Distribución geográfica</h2>
@@ -542,20 +556,6 @@ tr:hover td{background:var(--surface-2)}
         </div>
         <div class="panel" style="overflow-y:auto"><h2>Resumen por cliente</h2><div id="opClientList"></div></div>
         <div class="panel" style="overflow-y:auto"><h2>Móviles con pendientes</h2><div class="mob-list" id="opMobList"></div></div>
-      </div>
-      <div class="day-grid">
-        <div class="panel">
-          <h2>🏆 Ranking del día — top atenciones</h2>
-          <div id="opRankingList" style="margin-top:6px;max-height:360px;overflow-y:auto;padding-right:4px"></div>
-        </div>
-        <div class="panel">
-          <h2>Inicios de ruta</h2>
-          <div id="opIniList" style="max-height:360px;overflow-y:auto;padding-right:4px"></div>
-        </div>
-        <div class="panel">
-          <h2>⚠ Términos de ruta</h2>
-          <div id="opObsList" style="max-height:320px;overflow-y:auto;padding-right:4px"></div>
-        </div>
       </div>
     </div>
     <div class="subtab-content" id="sub-op-historico">
