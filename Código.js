@@ -723,6 +723,16 @@ function parsearIndicadores_(v) {
     'total atenciones', 'total personas atendidas',
     'total pacientes atendidos', 'total pacientes con necesidad de derivacion a especialista'
   ];
+  // Campos demográficos: son desgloses de las mismas personas, no atenciones adicionales
+  const DEMO_EXACT = ['hombre', 'mujer', 'sexo masculino', 'sexo femenino'];
+  const DEMO_PREFIX = ['rango'];
+  function isDemografico_(key) {
+    const n = normalize_(key);
+    if (DEMO_EXACT.indexOf(n) >= 0) return true;
+    for (var d = 0; d < DEMO_PREFIX.length; d++) { if (n.indexOf(DEMO_PREFIX[d]) === 0) return true; }
+    return false;
+  }
+
   let consolidadorIdx = -1;
   for (let i = 0; i < items.length; i++) {
     if (CONSOLIDATORS.indexOf(normalize_(items[i].key)) >= 0) {
@@ -748,8 +758,10 @@ function parsearIndicadores_(v) {
       breakdown = otros.sort(function(a, b){ return b.value - a.value; });
     }
   } else {
-    total = items.reduce(function(a, b){ return a + b.value; }, 0);
-    breakdown = items.slice().sort(function(a, b){ return b.value - a.value; });
+    // Sin consolidador: sumar solo campos de atenciones, excluir demográficos
+    const atencItems = items.filter(function(it){ return !isDemografico_(it.key); });
+    total = atencItems.reduce(function(a, b){ return a + b.value; }, 0);
+    breakdown = atencItems.slice().sort(function(a, b){ return b.value - a.value; });
   }
   return { total: total, breakdown: breakdown };
 }
