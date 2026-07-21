@@ -1132,7 +1132,8 @@ function applyKamFilter(arr){
 function loadData(){
   allData={};
   setStatus('loading','Cargando Operación...');
-  var p={token:sessionToken||null,fecha:fechaGlobal||null};
+  var p={token:sessionToken||null};
+  if(fechaGlobal) p.fecha=fechaGlobal;
 
   function onAuthError(){sessionToken=null;localStorage.removeItem('os_token');showAuthScreen('login');}
 
@@ -2758,7 +2759,7 @@ function authClearError(prefix) {
 
 function authFetch(source, queryParams) {
   var url = GAS_API_URL + '?source=' + source;
-  Object.keys(queryParams).forEach(function(k) { url += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(queryParams[k]); });
+  Object.keys(queryParams).forEach(function(k) { if(queryParams[k]!=null) url += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(queryParams[k]); });
   return fetch(url).then(function(r) { return r.json(); });
 }
 
