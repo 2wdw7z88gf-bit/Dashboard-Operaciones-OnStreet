@@ -1471,6 +1471,7 @@ function openFichaMovil(idx) {
   const _mondayKey1 = (m.cliente + '|' + (m.movil  || '')).toLowerCase();
   const _mondayKey2 = (m.cliente + '|' + (m.nombre || '')).toLowerCase();
   const mondayEvents = _mondayMap[_mondayKey1] || _mondayMap[_mondayKey2] || [];
+  console.log('[Ficha] mondaySupervisiones keys:', Object.keys(_mondayMap).length, '| key1:', _mondayKey1, '| key2:', _mondayKey2, '| found:', mondayEvents.length);
 
   let html = '';
 

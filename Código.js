@@ -322,7 +322,7 @@ function getTabBitacora(params) {
 // Token se guarda con: PropertiesService.getScriptProperties().setProperty('MONDAY_TOKEN','...')
 // Ejecuta setupMondayToken() una vez desde el editor de GAS para guardarlo.
 var MONDAY_API_URL_       = 'https://api.monday.com/v2';
-var MONDAY_CACHE_KEY_     = 'monday_su_v4';
+var MONDAY_CACHE_KEY_     = 'monday_su_v5';
 var MONDAY_CACHE_SEC_     = 3600;
 var MONDAY_BOARD_RAPIDA_  = '5678712035';
 var MONDAY_BOARD_INTEGRAL_= '5623247223';
@@ -341,9 +341,8 @@ function readMondaySupervisions_() {
   var token = PropertiesService.getScriptProperties().getProperty('MONDAY_TOKEN');
   if (!token) return {};
 
-  // order_by: fecha desc → los más recientes llegan primero (evita quedarse con los del 2024)
-  var orderBy = 'order_by: [{column_id: \\"date\\", direction: desc}]';
-  var query = '{ rapida: boards(ids: [' + MONDAY_BOARD_RAPIDA_ + ']) { columns { id title } items_page(limit: 500, ' + orderBy + ') { items { column_values { id text } } } } integral: boards(ids: [' + MONDAY_BOARD_INTEGRAL_ + ']) { columns { id title } items_page(limit: 500, ' + orderBy + ') { items { column_values { id text } } } } }';
+  // Sin order_by en la API — el sort client-side (líneas ~415-417) ordena los 500 y toma los 5 más recientes
+  var query = '{ rapida: boards(ids: [' + MONDAY_BOARD_RAPIDA_ + ']) { columns { id title } items_page(limit: 500) { items { column_values { id text } } } } integral: boards(ids: [' + MONDAY_BOARD_INTEGRAL_ + ']) { columns { id title } items_page(limit: 500) { items { column_values { id text } } } } }';
 
   var resp;
   try {
