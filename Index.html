@@ -1034,7 +1034,7 @@ tr:hover td{background:var(--surface-2)}
   <div class="tab-content" id="tab-tendencias">
     <div class="kpi-grid">
       <div class="kpi info">
-        <div class="kpi-label">Rutas última semana</div>
+        <div class="kpi-label">Rutas esta semana</div>
         <div class="kpi-val"><span id="tendSemActual">—</span><span class="kpi-delta flat" id="tendSemDelta">—</span></div>
         <div class="kpi-sub" id="tendSemSub">vs 7 días previos</div>
       </div>
@@ -2536,13 +2536,18 @@ function renderTendencias(){
   const c60=(!kamKeys&&allData.historico.conteoPorDia60)||null;
   const fechaRef=(allData.unificador&&allData.unificador.fecha)?parseDDMM_(allData.unificador.fecha):new Date();
   fechaRef.setHours(0,0,0,0);const hoyISO=isoOffset(fechaRef,0);
-  const sem1Desde=isoOffset(fechaRef,-6),sem1Hasta=hoyISO,sem2Desde=isoOffset(fechaRef,-13),sem2Hasta=isoOffset(fechaRef,-7);
+  // Semana: lunes de esta semana → hoy vs lunes anterior → mismo día semana pasada
+  const dow=fechaRef.getDay(),dLun=dow===0?6:dow-1;
+  const lunes=new Date(fechaRef);lunes.setDate(fechaRef.getDate()-dLun);
+  const lunISO=lunes.getFullYear()+'-'+String(lunes.getMonth()+1).padStart(2,'0')+'-'+String(lunes.getDate()).padStart(2,'0');
+  const sem1Desde=lunISO,sem1Hasta=hoyISO,sem2Desde=isoOffset(lunes,-7),sem2Hasta=isoOffset(fechaRef,-7);
   const semActual=c60?sumarDia60_(c60,sem1Desde,sem1Hasta):getRutasEnRango(rutas,sem1Desde,sem1Hasta).length;
   const semPrev=c60?sumarDia60_(c60,sem2Desde,sem2Hasta):getRutasEnRango(rutas,sem2Desde,sem2Hasta).length;
   const deltaSem=deltaPct(semActual,semPrev),fmtSem=formatDelta(deltaSem);
   document.getElementById('tendSemActual').textContent=semActual;
   const dsEl=document.getElementById('tendSemDelta');dsEl.textContent=fmtSem.txt;dsEl.className='kpi-delta '+fmtSem.cls;
-  document.getElementById('tendSemSub').textContent='vs '+semPrev+' (7 días previos)';
+  const diasSem=['dom','lun','mar','mié','jue','vie','sáb'];
+  document.getElementById('tendSemSub').textContent='vs '+semPrev+' (lun–'+diasSem[fechaRef.getDay()]+' sem. anterior)';
   const mesActual=c60?sumarDia60_(c60,isoOffset(fechaRef,-27),hoyISO):getRutasEnRango(rutas,isoOffset(fechaRef,-27),hoyISO).length;
   const mesPrev=c60?sumarDia60_(c60,isoOffset(fechaRef,-55),isoOffset(fechaRef,-28)):getRutasEnRango(rutas,isoOffset(fechaRef,-55),isoOffset(fechaRef,-28)).length;
   document.getElementById('tendMesActual').textContent=mesActual;
