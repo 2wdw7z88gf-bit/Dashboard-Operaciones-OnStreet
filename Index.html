@@ -488,6 +488,44 @@ tr:hover td{background:var(--surface-2)}
 .btn-logout{font-size:12px;padding:5px 12px;border-radius:6px;border:0.5px solid var(--border-2);background:var(--surface);color:var(--text-2);cursor:pointer;font-family:inherit}
 .btn-logout:hover{background:var(--danger-bg);color:var(--danger-fg);border-color:var(--danger-fg)}
 
+/* ── Monday Supervisiones ─────────────────────────────────────── */
+.md-badge{display:inline-block;font-size:11px;font-weight:500;padding:1px 8px;border-radius:10px;background:var(--info-bg);color:var(--info-fg);margin-left:8px;vertical-align:middle}
+.empty-msg{text-align:center;color:var(--text-2);padding:24px;font-size:13px}
+.md-su-row{cursor:pointer;transition:background 0.15s}
+.md-su-row:hover td{background:var(--surface-2)}
+.md-su-row td{vertical-align:middle}
+.md-expand-btn{width:24px;height:24px;border-radius:50%;border:none;background:var(--surface-2);color:var(--text-2);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform 0.2s;margin:auto}
+.md-su-row.expanded .md-expand-btn{transform:rotate(180deg)}
+.md-detail-row td{padding:0!important;background:var(--surface-2)}
+.md-detail-inner{padding:12px 16px 14px;border-left:3px solid var(--info-fg);margin:4px 6px}
+.md-detail-label{font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px}
+.md-detail-text{font-size:13px;color:var(--text-1);white-space:pre-wrap;line-height:1.5}
+.md-tipo-chip{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;letter-spacing:0.3px;text-transform:uppercase}
+.md-tipo-chip.integral{background:var(--info-bg);color:var(--info-fg)}
+.md-tipo-chip.rapida{background:var(--ok-bg,#d1fae5);color:var(--ok-fg,#065f46)}
+/* Planes de Acción */
+.md-estado-btn{font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;border:none;cursor:pointer;letter-spacing:0.3px;white-space:nowrap;transition:opacity 0.15s}
+.md-estado-btn:hover{opacity:0.8}
+.md-estado-btn.pendiente{background:#fef3c7;color:#92400e}
+.md-estado-btn.en-proceso{background:#dbeafe;color:#1e40af}
+.md-estado-btn.listo{background:#d1fae5;color:#065f46}
+.md-estado-btn.otro{background:var(--surface-2);color:var(--text-2)}
+.md-estado-btn.saving{opacity:0.5;cursor:default}
+@media(prefers-color-scheme:dark){
+  .md-tipo-chip.rapida{background:#064e3b;color:#6ee7b7}
+  .md-estado-btn.pendiente{background:#78350f;color:#fde68a}
+  .md-estado-btn.en-proceso{background:#1e3a8a;color:#93c5fd}
+  .md-estado-btn.listo{background:#064e3b;color:#6ee7b7}
+}
+:root[data-theme="dark"] .md-tipo-chip.rapida{background:#064e3b;color:#6ee7b7}
+:root[data-theme="dark"] .md-estado-btn.pendiente{background:#78350f;color:#fde68a}
+:root[data-theme="dark"] .md-estado-btn.en-proceso{background:#1e3a8a;color:#93c5fd}
+:root[data-theme="dark"] .md-estado-btn.listo{background:#064e3b;color:#6ee7b7}
+:root[data-theme="light"] .md-tipo-chip.rapida{background:#d1fae5;color:#065f46}
+:root[data-theme="light"] .md-estado-btn.pendiente{background:#fef3c7;color:#92400e}
+:root[data-theme="light"] .md-estado-btn.en-proceso{background:#dbeafe;color:#1e40af}
+:root[data-theme="light"] .md-estado-btn.listo{background:#d1fae5;color:#065f46}
+
 </style>
 <script>
 (function(){
@@ -871,6 +909,7 @@ tr:hover td{background:var(--surface-2)}
     <div class="subtabs">
       <button class="subtab active" onclick="switchSubtab(event,'su-kpi')">KPI del mes</button>
       <button class="subtab" onclick="switchSubtab(event,'su-anual')">Vista anual</button>
+      <button class="subtab" onclick="switchSubtab(event,'su-monday')">Monday</button>
     </div>
     <div class="subtab-content active" id="sub-su-kpi">
       <div id="suAlertBox"></div>
@@ -928,6 +967,78 @@ tr:hover td{background:var(--surface-2)}
         </div>
       </div>
     </div>
+
+    <!-- SUB: MONDAY -->
+    <div class="subtab-content" id="sub-su-monday">
+
+      <!-- SECCIÓN 1: Supervisiones Integrales + Rápidas -->
+      <div class="panel" id="mdSuPanel">
+        <h2>Supervisiones desde Monday <span class="md-badge" id="mdSuBadge" style="display:none"></span></h2>
+        <div class="filter-row" style="margin-bottom:10px">
+          <select id="mdSuFiltTipo" style="min-width:130px">
+            <option value="">Todas</option>
+            <option value="Integral">Integral</option>
+            <option value="Rápida">Rápida</option>
+          </select>
+          <select id="mdSuFiltCliente" style="min-width:180px"><option value="">Todos los clientes</option></select>
+          <input id="mdSuFiltTexto" placeholder="Buscar móvil o supervisor..." style="min-width:200px" />
+        </div>
+        <div class="tabla-wrap" style="max-height:500px">
+          <table id="mdSuTable">
+            <thead>
+              <tr>
+                <th style="width:36px"></th>
+                <th>Tipo</th>
+                <th>Fecha</th>
+                <th>Cliente</th>
+                <th>Móvil</th>
+                <th>Supervisor</th>
+              </tr>
+            </thead>
+            <tbody id="mdSuTableBody">
+              <tr><td colspan="6" class="empty-msg">Cargando datos de Monday...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 2: Planes de Acción -->
+      <div class="panel" id="mdPlanesPanel" style="margin-top:16px">
+        <h2>Planes de Acción <span class="md-badge" id="mdPlanesBadge" style="display:none"></span></h2>
+        <div class="filter-row" style="margin-bottom:10px">
+          <select id="mdPlanesFiltEstado" style="min-width:140px">
+            <option value="">Todos los estados</option>
+            <option value="Pendiente">Pendiente</option>
+            <option value="En proceso">En proceso</option>
+            <option value="Listo">Listo</option>
+          </select>
+          <select id="mdPlanesFiltCliente" style="min-width:180px"><option value="">Todos los clientes</option></select>
+          <input id="mdPlanesFiltTexto" placeholder="Buscar..." style="min-width:180px" />
+        </div>
+        <div class="tabla-wrap" style="max-height:480px">
+          <table id="mdPlanesTable">
+            <thead>
+              <tr>
+                <th>Estado</th>
+                <th>Acción</th>
+                <th>Cliente</th>
+                <th>Móvil</th>
+                <th>Fecha Sup.</th>
+                <th>Fecha Límite</th>
+                <th>Responsable</th>
+              </tr>
+            </thead>
+            <tbody id="mdPlanesTableBody">
+              <tr><td colspan="7" class="empty-msg">Cargando planes de acción...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p id="mdPlanesHint" style="font-size:11px;color:var(--text-2);margin-top:8px;display:none">
+          Haz clic en el estado para actualizarlo en Monday.
+        </p>
+      </div>
+
+    </div><!-- /sub-su-monday -->
   </div>
 
   <!-- ============= TAB: KILÓMETROS ============= -->
@@ -1255,6 +1366,8 @@ function loadData(){
     var onOk=function(d){
       merge(d);
       if(allData.supervisiones) renderSupervisiones();
+      renderMondaySupervisiones();
+      renderMondayPlanes();
       var ts=new Date(allData.lastUpdated||Date.now());
       var msg='Actualizado a las '+ts.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
       if(fechaGlobal) msg+=' · viendo '+formatDate(fechaGlobal);
@@ -1471,7 +1584,6 @@ function openFichaMovil(idx) {
   const _mondayKey1 = (m.cliente + '|' + (m.movil  || '')).toLowerCase();
   const _mondayKey2 = (m.cliente + '|' + (m.nombre || '')).toLowerCase();
   const mondayEvents = _mondayMap[_mondayKey1] || _mondayMap[_mondayKey2] || [];
-  console.log('[Ficha] mondaySupervisiones keys:', Object.keys(_mondayMap).length, '| key1:', _mondayKey1, '| key2:', _mondayKey2, '| found:', mondayEvents.length);
 
   let html = '';
 
@@ -2394,6 +2506,208 @@ function renderSuTable(){
     cells+='<td><span class="bar"><span class="bar-fill '+cls+'" style="width:'+Math.min(100,pct*100)+'%"></span></span><span class="pct">'+Math.round(pct*100)+'%</span></td>';
     tr.innerHTML=cells;tb.appendChild(tr);
   });
+}
+
+// ── MONDAY SUPERVISIONES ───────────────────────────────────────────────────
+function renderMondaySupervisiones() {
+  var lista = (allData && allData.mondayLista) || [];
+  var tbody = document.getElementById('mdSuTableBody');
+  if (!tbody) return;
+
+  var badge = document.getElementById('mdSuBadge');
+
+  // Poblar selector de clientes
+  var filtCliente = document.getElementById('mdSuFiltCliente');
+  if (filtCliente && filtCliente.options.length <= 1) {
+    var clientes = [];
+    lista.forEach(function(sv) { if (sv.cliente && clientes.indexOf(sv.cliente) < 0) clientes.push(sv.cliente); });
+    clientes.sort().forEach(function(c) {
+      var o = document.createElement('option'); o.value = c; o.textContent = c; filtCliente.appendChild(o);
+    });
+  }
+
+  function rebuild() {
+    var tipo    = (document.getElementById('mdSuFiltTipo')    || {}).value || '';
+    var cliente = (document.getElementById('mdSuFiltCliente') || {}).value || '';
+    var texto   = ((document.getElementById('mdSuFiltTexto')  || {}).value || '').toLowerCase();
+
+    var rows = lista.filter(function(sv) {
+      if (tipo    && sv.tipo    !== tipo)                          return false;
+      if (cliente && sv.cliente !== cliente)                       return false;
+      if (texto   && (sv.movil  || '').toLowerCase().indexOf(texto) < 0
+                  && (sv.supervisor || '').toLowerCase().indexOf(texto) < 0
+                  && (sv.cliente   || '').toLowerCase().indexOf(texto) < 0) return false;
+      return true;
+    });
+
+    if (badge) { badge.textContent = rows.length + ' supervisiones'; badge.style.display = rows.length ? '' : 'none'; }
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">Sin resultados</td></tr>';
+      return;
+    }
+
+    var html = '';
+    rows.forEach(function(sv, i) {
+      var tipoClass = sv.tipo === 'Integral' ? 'integral' : 'rapida';
+      var fechaFmt  = sv.fecha ? sv.fecha.replace(/(\d{4})-(\d{2})-(\d{2})/, '$3/$2/$1') : '—';
+      html += '<tr class="md-su-row" id="mdSuRow' + i + '" onclick="toggleMdSuRow(' + i + ')">';
+      html += '<td><button class="md-expand-btn" tabindex="-1">&#9660;</button></td>';
+      html += '<td><span class="md-tipo-chip ' + tipoClass + '">' + escapeHtml(sv.tipo) + '</span></td>';
+      html += '<td style="white-space:nowrap">' + escapeHtml(fechaFmt) + '</td>';
+      html += '<td>' + escapeHtml(sv.cliente || '—') + '</td>';
+      html += '<td>' + escapeHtml(sv.movil   || '—') + '</td>';
+      html += '<td>' + escapeHtml(sv.supervisor || '—') + '</td>';
+      html += '</tr>';
+      // Detalle expandible
+      var coment = sv.comentario ? escapeHtml(sv.comentario) : '<em style="color:var(--text-2)">Sin comentario</em>';
+      html += '<tr class="md-detail-row" id="mdSuDetail' + i + '" style="display:none"><td colspan="6"><div class="md-detail-inner"><div class="md-detail-label">Comentario</div><div class="md-detail-text">' + coment + '</div></div></td></tr>';
+    });
+    tbody.innerHTML = html;
+  }
+
+  // Filtros
+  ['mdSuFiltTipo','mdSuFiltCliente','mdSuFiltTexto'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) { el.oninput = rebuild; el.onchange = rebuild; }
+  });
+
+  rebuild();
+}
+
+function toggleMdSuRow(i) {
+  var row    = document.getElementById('mdSuRow' + i);
+  var detail = document.getElementById('mdSuDetail' + i);
+  if (!row || !detail) return;
+  var open = detail.style.display !== 'none';
+  detail.style.display = open ? 'none' : '';
+  row.classList.toggle('expanded', !open);
+}
+
+// ── MONDAY PLANES DE ACCIÓN ────────────────────────────────────────────────
+function renderMondayPlanes() {
+  var planesData = (allData && allData.mondayPlanes) || { planes: [], colEstadoId: null };
+  var planes     = planesData.planes || [];
+  var colEstadoId= planesData.colEstadoId;
+  var tbody      = document.getElementById('mdPlanesTableBody');
+  var badge      = document.getElementById('mdPlanesBadge');
+  var hint       = document.getElementById('mdPlanesHint');
+  if (!tbody) return;
+
+  // Poblar selector de clientes
+  var filtCliente = document.getElementById('mdPlanesFiltCliente');
+  if (filtCliente && filtCliente.options.length <= 1) {
+    var clientes = [];
+    planes.forEach(function(p) { if (p.cliente && clientes.indexOf(p.cliente) < 0) clientes.push(p.cliente); });
+    clientes.sort().forEach(function(c) {
+      var o = document.createElement('option'); o.value = c; o.textContent = c; filtCliente.appendChild(o);
+    });
+  }
+
+  if (hint && colEstadoId) hint.style.display = '';
+
+  function estadoClass(estado) {
+    var e = (estado || '').toLowerCase();
+    if (e.indexOf('listo') >= 0 || e.indexOf('done') >= 0) return 'listo';
+    if (e.indexOf('proceso') >= 0 || e.indexOf('progress') >= 0 || e.indexOf('curso') >= 0) return 'en-proceso';
+    if (e.indexOf('pendiente') >= 0 || e === '' || e === '-') return 'pendiente';
+    return 'otro';
+  }
+
+  function nextEstado(actual) {
+    var cls = estadoClass(actual);
+    if (cls === 'pendiente')  return 'En proceso';
+    if (cls === 'en-proceso') return 'Listo';
+    return 'Pendiente'; // listo u otro → vuelve a Pendiente
+  }
+
+  function rebuild() {
+    var filtEst    = (document.getElementById('mdPlanesFiltEstado')  || {}).value || '';
+    var filtCli    = (document.getElementById('mdPlanesFiltCliente')  || {}).value || '';
+    var filtTexto  = ((document.getElementById('mdPlanesFiltTexto')   || {}).value || '').toLowerCase();
+
+    var rows = planes.filter(function(p) {
+      if (filtEst && (p.estado || '') !== filtEst) return false;
+      if (filtCli && p.cliente !== filtCli)         return false;
+      if (filtTexto && (p.name + ' ' + p.descripcion + ' ' + p.responsable).toLowerCase().indexOf(filtTexto) < 0) return false;
+      return true;
+    });
+
+    if (badge) { badge.textContent = rows.length + ' planes'; badge.style.display = rows.length ? '' : 'none'; }
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-msg">Sin resultados</td></tr>';
+      return;
+    }
+
+    var html = '';
+    rows.forEach(function(p) {
+      var eClass  = estadoClass(p.estado);
+      var eLabel  = p.estado || 'Pendiente';
+      var fechaSup = p.fecha    ? p.fecha.replace(/(\d{4})-(\d{2})-(\d{2})/, '$3/$2/$1') : '—';
+      var fechaLim = p.fechaLim ? p.fechaLim.replace(/(\d{4})-(\d{2})-(\d{2})/, '$3/$2/$1') : '—';
+      var btnAttr  = colEstadoId ? 'onclick="updatePlanEstado(this,\'' + p.id + '\',\'' + colEstadoId + '\',\'' + nextEstado(p.estado) + '\')"' : 'disabled title="Sin columna Estado detectada"';
+      html += '<tr>';
+      html += '<td><button class="md-estado-btn ' + eClass + '" ' + btnAttr + '>' + escapeHtml(eLabel) + '</button></td>';
+      html += '<td title="' + escapeHtml(p.descripcion || '') + '">' + escapeHtml(p.name || p.descripcion || '—') + '</td>';
+      html += '<td>' + escapeHtml(p.cliente     || '—') + '</td>';
+      html += '<td>' + escapeHtml(p.movil       || '—') + '</td>';
+      html += '<td style="white-space:nowrap">' + escapeHtml(fechaSup) + '</td>';
+      html += '<td style="white-space:nowrap">' + escapeHtml(fechaLim) + '</td>';
+      html += '<td>' + escapeHtml(p.responsable || '—') + '</td>';
+      html += '</tr>';
+    });
+    tbody.innerHTML = html;
+  }
+
+  ['mdPlanesFiltEstado','mdPlanesFiltCliente','mdPlanesFiltTexto'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) { el.oninput = rebuild; el.onchange = rebuild; }
+  });
+
+  rebuild();
+}
+
+function updatePlanEstado(btn, itemId, colId, newEstado) {
+  if (!btn || btn.classList.contains('saving')) return;
+  btn.classList.add('saving');
+  var oldText = btn.textContent;
+
+  function doUpdate() {
+    if (IS_GAS) {
+      google.script.run
+        .withSuccessHandler(function(res) { onDone(res); })
+        .withFailureHandler(function(err) { onErr(err); })
+        .updateMondayPlanEstadoGas({ token: sessionToken, itemId: itemId, colId: colId, value: newEstado });
+    } else {
+      authFetch('monday_update_plan', { token: sessionToken, itemId: itemId, colId: colId, value: newEstado })
+        .then(function(res) { onDone(res); })
+        .catch(function(err) { onErr(err); });
+    }
+  }
+
+  function onDone(res) {
+    btn.classList.remove('saving');
+    if (res && res.ok) {
+      // Actualiza el estado en allData en memoria
+      var planes = (allData.mondayPlanes && allData.mondayPlanes.planes) || [];
+      for (var i = 0; i < planes.length; i++) {
+        if (planes[i].id === itemId) { planes[i].estado = newEstado; break; }
+      }
+      renderMondayPlanes();
+    } else {
+      btn.textContent = oldText;
+      alert('Error al actualizar estado: ' + (res && res.error ? res.error : 'Sin respuesta'));
+    }
+  }
+
+  function onErr(err) {
+    btn.classList.remove('saving');
+    btn.textContent = oldText;
+    console.error('[Monday] updatePlanEstado error:', err);
+  }
+
+  doUpdate();
 }
 
 // ── KILÓMETROS ─────────────────────────────────────────────────────────────

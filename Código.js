@@ -223,6 +223,18 @@ function doGet(e) {
       const fechaFin    = String(e.parameter.fechaFin    || '');
       result = readPerdidaRutaData(cliente, fechaInicio, fechaFin);
 
+    } else if (source === 'monday_update_plan') {
+      const upToken  = params.token || null;
+      const upUser   = verificarToken_(upToken);
+      if (!upUser) {
+        result = { error: 'token_invalido' };
+      } else {
+        const itemId  = String(params.itemId  || '');
+        const colId_  = String(params.colId   || '');
+        const newVal  = String(params.value   || '');
+        result = updateMondayPlanEstado_(itemId, colId_, newVal);
+      }
+
     } else {
       result = { error: 'source no reconocido' };
     }
@@ -321,11 +333,14 @@ function getTabBitacora(params) {
 // ── MONDAY.COM API ─────────────────────────────────────────────────────────
 // Token se guarda con: PropertiesService.getScriptProperties().setProperty('MONDAY_TOKEN','...')
 // Ejecuta setupMondayToken() una vez desde el editor de GAS para guardarlo.
-var MONDAY_API_URL_       = 'https://api.monday.com/v2';
-var MONDAY_CACHE_KEY_     = 'monday_su_v6';
-var MONDAY_CACHE_SEC_     = 3600;
-var MONDAY_BOARD_RAPIDA_  = '5678712035';
-var MONDAY_BOARD_INTEGRAL_= '5623247223';
+var MONDAY_API_URL_          = 'https://api.monday.com/v2';
+var MONDAY_CACHE_KEY_        = 'monday_su_v8';   // v8: items incluyen campos cliente+movil
+var MONDAY_CACHE_SEC_        = 3600;
+var MONDAY_BOARD_RAPIDA_     = '5678712035';
+var MONDAY_BOARD_INTEGRAL_   = '5623247223';
+var MONDAY_BOARD_PLANES_     = '8505742190';
+var MONDAY_PLANES_CACHE_KEY_ = 'monday_planes_v1';
+var MONDAY_PLANES_CACHE_SEC_ = 1800;
 
 function setupMondayToken() {
   var token = 'PEGA_TU_TOKEN_AQUI';
@@ -341,8 +356,8 @@ function readMondaySupervisions_() {
   var token = PropertiesService.getScriptProperties().getProperty('MONDAY_TOKEN');
   if (!token) return {};
 
-  // order_by desc por fecha → recibimos los 500 más recientes de cada tablero (el tablero tiene >500 items)
-  var ob = 'order_by: [{column_id: "date", direction: desc}]';
+  // query_params.order_by → 500 más recientes por fecha (tablero tiene >500 items)
+  var ob = 'query_params: {order_by: [{column_id: "date", direction: desc}]}';
   var query = '{ rapida: boards(ids: [' + MONDAY_BOARD_RAPIDA_ + ']) { columns { id title } items_page(limit: 500, ' + ob + ') { items { column_values { id text } } } } integral: boards(ids: [' + MONDAY_BOARD_INTEGRAL_ + ']) { columns { id title } items_page(limit: 500, ' + ob + ') { items { column_values { id text } } } } }';
 
   var resp;
@@ -406,7 +421,9 @@ function readMondaySupervisions_() {
         tipo:       tipo === 'rapida' ? 'Rápida' : 'Integral',
         fecha:      fecha,
         supervisor: superv,
-        comentario: coment
+        comentario: coment,
+        cliente:    cliente,
+        movil:      movil
       });
     });
   });
@@ -453,15 +470,146 @@ function debugMondayAPI() {
   Logger.log('Items La Araucana en Integral: ' + count);
 }
 
+function readMondayPlanesAccion_() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get(MONDAY_PLANES_CACHE_KEY_);
+  if (cached) { try { return JSON.parse(cached); } catch(e) {} }
+
+  var token = PropertiesService.getScriptProperties().getProperty('MONDAY_TOKEN');
+  if (!token) return { planes: [], colEstadoId: null };
+
+  var query = '{ boards(ids: [' + MONDAY_BOARD_PLANES_ + ']) { columns { id title } items_page(limit: 500) { items { id name column_values { id text } } } } }';
+  var resp;
+  try {
+    resp = UrlFetchApp.fetch(MONDAY_API_URL_, {
+      method: 'POST',
+      headers: { Authorization: token, 'Content-Type': 'application/json', 'API-Version': '2024-01' },
+      payload: JSON.stringify({ query: query }),
+      muteHttpExceptions: true
+    });
+  } catch(e) { return { planes: [], colEstadoId: null }; }
+
+  if (resp.getResponseCode() !== 200) return { planes: [], colEstadoId: null };
+  var raw; try { raw = JSON.parse(resp.getContentText()); } catch(e) { return { planes: [], colEstadoId: null }; }
+  if (!raw.data || !raw.data.boards || !raw.data.boards[0]) return { planes: [], colEstadoId: null };
+
+  var board = raw.data.boards[0];
+  var cols  = board.columns || [];
+
+  Logger.log('[Planes] Columnas: ' + cols.map(function(c){ return c.id + '=' + c.title; }).join(', '));
+
+  function colId(titles) {
+    if (!Array.isArray(titles)) titles = [titles];
+    for (var i = 0; i < titles.length; i++) {
+      var t = titles[i];
+      var c = cols.find(function(col){ return col.title === t; });
+      if (c) return c.id;
+    }
+    return null;
+  }
+
+  var idCliente    = colId(['Cliente']);
+  var idFecha      = colId(['Fecha de Supervisión','Fecha Supervisión','Fecha']);
+  var idFechaLim   = colId(['Fecha límite','Fecha Límite','Límite','Fecha de Solución','Fecha de solución','Fecha Solución']);
+  var idEstado     = colId(['Estado','Status','Estatus']);
+  var idDescr      = colId(['¿Qué?','Qué','Detalle','Problema','Observación','Descripción']);
+  var idResponsable= colId(['Responsable','Encargado']);
+  var idMovilDir   = colId(['Móvil','Nombre Móvil','Movil']);
+  var movilColIds  = cols.filter(function(c){ return c.title && c.title.indexOf('Móviles ') === 0; }).map(function(c){ return c.id; });
+
+  Logger.log('[Planes] idCliente=' + idCliente + ' idFecha=' + idFecha + ' idEstado=' + idEstado + ' idMovilDir=' + idMovilDir);
+
+  var items = (board.items_page && board.items_page.items) || [];
+  var planes = [];
+
+  items.forEach(function(item) {
+    var cv = {};
+    (item.column_values || []).forEach(function(v){ cv[v.id] = v.text || ''; });
+
+    var movil = '';
+    if (idMovilDir && cv[idMovilDir]) { movil = cv[idMovilDir]; }
+    if (!movil) {
+      for (var i = 0; i < movilColIds.length; i++) { if (cv[movilColIds[i]]) { movil = cv[movilColIds[i]]; break; } }
+    }
+
+    planes.push({
+      id:          item.id,
+      name:        item.name || '',
+      cliente:     idCliente    ? cv[idCliente]    : '',
+      movil:       movil,
+      fecha:       idFecha      ? cv[idFecha]      : '',
+      fechaLim:    idFechaLim   ? cv[idFechaLim]   : '',
+      estado:      idEstado     ? cv[idEstado]     : '',
+      descripcion: idDescr      ? cv[idDescr]      : '',
+      responsable: idResponsable ? cv[idResponsable] : ''
+    });
+  });
+
+  planes.sort(function(a,b){ return (b.fecha||'').localeCompare(a.fecha||''); });
+
+  var result = { planes: planes, colEstadoId: idEstado };
+  try { cache.put(MONDAY_PLANES_CACHE_KEY_, JSON.stringify(result), MONDAY_PLANES_CACHE_SEC_); } catch(e) {}
+  return result;
+}
+
+// Wrapper público para google.script.run (sin underscore)
+function updateMondayPlanEstadoGas(params) {
+  var token   = (params && params.token)  || null;
+  var usuario = verificarToken_(token);
+  if (!usuario) return { error: 'token_invalido' };
+  return updateMondayPlanEstado_(
+    String((params && params.itemId) || ''),
+    String((params && params.colId)  || ''),
+    String((params && params.value)  || '')
+  );
+}
+
+function updateMondayPlanEstado_(itemId, colEstadoId, value) {
+  if (!itemId || !colEstadoId || !value) return { error: 'missing_params' };
+  var token = PropertiesService.getScriptProperties().getProperty('MONDAY_TOKEN');
+  if (!token) return { error: 'no_token' };
+
+  var mutation = 'mutation { change_simple_column_value(board_id: ' + MONDAY_BOARD_PLANES_ + ', item_id: ' + itemId + ', column_id: "' + colEstadoId + '", value: ' + JSON.stringify(value) + ') { id } }';
+  var resp;
+  try {
+    resp = UrlFetchApp.fetch(MONDAY_API_URL_, {
+      method: 'POST',
+      headers: { Authorization: token, 'Content-Type': 'application/json', 'API-Version': '2024-01' },
+      payload: JSON.stringify({ query: mutation }),
+      muteHttpExceptions: true
+    });
+  } catch(e) { return { error: e.toString() }; }
+
+  if (resp.getResponseCode() !== 200) return { error: 'http_' + resp.getResponseCode() };
+  try { CacheService.getScriptCache().remove(MONDAY_PLANES_CACHE_KEY_); } catch(e) {}
+  var raw; try { raw = JSON.parse(resp.getContentText()); } catch(e) { return { error: 'json_parse' }; }
+  if (raw.errors && raw.errors.length) return { error: JSON.stringify(raw.errors[0]) };
+  return { ok: true };
+}
+
 function getTabSupervisiones(params) {
   var token = (params && params.token) || null;
   var usuario = verificarToken_(token);
   if (!usuario) return { authError: 'token_invalido' };
   function safeRead(fn) { try { return fn(); } catch(e) { return null; } }
   var flotaInfo = safeRead(function() { return getCached('flota', readFlota, CACHE_DURATION_SECONDS); }) || { flota: [], jefePorMovil: {}, jefePorNombre: {}, kams: [] };
+
+  var byMovil = safeRead(function() { return readMondaySupervisions_(); }) || {};
+
+  // Lista plana para la pestaña Supervisiones (derivada de byMovil, sin segunda llamada a la API)
+  var mondayLista = [];
+  Object.keys(byMovil).forEach(function(key) {
+    (byMovil[key] || []).forEach(function(sv) {
+      mondayLista.push(sv); // ya incluye sv.cliente y sv.movil desde v8
+    });
+  });
+  mondayLista.sort(function(a,b){ return (b.fecha||'').localeCompare(a.fecha||''); });
+
   return {
     supervisiones:       safeRead(function() { return getCached('supervisiones', function() { return readSupervisiones(flotaInfo); }, CACHE_DURATION_SECONDS); }),
-    mondaySupervisiones: safeRead(function() { return readMondaySupervisions_(); }),
+    mondaySupervisiones: byMovil,
+    mondayLista:         mondayLista,
+    mondayPlanes:        safeRead(function() { return readMondayPlanesAccion_(); }) || { planes: [], colEstadoId: null },
     lastUpdated: new Date().toISOString()
   };
 }
