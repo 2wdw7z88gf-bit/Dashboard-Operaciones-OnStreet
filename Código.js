@@ -322,7 +322,7 @@ function getTabBitacora(params) {
 // Token se guarda con: PropertiesService.getScriptProperties().setProperty('MONDAY_TOKEN','...')
 // Ejecuta setupMondayToken() una vez desde el editor de GAS para guardarlo.
 var MONDAY_API_URL_       = 'https://api.monday.com/v2';
-var MONDAY_CACHE_KEY_     = 'monday_su_v5';
+var MONDAY_CACHE_KEY_     = 'monday_su_v6';
 var MONDAY_CACHE_SEC_     = 3600;
 var MONDAY_BOARD_RAPIDA_  = '5678712035';
 var MONDAY_BOARD_INTEGRAL_= '5623247223';
@@ -341,8 +341,9 @@ function readMondaySupervisions_() {
   var token = PropertiesService.getScriptProperties().getProperty('MONDAY_TOKEN');
   if (!token) return {};
 
-  // Sin order_by en la API — el sort client-side (líneas ~415-417) ordena los 500 y toma los 5 más recientes
-  var query = '{ rapida: boards(ids: [' + MONDAY_BOARD_RAPIDA_ + ']) { columns { id title } items_page(limit: 500) { items { column_values { id text } } } } integral: boards(ids: [' + MONDAY_BOARD_INTEGRAL_ + ']) { columns { id title } items_page(limit: 500) { items { column_values { id text } } } } }';
+  // order_by desc por fecha → recibimos los 500 más recientes de cada tablero (el tablero tiene >500 items)
+  var ob = 'order_by: [{column_id: "date", direction: desc}]';
+  var query = '{ rapida: boards(ids: [' + MONDAY_BOARD_RAPIDA_ + ']) { columns { id title } items_page(limit: 500, ' + ob + ') { items { column_values { id text } } } } integral: boards(ids: [' + MONDAY_BOARD_INTEGRAL_ + ']) { columns { id title } items_page(limit: 500, ' + ob + ') { items { column_values { id text } } } } }';
 
   var resp;
   try {
@@ -418,6 +419,38 @@ function readMondaySupervisions_() {
 
   try { cache.put(MONDAY_CACHE_KEY_, JSON.stringify(byMovil), MONDAY_CACHE_SEC_); } catch(e) { /* objeto demasiado grande */ }
   return byMovil;
+}
+
+function debugMondayAPI() {
+  var token = PropertiesService.getScriptProperties().getProperty('MONDAY_TOKEN');
+  if (!token) { Logger.log('SIN TOKEN'); return; }
+  // Buscar items del Integral que tengan "La Araucana" en cualquier col de móvil
+  // Columnas clave Integral: Cliente=selecci_n_m_ltiple57__1, Fecha=date, Móviles La Araucana=selecci_n_m_ltiple_3__1
+  var colIds = '["selecci_n_m_ltiple57__1","date","nombre_supervisor","selecci_n_m_ltiple_3__1"]';
+  var query = '{ integral: boards(ids: [' + MONDAY_BOARD_INTEGRAL_ + ']) { items_page(limit: 500) { items { id name column_values(ids: ' + colIds + ') { id text } } } } }';
+  var resp = UrlFetchApp.fetch(MONDAY_API_URL_, {
+    method: 'POST',
+    headers: { Authorization: token, 'Content-Type': 'application/json', 'API-Version': '2024-01' },
+    payload: JSON.stringify({ query: query }),
+    muteHttpExceptions: true
+  });
+  var raw = JSON.parse(resp.getContentText());
+  var items = raw.data.integral[0].items_page.items;
+  Logger.log('Total items Integral: ' + items.length);
+  var count = 0;
+  items.forEach(function(item) {
+    var cv = {};
+    item.column_values.forEach(function(v){ cv[v.id] = v.text || ''; });
+    var cliente = cv['selecci_n_m_ltiple57__1'];
+    var movil   = cv['selecci_n_m_ltiple_3__1'];
+    var fecha   = cv['date'];
+    var sup     = cv['nombre_supervisor'];
+    if (cliente && cliente.indexOf('Araucana') >= 0) {
+      Logger.log('cliente="' + cliente + '" movil="' + movil + '" fecha="' + fecha + '" sup="' + sup + '"');
+      count++;
+    }
+  });
+  Logger.log('Items La Araucana en Integral: ' + count);
 }
 
 function getTabSupervisiones(params) {
