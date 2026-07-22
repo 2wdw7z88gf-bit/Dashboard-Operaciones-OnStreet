@@ -85,6 +85,12 @@ function doGet(e) {
     } else if (source === 'logout') {
       result = cerrarSesion(params.token || null);
 
+    } else if (source === 'reset_request') {
+      result = solicitarReset(params.email || '');
+
+    } else if (source === 'reset_confirm') {
+      result = confirmarReset(params.token || '', params.password || '');
+
     } else if (source === 'all') {
       const tokenParam = params.token || null;
       const usuario = verificarToken_(tokenParam);
@@ -2259,6 +2265,62 @@ function verificarToken_(token) {
 function cerrarSesion(token) {
   if (token) CacheService.getScriptCache().remove('tok_' + token);
   return { ok: true };
+}
+
+function solicitarReset(email) {
+  if (!email) return { ok: false, error: 'Email requerido' };
+  var sheet = getUsuariosSheet_();
+  if (!sheet) return { ok: false, error: 'Servicio no disponible' };
+  var data = sheet.getDataRange().getValues();
+  var found = false;
+  for (var i = 1; i < data.length; i++) {
+    if (normalize_(String(data[i][0])) === normalize_(email)) { found = true; break; }
+  }
+  // Siempre responder ok para no revelar si el email existe
+  if (!found) return { ok: true };
+  var token = generarToken_();
+  CacheService.getScriptCache().put('reset_' + token, normalize_(email), 900); // 15 minutos
+  var resetUrl = 'https://dashboard-operaciones-on-street.vercel.app/?reset=' + token;
+  try {
+    MailApp.sendEmail({
+      to: email,
+      subject: 'Recuperar contraseña — Dashboard On Street',
+      htmlBody:
+        '<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px">' +
+        '<h2 style="color:#E84717;margin:0 0 16px">Dashboard On Street</h2>' +
+        '<p style="color:#333">Recibimos una solicitud para restablecer la contraseña de tu cuenta.</p>' +
+        '<p style="margin:24px 0">' +
+        '<a href="' + resetUrl + '" style="background:#E84717;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Restablecer contraseña</a>' +
+        '</p>' +
+        '<p style="font-size:13px;color:#666">Este enlace es válido por <strong>15 minutos</strong>.<br>Si no solicitaste esto, ignora este correo.</p>' +
+        '<hr style="border:none;border-top:1px solid #eee;margin:24px 0">' +
+        '<p style="font-size:12px;color:#aaa">On Street</p></div>',
+      body: 'Para restablecer tu contraseña, copia este enlace en tu navegador:\n\n' + resetUrl + '\n\nVálido por 15 minutos. Si no solicitaste esto, ignora este correo.'
+    });
+  } catch(e) {
+    Logger.log('Error al enviar email de reset: ' + e.toString());
+  }
+  return { ok: true };
+}
+
+function confirmarReset(token, newPassword) {
+  if (!token || !newPassword) return { ok: false, error: 'Datos incompletos' };
+  if (newPassword.length < 8) return { ok: false, error: 'La contraseña debe tener al menos 8 caracteres' };
+  var cache = CacheService.getScriptCache();
+  var email = cache.get('reset_' + token);
+  if (!email) return { ok: false, error: 'El enlace expiró o ya fue utilizado' };
+  var sheet = getUsuariosSheet_();
+  if (!sheet) return { ok: false, error: 'Servicio no disponible' };
+  var data = sheet.getDataRange().getValues();
+  var newHash = hashPassword_(newPassword);
+  for (var i = 1; i < data.length; i++) {
+    if (normalize_(String(data[i][0])) === email) {
+      sheet.getRange(i + 1, 4).setValue(newHash);
+      cache.remove('reset_' + token);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Usuario no encontrado' };
 }
 
 // Corre UNA VEZ desde el editor de Apps Script para crear la hoja Usuarios

@@ -449,6 +449,7 @@ tr:hover td{background:var(--surface-2)}
 .auth-link a{color:var(--info-fg);cursor:pointer;text-decoration:none;font-weight:500}
 .auth-link a:hover{text-decoration:underline}
 .auth-error{background:var(--danger-bg);color:var(--danger-fg);border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px;display:none}
+.auth-success{background:#d1fae5;color:#065f46;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px}
 .auth-error.visible{display:block}
 .auth-pending{text-align:center;padding:12px 0}
 .auth-pending-icon{font-size:40px;margin-bottom:12px}
@@ -495,6 +496,7 @@ tr:hover td{background:var(--surface-2)}
     </div>
     <button class="auth-btn" id="login-btn" onclick="doLogin()">Entrar</button>
     <div class="auth-link">¿No tienes cuenta? <a onclick="showAuthScreen('register')">Solicitar acceso</a></div>
+    <div class="auth-link"><a onclick="showAuthScreen('reset-request')">¿Olvidaste tu contraseña?</a></div>
   </div>
 
   <!-- REGISTER -->
@@ -540,6 +542,38 @@ tr:hover td{background:var(--surface-2)}
       <div class="auth-sub" style="text-align:center;margin-top:8px">Tu cuenta aún no ha sido aprobada. Cuando un administrador la apruebe, podrás ingresar.</div>
     </div>
     <div class="auth-link" style="margin-top:24px"><a onclick="showAuthScreen('login')">Volver al inicio de sesión</a></div>
+  </div>
+
+  <!-- RESET REQUEST -->
+  <div class="auth-card" id="auth-reset-request" style="display:none">
+    <div class="auth-title">Recuperar contraseña</div>
+    <div class="auth-sub">Ingresa tu email y te enviaremos un enlace para crear una nueva contraseña.</div>
+    <div class="auth-error" id="reset-request-error"></div>
+    <div class="auth-success" id="reset-request-ok" style="display:none">Revisa tu correo — te enviamos el enlace de recuperación.</div>
+    <div id="reset-request-form">
+      <div class="auth-field">
+        <label>Email</label>
+        <input type="email" id="reset-email" placeholder="nombre@onstreet.cl" autocomplete="email" />
+      </div>
+      <button class="auth-btn" id="reset-request-btn" onclick="doResetRequest()">Enviar enlace</button>
+    </div>
+    <div class="auth-link"><a onclick="showAuthScreen('login')">Volver al inicio de sesión</a></div>
+  </div>
+
+  <!-- RESET CONFIRM -->
+  <div class="auth-card" id="auth-reset-confirm" style="display:none">
+    <div class="auth-title">Nueva contraseña</div>
+    <div class="auth-sub">Ingresa tu nueva contraseña.</div>
+    <div class="auth-error" id="reset-confirm-error"></div>
+    <div class="auth-field">
+      <label>Nueva contraseña</label>
+      <input type="password" id="reset-new-password" placeholder="Mínimo 8 caracteres" autocomplete="new-password" />
+    </div>
+    <div class="auth-field">
+      <label>Confirmar contraseña</label>
+      <input type="password" id="reset-new-password2" placeholder="Repite la contraseña" autocomplete="new-password" />
+    </div>
+    <button class="auth-btn" id="reset-confirm-btn" onclick="doResetConfirm()">Cambiar contraseña</button>
   </div>
 </div>
 <!-- ======================================= -->
@@ -2725,14 +2759,27 @@ function populateKamSelector(){
 
 // ── AUTH ──────────────────────────────────────────────────────
 var sessionToken = localStorage.getItem('os_token') || null;
+var _urlParams = new URLSearchParams(window.location.search);
+var _pendingResetToken = _urlParams.get('reset') || null;
 
 function showAuthScreen(screen) {
-  ['auth-login','auth-register','auth-register-ok','auth-pending'].forEach(function(id){
-    document.getElementById(id).style.display = 'none';
+  ['auth-login','auth-register','auth-register-ok','auth-pending','auth-reset-request','auth-reset-confirm'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.style.display = 'none';
   });
   document.getElementById('auth-' + screen).style.display = '';
   document.getElementById('auth-overlay').classList.remove('hidden');
   document.getElementById('app-container').style.display = 'none';
+  if (screen === 'reset-request') {
+    document.getElementById('reset-request-form').style.display = '';
+    var btn = document.getElementById('reset-request-btn');
+    btn.style.display = '';
+    btn.disabled = false;
+    btn.textContent = 'Enviar enlace';
+    document.getElementById('reset-request-ok').style.display = 'none';
+    document.getElementById('reset-request-error').style.display = 'none';
+    document.getElementById('reset-email').value = '';
+  }
 }
 
 function hideAuthOverlay(usuario) {
@@ -2832,6 +2879,47 @@ function doLogout() {
   showAuthScreen('login');
 }
 
+function doResetRequest() {
+  var email = document.getElementById('reset-email').value.trim();
+  var errEl = document.getElementById('reset-request-error');
+  errEl.style.display = 'none';
+  if (!email) { errEl.textContent = 'Ingresa tu email'; errEl.style.display = ''; return; }
+  var btn = document.getElementById('reset-request-btn');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  var onOk = function(res) {
+    btn.disabled = false; btn.textContent = 'Enviar enlace';
+    if (!res || !res.ok) { errEl.textContent = (res && res.error) ? res.error : 'Error al enviar'; errEl.style.display = ''; return; }
+    document.getElementById('reset-request-form').style.display = 'none';
+    btn.style.display = 'none';
+    document.getElementById('reset-request-ok').style.display = '';
+  };
+  var onErr = function() { btn.disabled = false; btn.textContent = 'Enviar enlace'; errEl.textContent = 'Error de conexión'; errEl.style.display = ''; };
+  if (IS_GAS) { google.script.run.withSuccessHandler(onOk).withFailureHandler(onErr).solicitarReset(email); }
+  else { authFetch('reset_request', { email: email }).then(onOk).catch(onErr); }
+}
+
+function doResetConfirm() {
+  var pass = document.getElementById('reset-new-password').value;
+  var pass2 = document.getElementById('reset-new-password2').value;
+  var errEl = document.getElementById('reset-confirm-error');
+  errEl.style.display = 'none';
+  if (!pass || pass.length < 8) { errEl.textContent = 'La contraseña debe tener al menos 8 caracteres'; errEl.style.display = ''; return; }
+  if (pass !== pass2) { errEl.textContent = 'Las contraseñas no coinciden'; errEl.style.display = ''; return; }
+  if (!_pendingResetToken) { errEl.textContent = 'Enlace inválido'; errEl.style.display = ''; return; }
+  var btn = document.getElementById('reset-confirm-btn');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  var onOk = function(res) {
+    btn.disabled = false; btn.textContent = 'Cambiar contraseña';
+    if (!res || !res.ok) { errEl.textContent = (res && res.error) ? res.error : 'Error al cambiar contraseña'; errEl.style.display = ''; return; }
+    _pendingResetToken = null;
+    window.history.replaceState({}, document.title, window.location.pathname);
+    showAuthScreen('login');
+  };
+  var onErr = function() { btn.disabled = false; btn.textContent = 'Cambiar contraseña'; errEl.textContent = 'Error de conexión'; errEl.style.display = ''; };
+  if (IS_GAS) { google.script.run.withSuccessHandler(onOk).withFailureHandler(onErr).confirmarReset(_pendingResetToken, pass); }
+  else { authFetch('reset_confirm', { token: _pendingResetToken, password: pass }).then(onOk).catch(onErr); }
+}
+
 // Enter key support for auth forms
 document.addEventListener('keydown', function(e) {
   if (e.key !== 'Enter') return;
@@ -2839,12 +2927,15 @@ document.addEventListener('keydown', function(e) {
   if (!overlay || overlay.classList.contains('hidden')) return;
   var loginVisible = document.getElementById('auth-login').style.display !== 'none';
   var regVisible = document.getElementById('auth-register').style.display !== 'none';
+  var resetConfVisible = document.getElementById('auth-reset-confirm').style.display !== 'none';
   if (loginVisible) doLogin();
   else if (regVisible) doRegister();
+  else if (resetConfVisible) doResetConfirm();
 });
 
 // ── INIT ──────────────────────────────────────────────────────
 (function initAuth() {
+  if (_pendingResetToken) { showAuthScreen('reset-confirm'); return; }
   if (!sessionToken) { showAuthScreen('login'); return; }
   hideAuthOverlay(null);
   loadData();
