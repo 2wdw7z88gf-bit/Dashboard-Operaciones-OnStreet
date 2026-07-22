@@ -318,6 +318,108 @@ function getTabBitacora(params) {
   };
 }
 
+// ── MONDAY.COM API ─────────────────────────────────────────────────────────
+// Token se guarda con: PropertiesService.getScriptProperties().setProperty('MONDAY_TOKEN','...')
+// Ejecuta setupMondayToken() una vez desde el editor de GAS para guardarlo.
+var MONDAY_API_URL_       = 'https://api.monday.com/v2';
+var MONDAY_CACHE_KEY_     = 'monday_su_v3';
+var MONDAY_CACHE_SEC_     = 3600;
+var MONDAY_BOARD_RAPIDA_  = '5678712035';
+var MONDAY_BOARD_INTEGRAL_= '5623247223';
+
+function setupMondayToken() {
+  var token = 'PEGA_TU_TOKEN_AQUI';
+  PropertiesService.getScriptProperties().setProperty('MONDAY_TOKEN', token);
+  Logger.log('Token guardado.');
+}
+
+function readMondaySupervisions_() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get(MONDAY_CACHE_KEY_);
+  if (cached) { try { return JSON.parse(cached); } catch(e) {} }
+
+  var token = PropertiesService.getScriptProperties().getProperty('MONDAY_TOKEN');
+  if (!token) return {};
+
+  var query = '{ rapida: boards(ids: [' + MONDAY_BOARD_RAPIDA_ + ']) { columns { id title } items_page(limit: 500) { items { column_values { id text } } } } integral: boards(ids: [' + MONDAY_BOARD_INTEGRAL_ + ']) { columns { id title } items_page(limit: 500) { items { column_values { id text } } } } }';
+
+  var resp;
+  try {
+    resp = UrlFetchApp.fetch(MONDAY_API_URL_, {
+      method: 'POST',
+      headers: { Authorization: token, 'Content-Type': 'application/json', 'API-Version': '2024-01' },
+      payload: JSON.stringify({ query: query }),
+      muteHttpExceptions: true
+    });
+  } catch(e) { return {}; }
+
+  if (resp.getResponseCode() !== 200) return {};
+  var raw;
+  try { raw = JSON.parse(resp.getContentText()); } catch(e) { return {}; }
+  if (!raw.data) return {};
+
+  var byMovil = {};
+
+  ['rapida', 'integral'].forEach(function(tipo) {
+    var boards = raw.data[tipo];
+    if (!boards || !boards[0]) return;
+    var board  = boards[0];
+    var cols   = board.columns || [];
+
+    function colId(title) {
+      var c = cols.find(function(c){ return c.title === title; });
+      return c ? c.id : null;
+    }
+
+    var idCliente   = colId('Cliente');
+    var idFecha     = colId('Fecha');
+    var idSuperv    = colId('Nombre Supervisor');
+    var idComent    = tipo === 'rapida' ? colId('Comentario') : null;
+    // Todas las columnas "Móviles X" (una por cliente)
+    var movilColIds = cols
+      .filter(function(c){ return c.title && c.title.indexOf('Móviles ') === 0; })
+      .map(function(c){ return c.id; });
+
+    var items = (board.items_page && board.items_page.items) || [];
+    items.forEach(function(item) {
+      var cv = {};
+      (item.column_values || []).forEach(function(v){ cv[v.id] = v.text || ''; });
+
+      var fecha   = idFecha   ? cv[idFecha]   : '';
+      var cliente = idCliente ? cv[idCliente] : '';
+      var superv  = idSuperv  ? cv[idSuperv]  : '';
+      var coment  = idComent  ? cv[idComent]  : '';
+      if (!cliente || !fecha) return;
+
+      // Extraer móvil: primera columna "Móviles X" con valor
+      var movil = '';
+      for (var i = 0; i < movilColIds.length; i++) {
+        if (cv[movilColIds[i]]) { movil = cv[movilColIds[i]]; break; }
+      }
+
+      // Clave = cliente|movil (minúsculas), igual que en el Dashboard
+      var key = (cliente + '|' + movil).toLowerCase();
+      if (!byMovil[key]) byMovil[key] = [];
+      if (byMovil[key].length < 5) {
+        byMovil[key].push({
+          tipo:       tipo === 'rapida' ? 'Rápida' : 'Integral',
+          fecha:      fecha,
+          supervisor: superv,
+          comentario: coment
+        });
+      }
+    });
+  });
+
+  // Ordenar cada grupo por fecha desc
+  Object.keys(byMovil).forEach(function(k) {
+    byMovil[k].sort(function(a, b){ return (b.fecha||'').localeCompare(a.fecha||''); });
+  });
+
+  try { cache.put(MONDAY_CACHE_KEY_, JSON.stringify(byMovil), MONDAY_CACHE_SEC_); } catch(e) { /* objeto demasiado grande */ }
+  return byMovil;
+}
+
 function getTabSupervisiones(params) {
   var token = (params && params.token) || null;
   var usuario = verificarToken_(token);
@@ -325,7 +427,8 @@ function getTabSupervisiones(params) {
   function safeRead(fn) { try { return fn(); } catch(e) { return null; } }
   var flotaInfo = safeRead(function() { return getCached('flota', readFlota, CACHE_DURATION_SECONDS); }) || { flota: [], jefePorMovil: {}, jefePorNombre: {}, kams: [] };
   return {
-    supervisiones: safeRead(function() { return getCached('supervisiones', function() { return readSupervisiones(flotaInfo); }, CACHE_DURATION_SECONDS); }),
+    supervisiones:       safeRead(function() { return getCached('supervisiones', function() { return readSupervisiones(flotaInfo); }, CACHE_DURATION_SECONDS); }),
+    mondaySupervisiones: safeRead(function() { return readMondaySupervisions_(); }),
     lastUpdated: new Date().toISOString()
   };
 }

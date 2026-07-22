@@ -1462,9 +1462,15 @@ function openFichaMovil(idx) {
   const kmEntry = ((allData.kilometros && allData.kilometros.moviles) || [])
     .find(function(k){ return (k.cliente+'|'+k.movil).toLowerCase() === key; });
 
-  // Supervisión
+  // Supervisión anual (hoja existente)
   const suEntry = ((allData.supervisiones && allData.supervisiones.moviles) || [])
     .find(function(s){ return s.cliente === m.cliente && (s.nombre === m.nombre || (!m.nombre && s.nombre === m.movil)); });
+
+  // Supervisiones Monday (eventos reales con comentarios)
+  const _mondayMap = allData.mondaySupervisiones || {};
+  const _mondayKey1 = (m.cliente + '|' + (m.movil  || '')).toLowerCase();
+  const _mondayKey2 = (m.cliente + '|' + (m.nombre || '')).toLowerCase();
+  const mondayEvents = _mondayMap[_mondayKey1] || _mondayMap[_mondayKey2] || [];
 
   let html = '';
 
@@ -1513,15 +1519,34 @@ function openFichaMovil(idx) {
     +'</div>';
   }
 
-  // Supervisión
-  if (suEntry) {
-    const pct = Math.round((suEntry.pctMovil||0)*100);
-    const color = pct >= 70 ? 'var(--ok-fg)' : pct >= 30 ? 'var(--warn-fg)' : 'var(--danger-fg)';
-    html += '<div class="ficha-sec"><div class="ficha-sec-title">Supervisiones</div>'
-      +'<div class="ficha-row"><span class="ficha-rkey">Total año</span><span class="ficha-rval">'+suEntry.total+'</span></div>'
-      +(suEntry.meta ? '<div class="ficha-row"><span class="ficha-rkey">Meta</span><span class="ficha-rval">'+suEntry.meta+'</span></div>' : '')
-      +'<div class="ficha-row"><span class="ficha-rkey">Cumplimiento</span><span class="ficha-rval" style="color:'+color+'">'+pct+'%</span></div>'
-    +'</div>';
+  // Supervisiones: eventos Monday + totales anuales
+  if (mondayEvents.length > 0 || suEntry) {
+    html += '<div class="ficha-sec"><div class="ficha-sec-title">Supervisiones</div>';
+
+    if (mondayEvents.length > 0) {
+      mondayEvents.forEach(function(ev) {
+        var tipoBg = ev.tipo === 'Rápida' ? 'var(--blue-bg)' : 'var(--ok-bg)';
+        var tipoFg = ev.tipo === 'Rápida' ? 'var(--blue-fg)' : 'var(--ok-fg)';
+        html += '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'
+          +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+            +'<span style="font-size:12.5px;font-weight:500;font-variant-numeric:tabular-nums">'+escapeHtml(ev.fecha)+'</span>'
+            +'<span style="font-size:10px;font-weight:600;padding:1px 7px;border-radius:10px;background:'+tipoBg+';color:'+tipoFg+'">'+ev.tipo+'</span>'
+            +(ev.supervisor ? '<span style="font-size:11.5px;color:var(--text-2)">'+escapeHtml(ev.supervisor)+'</span>' : '')
+          +'</div>'
+          +(ev.comentario ? '<div style="font-size:12.5px;color:var(--text-2);line-height:1.45;font-style:italic">&ldquo;'+escapeHtml(ev.comentario)+'&rdquo;</div>' : '')
+        +'</div>';
+      });
+    }
+
+    if (suEntry) {
+      const pct   = Math.round((suEntry.pctMovil||0)*100);
+      const color = pct >= 70 ? 'var(--ok-fg)' : pct >= 30 ? 'var(--warn-fg)' : 'var(--danger-fg)';
+      html += '<div class="ficha-row" style="margin-top:4px"><span class="ficha-rkey">Total año</span><span class="ficha-rval">'+suEntry.total+'</span></div>'
+        +(suEntry.meta ? '<div class="ficha-row"><span class="ficha-rkey">Meta</span><span class="ficha-rval">'+suEntry.meta+'</span></div>' : '')
+        +'<div class="ficha-row"><span class="ficha-rkey">Cumplimiento</span><span class="ficha-rval" style="color:'+color+'">'+pct+'%</span></div>';
+    }
+
+    html += '</div>';
   }
 
   // Botón editar
