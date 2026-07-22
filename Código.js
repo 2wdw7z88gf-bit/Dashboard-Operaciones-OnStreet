@@ -322,7 +322,7 @@ function getTabBitacora(params) {
 // Token se guarda con: PropertiesService.getScriptProperties().setProperty('MONDAY_TOKEN','...')
 // Ejecuta setupMondayToken() una vez desde el editor de GAS para guardarlo.
 var MONDAY_API_URL_       = 'https://api.monday.com/v2';
-var MONDAY_CACHE_KEY_     = 'monday_su_v3';
+var MONDAY_CACHE_KEY_     = 'monday_su_v4';
 var MONDAY_CACHE_SEC_     = 3600;
 var MONDAY_BOARD_RAPIDA_  = '5678712035';
 var MONDAY_BOARD_INTEGRAL_= '5623247223';
@@ -341,7 +341,9 @@ function readMondaySupervisions_() {
   var token = PropertiesService.getScriptProperties().getProperty('MONDAY_TOKEN');
   if (!token) return {};
 
-  var query = '{ rapida: boards(ids: [' + MONDAY_BOARD_RAPIDA_ + ']) { columns { id title } items_page(limit: 500) { items { column_values { id text } } } } integral: boards(ids: [' + MONDAY_BOARD_INTEGRAL_ + ']) { columns { id title } items_page(limit: 500) { items { column_values { id text } } } } }';
+  // order_by: fecha desc → los más recientes llegan primero (evita quedarse con los del 2024)
+  var orderBy = 'order_by: [{column_id: \\"date\\", direction: desc}]';
+  var query = '{ rapida: boards(ids: [' + MONDAY_BOARD_RAPIDA_ + ']) { columns { id title } items_page(limit: 500, ' + orderBy + ') { items { column_values { id text } } } } integral: boards(ids: [' + MONDAY_BOARD_INTEGRAL_ + ']) { columns { id title } items_page(limit: 500, ' + orderBy + ') { items { column_values { id text } } } } }';
 
   var resp;
   try {
@@ -400,20 +402,19 @@ function readMondaySupervisions_() {
       // Clave = cliente|movil (minúsculas), igual que en el Dashboard
       var key = (cliente + '|' + movil).toLowerCase();
       if (!byMovil[key]) byMovil[key] = [];
-      if (byMovil[key].length < 5) {
-        byMovil[key].push({
-          tipo:       tipo === 'rapida' ? 'Rápida' : 'Integral',
-          fecha:      fecha,
-          supervisor: superv,
-          comentario: coment
-        });
-      }
+      byMovil[key].push({
+        tipo:       tipo === 'rapida' ? 'Rápida' : 'Integral',
+        fecha:      fecha,
+        supervisor: superv,
+        comentario: coment
+      });
     });
   });
 
-  // Ordenar cada grupo por fecha desc
+  // Ordenar por fecha desc y quedarse con las 5 más recientes por móvil
   Object.keys(byMovil).forEach(function(k) {
     byMovil[k].sort(function(a, b){ return (b.fecha||'').localeCompare(a.fecha||''); });
+    byMovil[k] = byMovil[k].slice(0, 5);
   });
 
   try { cache.put(MONDAY_CACHE_KEY_, JSON.stringify(byMovil), MONDAY_CACHE_SEC_); } catch(e) { /* objeto demasiado grande */ }
