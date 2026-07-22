@@ -113,6 +113,33 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .det-modal-btns button{flex:1;padding:10px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;border:none}
 .det-btn-save{background:var(--info-fg);color:#fff}.det-btn-save:hover{filter:brightness(1.1)}
 .det-btn-cancel{background:var(--surface-2);color:var(--text-1)}
+/* Ficha de móvil */
+.ficha-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9050;justify-content:flex-end}
+.ficha-ov.open{display:flex}
+.ficha-panel{background:var(--surface);width:400px;max-width:100vw;height:100vh;overflow-y:auto;box-shadow:-4px 0 24px rgba(0,0,0,0.15);display:flex;flex-direction:column}
+.ficha-ph{padding:16px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:10px;position:sticky;top:0;background:var(--surface);z-index:2}
+.ficha-ptitle{font-size:15px;font-weight:700;color:var(--text-1);line-height:1.3}
+.ficha-psub{font-size:12px;color:var(--text-2);margin-top:2px}
+.ficha-close-btn{background:none;border:none;font-size:18px;color:var(--text-2);cursor:pointer;padding:2px 6px;border-radius:4px;line-height:1;flex-shrink:0}
+.ficha-close-btn:hover{background:var(--surface-2)}
+.ficha-pbody{padding:16px 20px;flex:1}
+.ficha-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:16px}
+.ficha-card{background:var(--surface-2);border:0.5px solid var(--border);border-radius:8px;padding:10px 12px}
+.ficha-clabel{font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-3);margin-bottom:5px}
+.ficha-cval{font-size:13px;font-weight:600;color:var(--text-1);line-height:1.3}
+.ficha-csub{font-size:11.5px;color:var(--text-2);margin-top:2px}
+.ficha-sec{margin-bottom:16px}
+.ficha-sec-title{font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-3);margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border)}
+.ficha-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px}
+.ficha-row:last-child{border-bottom:none}
+.ficha-rkey{color:var(--text-2);white-space:nowrap}
+.ficha-rval{font-weight:500;color:var(--text-1);font-variant-numeric:tabular-nums;text-align:right}
+.ficha-hist-row{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12.5px}
+.ficha-hist-row:last-child{border-bottom:none}
+.ficha-hist-date{color:var(--text-2);min-width:70px;flex-shrink:0}
+.ficha-hist-desc{flex:1;color:var(--text-1)}
+.ficha-edit-btn{width:100%;margin-top:8px;padding:9px;background:transparent;border:0.5px dashed var(--border);border-radius:8px;font-size:13px;color:var(--text-2);cursor:pointer;text-align:center}
+.ficha-edit-btn:hover{background:var(--surface-2)}
 .body-grid{display:grid;grid-template-columns:1fr 320px;gap:14px;margin-bottom:14px}
 .panel{background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:16px 18px}
 .panel h2{font-size:15px;font-weight:500;margin-bottom:12px}
@@ -747,10 +774,6 @@ tr:hover td{background:var(--surface-2)}
         <select id="detKam"><option value="">Todos</option></select>
         <div style="flex:1"></div>
         <span id="detCount" class="det-count"></span>
-        <div class="det-toggle">
-          <button id="btnDetTabla" class="det-toggle-btn active" onclick="setDetView('tabla')">Tabla</button>
-          <button id="btnDetTarjetas" class="det-toggle-btn" onclick="setDetView('tarjetas')">Tarjetas</button>
-        </div>
       </div>
       <div id="detTablaView" class="tabla-wrap">
         <table class="det-table">
@@ -761,9 +784,6 @@ tr:hover td{background:var(--surface-2)}
           </tr></thead>
           <tbody id="detTbody"></tbody>
         </table>
-      </div>
-      <div id="detTarjetasView" style="display:none">
-        <div class="det-cards" id="detCardsGrid"></div>
       </div>
     </div>
   </div>
@@ -1398,7 +1418,7 @@ function _buildDetTabla(moviles) {
     const editBtn = (m.inicio||m.cantInicios)
       ? '<button class="det-edit-btn" onclick="openDetEdit('+idx+')">✎</button>' : '';
     const rowClass = '';
-    return '<tr'+rowClass+'>'
+    return '<tr style="cursor:pointer" onclick="openFichaMovil('+idx+')">'
       +'<td>'+movNom+'</td>'
       +'<td>'+cond+'</td>'
       +'<td>'+(m.hora||'—')+'</td>'
@@ -1406,44 +1426,118 @@ function _buildDetTabla(moviles) {
       +'<td>'+rutas+'</td>'
       +'<td style="font-variant-numeric:tabular-nums">'+(m.atenciones>0?m.atenciones:'—')+'</td>'
       +'<td style="font-size:12px;color:var(--text-2)">'+(m.kam||'—')+'</td>'
-      +'<td style="font-size:12px;color:var(--text-2)">'+(m.comuna||'—')+'</td>'
-      +'<td>'+editBtn+'</td>'
+      +'<td style="font-size:12px;color:var(--text-2)">'+(m.lugar||m.comuna||'—')+'</td>'
+      +'<td onclick="event.stopPropagation()">'+editBtn+'</td>'
       +'</tr>';
   }).join('');
 }
 
-function _buildDetCards(moviles) {
-  const grid = document.getElementById('detCardsGrid');
-  if (!grid) return;
-  grid.innerHTML = moviles.map(function(m, idx) {
-    const reemplazante = (m.alertasInicio || []).find(function(a){ return a.esReemplazo; });
-    const reemplazaA = reemplazante?.reemplazaA || m.conductorTitular || '';
-    const replRow = m.tieneReemplazo
-      ? '<div class="det-card-replace">↳ '+m.conductor+' reemplaza a '+(reemplazaA||'titular')+'</div>' : '';
-    const lugarRow = (m.lugar || m.comuna)
-      ? '<div class="det-card-info">📍 '+(m.lugar||m.comuna)+'</div>' : '';
-    const editBtn = (m.inicio||m.cantInicios)
-      ? '<button class="det-card-edit" onclick="openDetEdit('+idx+')">✎ Editar</button>' : '';
-    return '<div class="det-card" style="border-left:3px solid '+_detCardBorder(m)+'">'
-      +'<div class="det-card-title">'+m.cliente+'</div>'
-      +'<div style="font-size:12px;color:var(--text-2);margin-top:-4px">'+m.movil+'</div>'
-      +'<div class="det-card-badges">'+_detBadgesHtml(m)+'</div>'
-      +(m.conductor ? '<div class="det-card-info">👤 '+m.conductor+'</div>' : '')
-      +replRow
-      +(m.hora ? '<div class="det-card-info">⏰ '+m.hora+'</div>' : '')
-      +lugarRow
-      +(m.atenciones > 0 ? '<div style="font-size:13px;color:var(--text-2)">Atenciones: <strong>'+m.atenciones+'</strong></div>' : '')
-      +editBtn
-      +'</div>';
-  }).join('');
+function _buildDetCards() { /* reemplazado por ficha */ }
+
+function setDetView() { /* toggle eliminado */ }
+
+// ── FICHA DE MÓVIL ──────────────────────────────────────────────────────────
+let _fichaIdx = null;
+
+function openFichaMovil(idx) {
+  const m = _detCurrentMoviles[idx];
+  if (!m) return;
+  _fichaIdx = idx;
+
+  document.getElementById('fichaTitle').textContent = m.nombre || (m.cliente + ' · ' + m.movil);
+  document.getElementById('fichaSub').textContent = (m.nombre ? m.cliente + ' · ' : '') + m.movil + (m.kam ? ' · KAM: ' + m.kam : '');
+  document.getElementById('fichaBadge').innerHTML = _detBadgesHtml(m);
+
+  const reemplazante = (m.alertasInicio || []).find(function(a){ return a.esReemplazo; });
+  const reemplazaA = reemplazante?.reemplazaA || m.conductorTitular || '';
+
+  // Historial: rutas de este móvil, más recientes primero
+  const key = (m.cliente + '|' + m.movil).toLowerCase();
+  const histRutas = ((allData.historico && allData.historico.rutas) || [])
+    .filter(function(r){ return (r.cliente+'|'+r.movil).toLowerCase() === key; })
+    .sort(function(a,b){ return (b.fecha||'').localeCompare(a.fecha||''); })
+    .slice(0, 7);
+
+  // Kilómetros
+  const kmEntry = ((allData.kilometros && allData.kilometros.moviles) || [])
+    .find(function(k){ return (k.cliente+'|'+k.movil).toLowerCase() === key; });
+
+  // Supervisión
+  const suEntry = ((allData.supervisiones && allData.supervisiones.moviles) || [])
+    .find(function(s){ return s.cliente === m.cliente && (s.nombre === m.nombre || (!m.nombre && s.nombre === m.movil)); });
+
+  let html = '';
+
+  // Grid de datos clave
+  html += '<div class="ficha-grid">'
+    + '<div class="ficha-card"><div class="ficha-clabel">Estado</div><div class="ficha-cval">'+_detBadgesHtml(m)+'</div></div>'
+    + '<div class="ficha-card"><div class="ficha-clabel">Hora inicio</div><div class="ficha-cval">'+(m.hora||'—')+'</div>'
+      + (m.cantInicios ? '<div class="ficha-csub">'+m.cantInicios+'↑ iniciadas · '+(m.cantTerminos||0)+'↓ terminadas</div>' : '')
+    + '</div>'
+    + '<div class="ficha-card"><div class="ficha-clabel">Conductor</div><div class="ficha-cval" style="font-size:12.5px">'+(m.conductor||'—')+'</div>'
+      + (m.tieneReemplazo ? '<div class="ficha-csub" style="color:var(--warn-fg)">Reemplaza a '+(reemplazaA||'titular')+'</div>' : '')
+    + '</div>'
+    + '<div class="ficha-card"><div class="ficha-clabel">Lugar / Comuna</div><div class="ficha-cval" style="font-size:12.5px">'+(m.lugar||m.comuna||'—')+'</div></div>'
+  + '</div>';
+
+  // Operación hoy
+  if (m.rutasEnCurso > 0 || m.atenciones > 0 || m.dobleInicioSinTermino) {
+    html += '<div class="ficha-sec"><div class="ficha-sec-title">Operación hoy</div>';
+    if (m.rutasEnCurso > 0) html += '<div class="ficha-row"><span class="ficha-rkey">En curso</span><span class="ficha-rval">'+m.rutasEnCurso+'</span></div>';
+    if (m.atenciones > 0)   html += '<div class="ficha-row"><span class="ficha-rkey">Atenciones</span><span class="ficha-rval">'+m.atenciones+'</span></div>';
+    if (m.dobleInicioSinTermino) html += '<div class="ficha-row"><span class="ficha-rkey" style="color:var(--warn-fg)">⚠ Doble inicio sin término</span><span></span></div>';
+    html += '</div>';
+  }
+
+  // Historial
+  html += '<div class="ficha-sec"><div class="ficha-sec-title">Historial reciente</div>';
+  if (histRutas.length === 0) {
+    html += '<div style="font-size:13px;color:var(--text-2);padding:8px 0">Sin registros en historial</div>';
+  } else {
+    histRutas.forEach(function(r) {
+      const condStr = r.conductor ? ' · <span style="color:var(--text-2)">'+escapeHtml(r.conductor)+'</span>' : '';
+      const lugarStr = (r.lugar||r.comuna) ? ' · <span style="color:var(--text-2)">'+escapeHtml(r.lugar||r.comuna)+'</span>' : '';
+      html += '<div class="ficha-hist-row"><span class="ficha-hist-date">'+escapeHtml(r.fecha||'—')+'</span>'
+        +'<div class="ficha-hist-desc">Ruta'+condStr+lugarStr+'</div></div>';
+    });
+  }
+  html += '</div>';
+
+  // Kilómetros
+  if (kmEntry) {
+    html += '<div class="ficha-sec"><div class="ficha-sec-title">Kilómetros</div>'
+      +'<div class="ficha-row"><span class="ficha-rkey">Hoy</span><span class="ficha-rval">'+Math.round(kmEntry.kmHoy||0).toLocaleString('es-CL')+' km</span></div>'
+      +'<div class="ficha-row"><span class="ficha-rkey">Este mes</span><span class="ficha-rval">'+Math.round(kmEntry.kmMes||0).toLocaleString('es-CL')+' km</span></div>'
+      +(kmEntry.promedioDiario ? '<div class="ficha-row"><span class="ficha-rkey">Promedio diario</span><span class="ficha-rval">'+Math.round(kmEntry.promedioDiario)+' km/día</span></div>' : '')
+      +(kmEntry.diasActivos    ? '<div class="ficha-row"><span class="ficha-rkey">Días activos mes</span><span class="ficha-rval">'+kmEntry.diasActivos+'</span></div>' : '')
+    +'</div>';
+  }
+
+  // Supervisión
+  if (suEntry) {
+    const pct = Math.round((suEntry.pctMovil||0)*100);
+    const color = pct >= 70 ? 'var(--ok-fg)' : pct >= 30 ? 'var(--warn-fg)' : 'var(--danger-fg)';
+    html += '<div class="ficha-sec"><div class="ficha-sec-title">Supervisiones</div>'
+      +'<div class="ficha-row"><span class="ficha-rkey">Total año</span><span class="ficha-rval">'+suEntry.total+'</span></div>'
+      +(suEntry.meta ? '<div class="ficha-row"><span class="ficha-rkey">Meta</span><span class="ficha-rval">'+suEntry.meta+'</span></div>' : '')
+      +'<div class="ficha-row"><span class="ficha-rkey">Cumplimiento</span><span class="ficha-rval" style="color:'+color+'">'+pct+'%</span></div>'
+    +'</div>';
+  }
+
+  // Botón editar
+  if (m.inicio || m.cantInicios) {
+    html += '<button class="ficha-edit-btn" onclick="closeFichaMovil();openDetEdit('+idx+')">✎ Editar conductor / ubicación</button>';
+  }
+
+  document.getElementById('fichaBody').innerHTML = html;
+  document.getElementById('fichaMovilOv').classList.add('open');
+  document.body.style.overflow = 'hidden';
 }
 
-function setDetView(view) {
-  _detView = view;
-  document.getElementById('detTablaView').style.display    = view === 'tabla'    ? '' : 'none';
-  document.getElementById('detTarjetasView').style.display = view === 'tarjetas' ? '' : 'none';
-  document.getElementById('btnDetTabla').classList.toggle('active',    view === 'tabla');
-  document.getElementById('btnDetTarjetas').classList.toggle('active', view === 'tarjetas');
+function closeFichaMovil() {
+  document.getElementById('fichaMovilOv').classList.remove('open');
+  document.body.style.overflow = '';
+  _fichaIdx = null;
 }
 
 // ── Modal editar ──
@@ -2925,6 +3019,11 @@ function doResetConfirm() {
   else { authFetch('reset_confirm', { token: _pendingResetToken, password: pass }).then(onOk).catch(onErr); }
 }
 
+// ESC: cerrar ficha de móvil
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') { closeFichaMovil(); }
+});
+
 // Enter key support for auth forms
 document.addEventListener('keydown', function(e) {
   if (e.key !== 'Enter') return;
@@ -2949,6 +3048,23 @@ document.addEventListener('keydown', function(e) {
 
 </script>
 <div id="kpiTip" class="tooltip" style="max-width:300px;line-height:1.6;font-size:12px"></div>
+
+<!-- FICHA DE MÓVIL -->
+<div class="ficha-ov" id="fichaMovilOv" onclick="if(event.target===this)closeFichaMovil()">
+  <div class="ficha-panel">
+    <div class="ficha-ph">
+      <div style="min-width:0">
+        <div class="ficha-ptitle" id="fichaTitle">—</div>
+        <div class="ficha-psub" id="fichaSub"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <span id="fichaBadge"></span>
+        <button type="button" class="ficha-close-btn" onclick="closeFichaMovil()">✕</button>
+      </div>
+    </div>
+    <div class="ficha-pbody" id="fichaBody"></div>
+  </div>
+</div>
 
 <!-- MODAL: EDITAR RUTA -->
 <div class="det-modal-ov" id="detModalOv" onclick="if(event.target===this)closeDetModal()">
@@ -2982,8 +3098,8 @@ document.addEventListener('keydown', function(e) {
       <input id="detEditLugar" type="text" placeholder="Dirección o lugar" />
     </div>
     <div class="det-modal-btns">
-      <button class="det-btn-cancel" onclick="closeDetModal()">Cancelar</button>
-      <button class="det-btn-save" id="detBtnGuardar" onclick="guardarDetEdit()">Guardar</button>
+      <button type="button" class="det-btn-cancel" onclick="closeDetModal()">Cancelar</button>
+      <button type="button" class="det-btn-save" id="detBtnGuardar" onclick="guardarDetEdit()">Guardar</button>
     </div>
   </div>
 </div>
