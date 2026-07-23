@@ -666,7 +666,7 @@ tr:hover td{background:var(--surface-2)}
   <!-- REGISTER SUCCESS -->
   <div class="auth-card" id="auth-register-ok" style="display:none">
     <div class="auth-pending">
-      <div class="auth-pending-icon">✉</div>
+      <div class="auth-pending-icon" id="authPendingIcon"></div>
       <div class="auth-title" style="text-align:center">Solicitud enviada</div>
       <div class="auth-sub" style="text-align:center;margin-top:8px">Tu cuenta está pendiente de aprobación. Un administrador revisará tu solicitud pronto.</div>
     </div>
@@ -731,12 +731,12 @@ tr:hover td{background:var(--surface-2)}
       <!-- Centro de Notificaciones -->
       <div style="position:relative" id="notifWrap">
         <button class="notif-bell-btn" id="notifBellBtn" onclick="toggleNotifPanel()" title="Notificaciones de planes">
-          🔔<span class="notif-badge" id="notifBadge" style="display:none">0</span>
+          <span id="notifBellIcon"></span><span class="notif-badge" id="notifBadge" style="display:none">0</span>
         </button>
         <div class="notif-panel" id="notifPanel" style="display:none">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)">
             <span style="font-weight:700;font-size:14px">Notificaciones</span>
-            <button onclick="requestBrowserNotif()" style="font-size:11px;background:transparent;border:1px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;color:var(--text-2)" title="Activar notificaciones del navegador">🔔 Activar</button>
+            <button onclick="requestBrowserNotif()" style="font-size:11px;background:transparent;border:1px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;color:var(--text-2);display:inline-flex;align-items:center;gap:4px" title="Activar notificaciones del navegador"><span id="notifActivarIcon"></span> Activar</button>
           </div>
           <div id="notifPanelContent"><div style="text-align:center;color:var(--text-2);padding:28px;font-size:13px">Cargando...</div></div>
         </div>
@@ -753,14 +753,14 @@ tr:hover td{background:var(--surface-2)}
 
   <!-- BANNER OFFLINE -->
   <div id="offline-banner">
-    <span>📵</span>
+    <span id="offlineIcon"></span>
     <span>Sin conexión — los datos pueden estar desactualizados.</span>
   </div>
 
   <!-- BANNER DORMIDOS -->
   <div id="bannerDormidos" class="banner-alert" style="display:none">
     <div class="banner-msg">
-      <span class="banner-icon">⚠</span>
+      <span class="banner-icon" id="bannerDormidosIcon"></span>
       <span><b id="bannerDormidosTxt">—</b> · pueden estar dados de baja o sin operación reciente</span>
     </div>
     <button class="btn-refresh" id="bannerDormidosBtn" type="button" style="font-size:12px">Ver detalle</button>
@@ -815,7 +815,7 @@ tr:hover td{background:var(--surface-2)}
       </div>
       <div class="day-grid">
         <div class="panel">
-          <h2>🏆 Ranking del día — top atenciones</h2>
+          <h2><span id="trophyIcon"></span> Ranking del día — top atenciones</h2>
           <div id="opRankingList" style="margin-top:6px;max-height:360px;overflow-y:auto;padding-right:4px"></div>
         </div>
         <div class="panel">
@@ -823,7 +823,7 @@ tr:hover td{background:var(--surface-2)}
           <div id="opIniList" style="max-height:360px;overflow-y:auto;padding-right:4px"></div>
         </div>
         <div class="panel">
-          <h2>⚠ Términos de ruta</h2>
+          <h2><span id="termRutaIcon"></span> Términos de ruta</h2>
           <div id="opObsList" style="max-height:320px;overflow-y:auto;padding-right:4px"></div>
         </div>
       </div>
@@ -1094,13 +1094,13 @@ tr:hover td{background:var(--surface-2)}
         <h2>Planes de Acción <span class="md-badge" id="mdPlanesBadge" style="display:none"></span></h2>
         <!-- Banner de alertas -->
         <div id="mdPlanesAlertBanner" style="display:none;align-items:center;gap:10px;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:13px;font-weight:500">
-          <span style="font-size:16px">⚠</span>
+          <span id="planesAlertIcon" style="display:inline-flex;align-items:center"></span>
           <span id="mdPlanesAlertText"></span>
           <button onclick="setMdPlanesTab('vencidos',document.querySelector('.md-plan-tab[data-tab=vencidos]'))" style="margin-left:auto;background:#991b1b;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer">Ver vencidos</button>
         </div>
         <!-- Pestañas de estado -->
         <div id="mdPlanesTabBar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-          <button class="md-plan-tab md-tab-vencidos" data-tab="vencidos" onclick="setMdPlanesTab('vencidos',this)" style="display:none">⚠ Vencidos <span class="md-tab-cnt" id="mdTabCntVencidos"></span></button>
+          <button class="md-plan-tab md-tab-vencidos" data-tab="vencidos" onclick="setMdPlanesTab('vencidos',this)" style="display:none"><span id="vencidosTabIcon" style="display:inline-flex;align-items:center;margin-right:4px"></span>Vencidos <span class="md-tab-cnt" id="mdTabCntVencidos"></span></button>
           <button class="md-plan-tab active" data-tab="pendiente" onclick="setMdPlanesTab('pendiente',this)">Pendientes <span class="md-tab-cnt" id="mdTabCntPendiente"></span></button>
           <button class="md-plan-tab" data-tab="en-proceso" onclick="setMdPlanesTab('en-proceso',this)">En Proceso <span class="md-tab-cnt" id="mdTabCntEnProceso"></span></button>
           <button class="md-plan-tab" data-tab="listo" onclick="setMdPlanesTab('listo',this)">Listos <span class="md-tab-cnt" id="mdTabCntListo"></span></button>
@@ -1375,6 +1375,49 @@ let opObsFiltro = 'all';
 // ── Entorno: GAS (testing) vs externo (Netlify/Vercel) ──────────────────────
 const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwgzwp6udBKjCyefdw_BGfBRS5gAIBBaPrJ70yXbwtkPWI1JbXb_8CFaXs8y2Fcv42-/exec';
 const IS_GAS = (function(){ try{ return typeof google!=='undefined'&&typeof google.script!=='undefined'&&typeof google.script.run!=='undefined'; }catch(e){ return false; } })();
+
+// ── Íconos SVG (Lucide) ───────────────────────────────────────────────────────
+const ICONS = {
+  bell:      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>',
+  alertTri:  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+  alertTriMd:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+  clock:     '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+  trophy:    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>',
+  mapPin:    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>',
+  pencil:    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>',
+  x:         '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
+  check:     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><polyline points="20 6 9 17 4 12"/></svg>',
+  phoneOff:  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07C9.44 17.29 8.76 16.6 8.06 15.9"/><path d="M6.1 8.6a19.79 19.79 0 0 0-.13 2.38"/><path d="M2 2l20 20"/></svg>',
+  mail:      '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>',
+  chevDown:  '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><polyline points="6 9 12 15 18 9"/></svg>',
+};
+// Medallas para rankings (reemplazan 🥇🥈🥉)
+const MEDALS = [
+  '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#fef08a;color:#854d0e;border:1.5px solid #eab308;font-size:10px;font-weight:800">1°</span>',
+  '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#e2e8f0;color:#475569;border:1.5px solid #94a3b8;font-size:10px;font-weight:800">2°</span>',
+  '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#fed7aa;color:#92400e;border:1.5px solid #f97316;font-size:10px;font-weight:800">3°</span>',
+];
+
+// Inyectar íconos en elementos estáticos del DOM
+document.addEventListener('DOMContentLoaded', function() {
+  var map = {
+    authPendingIcon:    ICONS.mail,
+    notifBellIcon:      ICONS.bell,
+    notifActivarIcon:   ICONS.bell,
+    offlineIcon:        ICONS.phoneOff,
+    bannerDormidosIcon: ICONS.alertTriMd,
+    trophyIcon:         ICONS.trophy,
+    termRutaIcon:       ICONS.alertTriMd,
+    planesAlertIcon:    ICONS.alertTriMd,
+    vencidosTabIcon:    ICONS.alertTri,
+    fichaCloseBtn:      ICONS.x,
+    detModalCloseBtn:   ICONS.x,
+  };
+  Object.keys(map).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.innerHTML = map[id];
+  });
+});
 const kpiTooltipContent = {};
 
 function getTodayISO(){
@@ -1602,7 +1645,7 @@ function _detBadgesHtml(m) {
   else if (est === 'iniciado') b.push('<span class="badge badge-teal">Iniciado</span>');
   else b.push('<span class="badge badge-sinic">Sin inicio</span>');
   if (m.tieneReemplazo)        b.push('<span class="badge badge-reemplazo">Conductor reemplazo</span>');
-  if (m.dobleInicioSinTermino) b.push('<span class="badge badge-doble">⚠ Doble inicio</span>');
+  if (m.dobleInicioSinTermino) b.push('<span class="badge badge-doble">'+ICONS.alertTri+' Doble inicio</span>');
   return b.join(' ');
 }
 
@@ -1627,7 +1670,7 @@ function _buildDetTabla(moviles) {
       : (m.conductor || '—');
     const rutas = '<span class="rutas-chip"><span class="ruta-up">'+(m.cantInicios||0)+'↑</span> <span class="ruta-down">'+(m.cantTerminos||0)+'↓</span></span>';
     const editBtn = (m.inicio||m.cantInicios)
-      ? '<button class="det-edit-btn" onclick="openDetEdit('+idx+')">✎</button>' : '';
+      ? '<button class="det-edit-btn" onclick="openDetEdit('+idx+')" style="display:inline-flex;align-items:center">'+ICONS.pencil+'</button>' : '';
     const rowClass = '';
     return '<tr style="cursor:pointer" onclick="openFichaMovil('+idx+')">'
       +'<td>'+movNom+'</td>'
@@ -1702,7 +1745,7 @@ function openFichaMovil(idx) {
     html += '<div class="ficha-sec"><div class="ficha-sec-title">Operación hoy</div>';
     if (m.rutasEnCurso > 0) html += '<div class="ficha-row"><span class="ficha-rkey">En curso</span><span class="ficha-rval">'+m.rutasEnCurso+'</span></div>';
     if (m.atenciones > 0)   html += '<div class="ficha-row"><span class="ficha-rkey">Atenciones</span><span class="ficha-rval">'+m.atenciones+'</span></div>';
-    if (m.dobleInicioSinTermino) html += '<div class="ficha-row"><span class="ficha-rkey" style="color:var(--warn-fg)">⚠ Doble inicio sin término</span><span></span></div>';
+    if (m.dobleInicioSinTermino) html += '<div class="ficha-row"><span class="ficha-rkey" style="color:var(--warn-fg)">'+ICONS.alertTri+' Doble inicio sin término</span><span></span></div>';
     html += '</div>';
   }
 
@@ -1762,7 +1805,7 @@ function openFichaMovil(idx) {
 
   // Botón editar
   if (m.inicio || m.cantInicios) {
-    html += '<button class="ficha-edit-btn" onclick="closeFichaMovil();openDetEdit('+idx+')">✎ Editar conductor / ubicación</button>';
+    html += '<button class="ficha-edit-btn" onclick="closeFichaMovil();openDetEdit('+idx+')" style="display:inline-flex;align-items:center;gap:5px">'+ICONS.pencil+' Editar conductor / ubicación</button>';
   }
 
   document.getElementById('fichaBody').innerHTML = html;
@@ -1952,18 +1995,18 @@ function renderOperacion(){
   const sinIniMoviles=moviles.filter(m=>m.inicio===0);
   kpiTooltipContent['op-inicio']=sinIniMoviles.length>0
     ? tipList(sinIniMoviles.length+' sin inicio hoy',sinIniMoviles.map(m=>tipRow(m.cliente+' '+m.movil,'')),'')
-    : '<strong>Inicio</strong><br><span style="color:var(--ok-fg);font-size:12px">✓ Toda la flota tiene inicio</span>';
+    : '<strong>Inicio</strong><br><span style="color:var(--ok-fg);font-size:12px">'+ICONS.check+' Toda la flota tiene inicio</span>';
   const pendTerm=moviles.filter(function(m){return (m.cantInicios||0)>(m.cantTerminos||0);});
   kpiTooltipContent['op-termino']=pendTerm.length>0
     ? tipList(pendTerm.length+' pendientes de cierre',pendTerm.map(function(m){return tipRow(m.cliente+' '+m.movil,'');}), '')
-    : '<strong>Término</strong><br><span style="color:var(--ok-fg);font-size:12px">✓ Todas las rutas cerradas</span>';
+    : '<strong>Término</strong><br><span style="color:var(--ok-fg);font-size:12px">'+ICONS.check+' Todas las rutas cerradas</span>';
   if(srMoviles.length===0){
     kpiTooltipContent['op-encurso']='<strong>Segunda ruta</strong><br><em style="color:var(--text-3);font-size:11px">Ningún móvil tiene segunda ruta programada hoy</em>';
   } else {
     var srRows=srMoviles.map(function(m){
       var t=hhmm2min_(m.horaInicio2),vencida=!m.iniciada&&t!==null&&minAhora>=t;
       var estadoColor=m.iniciada?'var(--ok-fg)':vencida?'var(--danger-fg)':'var(--text-3)';
-      var estadoTxt=m.iniciada?'✓ Iniciada':vencida?'⚠ Sin inicio — pasó la hora':'Pendiente';
+      var estadoTxt=m.iniciada?ICONS.check+' Iniciada':vencida?ICONS.alertTri+' Sin inicio — pasó la hora':'Pendiente';
       var hora=m.horaInicio2+(m.horaFin2?' – '+m.horaFin2:'');
       return '<div style="padding:4px 0;border-bottom:0.5px solid var(--border);font-size:12px">'
         +'<div><strong>'+escapeHtml(m.nombre)+'</strong> <span style="color:var(--text-3);font-size:11px">'+escapeHtml(hora)+'</span></div>'
@@ -2041,7 +2084,7 @@ function renderOpRanking(moviles){
   const top=moviles.filter(m=>(m.actividadTotal||0)>0).sort((a,b)=>(b.actividadTotal||0)-(a.actividadTotal||0)).slice(0,10);
   if(top.length===0){cont.innerHTML='<div class="empty">Sin atenciones registradas hoy</div>';return;}
   const max=top[0].actividadTotal||1;
-  const medals=['🥇','🥈','🥉'];
+  const medals=MEDALS;
   cont.innerHTML=top.map((m,i)=>{
     const color=clientColors[m.cliente]||'#888780';
     const pct=Math.round((m.actividadTotal||0)/max*100);
@@ -2380,7 +2423,7 @@ function renderGPSMap(){
     } else {
       popup+='<br><span style="font-size:11px;color:var(--text-3)">Sin GPS · posición aproximada</span>';
     }
-    if(g&&g.posicionDescripcion) popup+='<div class="pop-line" style="font-size:11px;color:var(--text-2)">📍 '+escapeHtml(g.posicionDescripcion)+'</div>';
+    if(g&&g.posicionDescripcion) popup+='<div class="pop-line" style="font-size:11px;color:var(--text-2)">'+ICONS.mapPin+' '+escapeHtml(g.posicionDescripcion)+'</div>';
     if(g&&g.horaUltimo) popup+='<div class="pop-line"><b>Última posición:</b> '+escapeHtml(g.horaUltimo)+'</div>';
     if(m.conductor) popup+='<div class="pop-line"><b>Conductor:</b> '+escapeHtml(m.conductor)+'</div>';
     if(m.kam) popup+='<div class="pop-line"><b>KAM:</b> '+escapeHtml(m.kam)+'</div>';
@@ -2563,10 +2606,10 @@ function renderSuKpiMes(data,mesIdxOverride){
   document.getElementById('suKpiFalta').textContent=faltanGlobal;document.getElementById('suKpiPct').textContent=Math.round(pctGlobalVsMeta*100)+'%';
   document.getElementById('suKpiPctSub').textContent=pctGlobalVsMeta>=1?'meta cumplida ✓ ('+Math.round(pctGlobalReal*100)+'% real)':'falta '+Math.round((1-pctGlobalVsMeta)*100)+'% para meta';
   const alertBox=document.getElementById('suAlertBox'),alerts=[];
-  if(pctGlobalVsMeta<1) alerts.push('<div class="alert alert-danger"><strong>⚠ Meta global no alcanzada:</strong> el cumplimiento va en <strong>'+Math.round(pctGlobalVsMeta*100)+'%</strong> de la meta del 50%. Faltan <strong>'+faltanGlobal+' móviles</strong> por supervisar.</div>');
+  if(pctGlobalVsMeta<1) alerts.push('<div class="alert alert-danger"><strong>'+ICONS.alertTri+' Meta global no alcanzada:</strong> el cumplimiento va en <strong>'+Math.round(pctGlobalVsMeta*100)+'%</strong> de la meta del 50%. Faltan <strong>'+faltanGlobal+' móviles</strong> por supervisar.</div>');
   const araucana=filas.find(f=>f.cliente==='La Araucana Móvil');
-  if(araucana&&!araucana.metaAlcanzada&&araucana.falt>0) alerts.push('<div class="alert alert-warn">⚠ <strong>La Araucana Móvil</strong> no cumple meta del 50%: '+araucana.supervisados+' de '+araucana.total+' supervisados. Se requieren <strong>'+araucana.falt+' adicionales</strong>.</div>');
-  if(alerts.length===0) alerts.push('<div class="alert alert-ok"><strong>✓ Meta global cumplida</strong> ('+Math.round(pctGlobalVsMeta*100)+'% — '+Math.round(pctGlobalReal*100)+'% real).</div>');
+  if(araucana&&!araucana.metaAlcanzada&&araucana.falt>0) alerts.push('<div class="alert alert-warn">'+ICONS.alertTri+' <strong>La Araucana Móvil</strong> no cumple meta del 50%: '+araucana.supervisados+' de '+araucana.total+' supervisados. Se requieren <strong>'+araucana.falt+' adicionales</strong>.</div>');
+  if(alerts.length===0) alerts.push('<div class="alert alert-ok"><strong>'+ICONS.check+' Meta global cumplida</strong> ('+Math.round(pctGlobalVsMeta*100)+'% — '+Math.round(pctGlobalReal*100)+'% real).</div>');
   alertBox.innerHTML=alerts.join('');
   const tb=document.getElementById('suKpiTableBody');tb.innerHTML='';
   filas.forEach(f=>{
@@ -2702,7 +2745,7 @@ function renderMondaySupervisiones() {
           det += '<span class="md-estado-btn ' + cls + '" style="cursor:pointer;font-size:10px;padding:2px 8px">' + escapeHtml(p.estado || 'Pendiente') + '</span>';
           det += '<span style="font-size:13px;color:var(--info-fg);text-decoration:underline;text-underline-offset:2px">' + escapeHtml(p.name || '—') + '</span>';
           if (fechaLFmt) det += '<span style="font-size:11px;color:var(--text-2)">· Límite: ' + escapeHtml(fechaLFmt) + (p.fechaLim ? '' : ' *') + '</span>';
-          det += '<span style="font-size:10px;color:var(--text-3);margin-left:auto">↓ ver plan</span>';
+          det += '<span style="font-size:10px;color:var(--text-3);margin-left:auto">'+ICONS.chevDown+' ver plan</span>';
           det += '</div>';
           if (p.descripcion) det += '<div style="font-size:12px;color:var(--text-2);margin-left:4px;margin-top:2px;margin-bottom:3px">' + escapeHtml(p.descripcion) + '</div>';
         });
@@ -2855,7 +2898,7 @@ function initNotifications() {
         var isOv    = p.fechaLim.substring(0,10) < today;
         var fechaFmt= p.fechaLim.substring(0,10).split('-').reverse().join('/');
         var tagClass= isOv ? 'vencido' : 'proxima';
-        var tagTxt  = isOv ? '⚠ VENCIDO · ' + fechaFmt : '⏰ Vence ' + fechaFmt;
+        var tagTxt  = isOv ? ICONS.alertTri+' VENCIDO · ' + fechaFmt : ICONS.clock+' Vence ' + fechaFmt;
         var meta    = [p.cliente, p.movil, p.responsable].filter(Boolean).join(' · ');
         html += '<div class="notif-item" onclick="goToMdPlan(\'' + escapeHtml(p.planKey || ('c_' + p.id)) + '\',\'' + escapeHtml(p.id) + '\')">';
         html += '<div style="display:flex;justify-content:space-between;align-items:center">';
@@ -3075,7 +3118,7 @@ function renderMondayPlanes() {
       selHtml += '</select>';
       var fechaLimClass = isVencido ? ' td-vencido' : (isProxima ? ' td-proxima' : '');
       var fechaLimStyle = 'white-space:nowrap' + (esDefault && !isVencido ? ';font-style:italic' : '');
-      var fechaLimLabel = fechaLim + (esDefault ? ' *' : '') + (isVencido ? ' ⚠' : '') + (isProxima ? ' ⏰' : '');
+      var fechaLimLabel = fechaLim + (esDefault ? ' *' : '') + (isVencido ? ' '+ICONS.alertTri : '') + (isProxima ? ' '+ICONS.clock : '');
       html += '<tr class="md-su-row' + (isVencido ? ' row-vencida' : '') + '" id="mdPlanRow' + i + '" data-plan-id="' + escapeHtml(p.id) + '" onclick="toggleMdPlanRow(' + i + ')" style="cursor:pointer">';
       html += '<td onclick="event.stopPropagation()">' + selHtml + '</td>';
       html += '<td style="font-size:11px;color:var(--text-2)">' + escapeHtml(p.accion || '—') + '</td>';
@@ -3181,7 +3224,7 @@ function renderKilometros(){
   if((sinAsignar.hoy||0)>50){
     alertSA.style.display='block';
     const top=(sinAsignar.topAgrupaciones||[]).slice(0,5);
-    alertSA.innerHTML='<strong>⚠ '+Math.round(sinAsignar.hoy)+' km sin asignar hoy</strong> — '+
+    alertSA.innerHTML='<strong>'+ICONS.alertTri+' '+Math.round(sinAsignar.hoy)+' km sin asignar hoy</strong> — '+
       (sinAsignar.cantidadAgrupaciones||0)+' agrupaciones GPS no matchearon contra la flota. '+
       (top.length>0?'Top: '+top.map(x=>x.agrupacion.slice(0,30)+'… ('+Math.round(x.km)+' km)').join(', ')+'.':'')+
       ' Revisá los aliases en el Apps Script (<code>ALIAS_KM_</code>).';
@@ -3238,7 +3281,7 @@ function renderKmRankingHoy(){
   const cont=document.getElementById('kmRankingHoy');cont.innerHTML='';
   if(top.length===0){cont.innerHTML='<div class="empty">Sin registros de km para hoy. Los datos del GPS se actualizan cada hora.</div>';return;}
   const maxKm=top[0].kmHoy||1;
-  const medals=['🥇','🥈','🥉'];
+  const medals=MEDALS;
   top.forEach((m,i)=>{
     const pct=Math.round((m.kmHoy||0)/maxKm*100);
     const pos=i<3?'<span class="km-rank-pos">'+medals[i]+'</span>':'<span class="km-rank-pos num">'+(i+1)+'</span>';
@@ -3262,7 +3305,7 @@ function renderKmRankingMes(){
   const cont=document.getElementById('kmRankingMes');cont.innerHTML='';
   if(top.length===0){cont.innerHTML='<div class="empty">Sin registros de km para este mes.</div>';return;}
   const maxKm=top[0].kmMes||1;
-  const medals=['🥇','🥈','🥉'];
+  const medals=MEDALS;
   top.forEach((m,i)=>{
     const pct=Math.round((m.kmMes||0)/maxKm*100);
     const pos=i<3?'<span class="km-rank-pos">'+medals[i]+'</span>':'<span class="km-rank-pos num">'+(i+1)+'</span>';
@@ -3832,7 +3875,7 @@ document.addEventListener('keydown', function(e) {
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
         <span id="fichaBadge"></span>
-        <button type="button" class="ficha-close-btn" onclick="closeFichaMovil()">✕</button>
+        <button type="button" class="ficha-close-btn" onclick="closeFichaMovil()" id="fichaCloseBtn"></button>
       </div>
     </div>
     <div class="ficha-pbody" id="fichaBody"></div>
@@ -3847,7 +3890,7 @@ document.addEventListener('keydown', function(e) {
         <h3 id="detModalTitle" style="margin:0">Editar inicio de ruta</h3>
         <div id="detModalSub" style="font-size:12px;color:var(--text-2);margin-top:3px"></div>
       </div>
-      <button onclick="closeDetModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-2);padding:0 0 0 12px">✕</button>
+      <button onclick="closeDetModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-2);padding:0 0 0 12px;display:inline-flex;align-items:center" id="detModalCloseBtn"></button>
     </div>
     <div class="det-f">
       <label>Conductor que inició</label>
