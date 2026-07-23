@@ -3118,7 +3118,8 @@ function renderMondayPlanes() {
       selHtml += '</select>';
       var fechaLimClass = isVencido ? ' td-vencido' : (isProxima ? ' td-proxima' : '');
       var fechaLimStyle = 'white-space:nowrap' + (esDefault && !isVencido ? ';font-style:italic' : '');
-      var fechaLimLabel = fechaLim + (esDefault ? ' *' : '') + (isVencido ? ' '+ICONS.alertTri : '') + (isProxima ? ' '+ICONS.clock : '');
+      var fechaLimTxt  = escapeHtml(fechaLim + (esDefault ? ' *' : ''));
+      var fechaLimIcon = isVencido ? ' '+ICONS.alertTri : (isProxima ? ' '+ICONS.clock : '');
       html += '<tr class="md-su-row' + (isVencido ? ' row-vencida' : '') + '" id="mdPlanRow' + i + '" data-plan-id="' + escapeHtml(p.id) + '" onclick="toggleMdPlanRow(' + i + ')" style="cursor:pointer">';
       html += '<td onclick="event.stopPropagation()">' + selHtml + '</td>';
       html += '<td style="font-size:11px;color:var(--text-2)">' + escapeHtml(p.accion || '—') + '</td>';
@@ -3126,7 +3127,7 @@ function renderMondayPlanes() {
       html += '<td>' + escapeHtml(p.cliente  || '—') + '</td>';
       html += '<td>' + escapeHtml(p.movil    || '—') + '</td>';
       html += '<td style="white-space:nowrap">' + escapeHtml(fechaSup) + '</td>';
-      html += '<td class="' + fechaLimClass + '" style="' + fechaLimStyle + '">' + escapeHtml(fechaLimLabel) + '</td>';
+      html += '<td class="' + fechaLimClass + '" style="' + fechaLimStyle + '">' + fechaLimTxt + fechaLimIcon + '</td>';
       html += '<td>' + escapeHtml(responsable) + '</td>';
       html += '</tr>';
       var qué = p.descripcion || '';
