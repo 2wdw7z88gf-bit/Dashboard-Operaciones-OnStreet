@@ -2906,7 +2906,7 @@ function initNotifications() {
     }
     return true;
   });
-  urgent.sort(function(a, b) { return (a.fechaLim||'').localeCompare(b.fechaLim||''); });
+  urgent.sort(function(a, b) { return (b.fechaLim||'').localeCompare(a.fechaLim||''); });
 
   // Badge
   var badge = document.getElementById('notifBadge');
@@ -3118,6 +3118,8 @@ function renderMondayPlanes() {
       if (filtTexto && (p.name + ' ' + p.descripcion + ' ' + p.responsable + ' ' + p.cliente + ' ' + p.movil).toLowerCase().indexOf(filtTexto) < 0) return false;
       return true;
     });
+
+    rows.sort(function(a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
 
     if (!rows.length) {
       tbody.innerHTML = '<tr><td colspan="8" class="empty-msg">Sin resultados</td></tr>';
