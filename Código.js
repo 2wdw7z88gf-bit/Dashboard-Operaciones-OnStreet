@@ -333,14 +333,17 @@ function getTabBitacora(params) {
 // ── MONDAY.COM API ─────────────────────────────────────────────────────────
 // Token se guarda con: PropertiesService.getScriptProperties().setProperty('MONDAY_TOKEN','...')
 // Ejecuta setupMondayToken() una vez desde el editor de GAS para guardarlo.
-var MONDAY_API_URL_          = 'https://api.monday.com/v2';
-var MONDAY_CACHE_KEY_        = 'monday_su_v8';   // v8: items incluyen campos cliente+movil
-var MONDAY_CACHE_SEC_        = 3600;
-var MONDAY_BOARD_RAPIDA_     = '5678712035';
-var MONDAY_BOARD_INTEGRAL_   = '5623247223';
-var MONDAY_BOARD_PLANES_     = '8505742190';
-var MONDAY_PLANES_CACHE_KEY_ = 'monday_planes_v2';
-var MONDAY_PLANES_CACHE_SEC_ = 1800;
+var MONDAY_API_URL_           = 'https://api.monday.com/v2';
+var MONDAY_CACHE_KEY_         = 'monday_su_v8';    // byMovil (tableros Rápida+Integral — reservado)
+var MONDAY_CACHE_SEC_         = 3600;
+var MONDAY_BOARD_RAPIDA_      = '5678712035';
+var MONDAY_BOARD_INTEGRAL_    = '5623247223';
+var MONDAY_BOARD_CONSOLIDADO_ = '5859805996';      // tablero consolidado Supervisiones
+var MONDAY_CONSOL_CACHE_KEY_  = 'monday_consol_v1';
+var MONDAY_CONSOL_CACHE_SEC_  = 3600;
+var MONDAY_BOARD_PLANES_      = '8505742190';
+var MONDAY_PLANES_CACHE_KEY_  = 'monday_planes_v2';
+var MONDAY_PLANES_CACHE_SEC_  = 1800;
 
 function setupMondayToken() {
   var token = 'PEGA_TU_TOKEN_AQUI';
@@ -468,6 +471,104 @@ function debugMondayAPI() {
     }
   });
   Logger.log('Items La Araucana en Integral: ' + count);
+}
+
+function readMondayConsolidado_() {
+  var cache  = CacheService.getScriptCache();
+  var cached = cache.get(MONDAY_CONSOL_CACHE_KEY_);
+  if (cached) { try { return JSON.parse(cached); } catch(e) {} }
+
+  var token = PropertiesService.getScriptProperties().getProperty('MONDAY_TOKEN');
+  if (!token) return {};
+
+  var ob    = 'query_params: {order_by: [{column_id: "__last_updated__", direction: desc}]}';
+  var query = '{ boards(ids: [' + MONDAY_BOARD_CONSOLIDADO_ + ']) { columns { id title } items_page(limit: 500, ' + ob + ') { items { column_values { id text } } } } }';
+
+  var resp;
+  try {
+    resp = UrlFetchApp.fetch(MONDAY_API_URL_, {
+      method: 'POST',
+      headers: { Authorization: token, 'Content-Type': 'application/json', 'API-Version': '2024-01' },
+      payload: JSON.stringify({ query: query }),
+      muteHttpExceptions: true
+    });
+  } catch(e) { return {}; }
+
+  if (resp.getResponseCode() !== 200) return {};
+  var raw; try { raw = JSON.parse(resp.getContentText()); } catch(e) { return {}; }
+  if (!raw.data || !raw.data.boards || !raw.data.boards[0]) return {};
+
+  var board = raw.data.boards[0];
+  var cols  = board.columns || [];
+
+  Logger.log('[Consolidado] Columnas: ' + cols.map(function(c){ return c.id + '=' + c.title; }).join(' | '));
+
+  function colId(titles) {
+    if (!Array.isArray(titles)) titles = [titles];
+    for (var i = 0; i < titles.length; i++) {
+      var t = titles[i];
+      var c = cols.find(function(col){ return col.title && col.title.toLowerCase() === t.toLowerCase(); });
+      if (c) return c.id;
+    }
+    return null;
+  }
+
+  var idTipo    = colId(['Tipo','Tipo de Supervisión','Tipo de supervision','Tipo supervisión']);
+  var idCliente = colId(['Cliente']);
+  var idFecha   = colId(['Fecha','Fecha de Supervisión','Fecha Supervisión']);
+  var idSuperv  = colId(['Nombre Supervisor','Supervisor','Nombre supervisor']);
+  var idComent  = colId(['Comentario','Observación','Observaciones','Notas']);
+  var idMovilDir= colId(['Móvil','Movil','Nombre Móvil']);
+  var movilColIds = cols.filter(function(c){ return c.title && c.title.indexOf('Móviles ') === 0; }).map(function(c){ return c.id; });
+
+  Logger.log('[Consolidado] idTipo=' + idTipo + ' idCliente=' + idCliente + ' idFecha=' + idFecha + ' idSuperv=' + idSuperv + ' idMovilDir=' + idMovilDir + ' movilColIds=' + movilColIds.join(','));
+
+  var items  = (board.items_page && board.items_page.items) || [];
+  var byMovil = {};
+
+  items.forEach(function(item) {
+    var cv = {};
+    (item.column_values || []).forEach(function(v){ cv[v.id] = v.text || ''; });
+
+    var tipo    = idTipo    ? cv[idTipo]    : '';
+    var cliente = idCliente ? cv[idCliente] : '';
+    var fecha   = idFecha   ? cv[idFecha]   : '';
+    var superv  = idSuperv  ? cv[idSuperv]  : '';
+    var coment  = idComent  ? cv[idComent]  : '';
+    if (!cliente || !fecha) return;
+
+    var movil = '';
+    if (idMovilDir && cv[idMovilDir]) { movil = cv[idMovilDir]; }
+    if (!movil) {
+      for (var i = 0; i < movilColIds.length; i++) { if (cv[movilColIds[i]]) { movil = cv[movilColIds[i]]; break; } }
+    }
+
+    // Normalizar tipo
+    var tipoNorm = tipo;
+    if (!tipoNorm) tipoNorm = 'Supervisión';
+    else if (tipoNorm.toLowerCase().indexOf('integral') >= 0) tipoNorm = 'Integral';
+    else if (tipoNorm.toLowerCase().indexOf('r') >= 0 && tipoNorm.toLowerCase().indexOf('pid') >= 0) tipoNorm = 'Rápida';
+
+    var key = (cliente + '|' + movil).toLowerCase();
+    if (!byMovil[key]) byMovil[key] = [];
+    byMovil[key].push({
+      tipo:       tipoNorm,
+      fecha:      fecha,
+      supervisor: superv,
+      comentario: coment,
+      cliente:    cliente,
+      movil:      movil
+    });
+  });
+
+  // Ordenar por fecha desc y mantener 5 más recientes por móvil
+  Object.keys(byMovil).forEach(function(k) {
+    byMovil[k].sort(function(a, b){ return (b.fecha||'').localeCompare(a.fecha||''); });
+    byMovil[k] = byMovil[k].slice(0, 5);
+  });
+
+  try { cache.put(MONDAY_CONSOL_CACHE_KEY_, JSON.stringify(byMovil), MONDAY_CONSOL_CACHE_SEC_); } catch(e) {}
+  return byMovil;
 }
 
 function readMondayPlanesAccion_() {
@@ -598,7 +699,7 @@ function getTabSupervisiones(params) {
 
   return {
     supervisiones:       safeRead(function() { return getCached('supervisiones', function() { return readSupervisiones(flotaInfo); }, CACHE_DURATION_SECONDS); }),
-    mondaySupervisiones: safeRead(function() { return readMondaySupervisions_(); }),
+    mondaySupervisiones: safeRead(function() { return readMondayConsolidado_(); }),
     mondayPlanes:        safeRead(function() { return readMondayPlanesAccion_(); }) || { planes: [], colEstadoId: null },
     lastUpdated: new Date().toISOString()
   };
