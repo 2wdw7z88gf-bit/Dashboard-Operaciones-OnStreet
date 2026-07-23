@@ -2926,11 +2926,12 @@ function initNotifications() {
         var isOv    = p.fechaLim.substring(0,10) < today;
         var fechaFmt= p.fechaLim.substring(0,10).split('-').reverse().join('/');
         var tagClass= isOv ? 'vencido' : 'proxima';
-        var tagTxt  = isOv ? ICONS.alertTri+' VENCIDO · ' + fechaFmt : ICONS.clock+' Vence ' + fechaFmt;
+        var tagIcon = isOv ? ICONS.alertTri : ICONS.clock;
+        var tagTxt  = isOv ? ' VENCIDO · ' + fechaFmt : ' Vence ' + fechaFmt;
         var meta    = [p.cliente, p.movil, p.responsable].filter(Boolean).join(' · ');
         html += '<div class="notif-item" onclick="goToMdPlan(\'' + escapeHtml(p.planKey || ('c_' + p.id)) + '\',\'' + escapeHtml(p.id) + '\')">';
         html += '<div style="display:flex;justify-content:space-between;align-items:center">';
-        html += '<span class="notif-item-tag ' + tagClass + '">' + escapeHtml(tagTxt) + '</span>';
+        html += '<span class="notif-item-tag ' + tagClass + '">' + tagIcon + escapeHtml(tagTxt) + '</span>';
         html += '<span style="font-size:10px;color:var(--text-2)">' + escapeHtml(p.accion || '') + '</span>';
         html += '</div>';
         html += '<div class="notif-item-name">' + escapeHtml(p.name || '—') + '</div>';
