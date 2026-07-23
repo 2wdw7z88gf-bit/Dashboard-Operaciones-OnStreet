@@ -541,6 +541,25 @@ tr:hover td{background:var(--surface-2)}
 :root[data-theme="light"] .md-estado-btn.en-proceso,:root[data-theme="light"] .md-estado-select.en-proceso{background:#dbeafe;color:#1e40af}
 :root[data-theme="light"] .md-estado-btn.listo,:root[data-theme="light"] .md-estado-select.listo{background:#d1fae5;color:#065f46}
 :root[data-theme="light"] .md-estado-select.no-completado{background:#fee2e2;color:#991b1b}
+/* Pestañas de Planes */
+.md-plan-tab{padding:5px 14px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--text-1);cursor:pointer;font-size:12px;font-weight:500;transition:all .15s;white-space:nowrap}
+.md-plan-tab:hover{background:var(--surface-2)}
+.md-plan-tab[data-tab="pendiente"].active{background:#92400e;color:#fef3c7;border-color:#92400e}
+.md-plan-tab[data-tab="en-proceso"].active{background:#1e40af;color:#dbeafe;border-color:#1e40af}
+.md-plan-tab[data-tab="listo"].active{background:#065f46;color:#d1fae5;border-color:#065f46}
+.md-plan-tab[data-tab="cerrado"].active{background:#991b1b;color:#fee2e2;border-color:#991b1b}
+.md-plan-tab[data-tab="todos"].active{background:var(--text-1);color:var(--surface-1);border-color:var(--text-1)}
+.md-tab-cnt{font-size:10px;font-weight:700;margin-left:4px;opacity:0.85}
+@media(prefers-color-scheme:dark){
+  .md-plan-tab[data-tab="pendiente"].active{background:#78350f;color:#fde68a;border-color:#78350f}
+  .md-plan-tab[data-tab="en-proceso"].active{background:#1e3a8a;color:#93c5fd;border-color:#1e3a8a}
+  .md-plan-tab[data-tab="listo"].active{background:#064e3b;color:#6ee7b7;border-color:#064e3b}
+  .md-plan-tab[data-tab="cerrado"].active{background:#7f1d1d;color:#fca5a5;border-color:#7f1d1d}
+}
+:root[data-theme="dark"] .md-plan-tab[data-tab="pendiente"].active{background:#78350f;color:#fde68a;border-color:#78350f}
+:root[data-theme="dark"] .md-plan-tab[data-tab="en-proceso"].active{background:#1e3a8a;color:#93c5fd;border-color:#1e3a8a}
+:root[data-theme="dark"] .md-plan-tab[data-tab="listo"].active{background:#064e3b;color:#6ee7b7;border-color:#064e3b}
+:root[data-theme="dark"] .md-plan-tab[data-tab="cerrado"].active{background:#7f1d1d;color:#fca5a5;border-color:#7f1d1d}
 
 </style>
 <script>
@@ -1021,15 +1040,15 @@ tr:hover td{background:var(--surface-2)}
       <!-- SECCIÓN 2: Planes de Acción -->
       <div class="panel" id="mdPlanesPanel" style="margin-top:16px">
         <h2>Planes de Acción <span class="md-badge" id="mdPlanesBadge" style="display:none"></span></h2>
+        <!-- Pestañas de estado -->
+        <div id="mdPlanesTabBar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+          <button class="md-plan-tab active" data-tab="pendiente" onclick="setMdPlanesTab('pendiente',this)">Pendientes <span class="md-tab-cnt" id="mdTabCntPendiente"></span></button>
+          <button class="md-plan-tab" data-tab="en-proceso" onclick="setMdPlanesTab('en-proceso',this)">En Proceso <span class="md-tab-cnt" id="mdTabCntEnProceso"></span></button>
+          <button class="md-plan-tab" data-tab="listo" onclick="setMdPlanesTab('listo',this)">Listos <span class="md-tab-cnt" id="mdTabCntListo"></span></button>
+          <button class="md-plan-tab" data-tab="cerrado" onclick="setMdPlanesTab('cerrado',this)">Cerrados <span class="md-tab-cnt" id="mdTabCntCerrado"></span></button>
+          <button class="md-plan-tab" data-tab="todos" onclick="setMdPlanesTab('todos',this)">Todos <span class="md-tab-cnt" id="mdTabCntTodos"></span></button>
+        </div>
         <div class="filter-row" style="margin-bottom:10px">
-          <select id="mdPlanesFiltEstado" style="min-width:140px">
-            <option value="">Todos los estados</option>
-            <option value="Pendiente">Pendiente</option>
-            <option value="En Proceso">En Proceso</option>
-            <option value="Listo">Listo</option>
-            <option value="No Completado">No Completado</option>
-            <option value="Desestimado">Desestimado</option>
-          </select>
           <select id="mdPlanesFiltCliente" style="min-width:180px"><option value="">Todos los clientes</option></select>
           <input id="mdPlanesFiltTexto" placeholder="Buscar..." style="min-width:180px" />
         </div>
@@ -1053,7 +1072,7 @@ tr:hover td{background:var(--surface-2)}
           </table>
         </div>
         <p id="mdPlanesHint" style="font-size:11px;color:var(--text-2);margin-top:8px;display:none">
-          Haz clic en el estado para actualizarlo en Monday.
+          Haz clic en el estado para actualizarlo.
         </p>
       </div>
 
@@ -2730,16 +2749,30 @@ function mdPlanesParaSupervision(sv) {
 }
 
 // ── MONDAY PLANES DE ACCIÓN ────────────────────────────────────────────────
+var _mdPlanesActiveTab = 'pendiente';
+
+function setMdPlanesTab(tab, btn) {
+  _mdPlanesActiveTab = tab;
+  var bar = document.getElementById('mdPlanesTabBar');
+  if (bar) {
+    var btns = bar.querySelectorAll('.md-plan-tab');
+    for (var b = 0; b < btns.length; b++) btns[b].classList.toggle('active', btns[b].dataset.tab === tab);
+  }
+  renderMondayPlanes();
+}
+
 function renderMondayPlanes() {
   var planesData = (allData && allData.mondayPlanes) || { planes: [], colEstadoId: null };
-  var planes     = planesData.planes || [];
-  var colEstadoId= planesData.colEstadoId;
-  var tbody      = document.getElementById('mdPlanesTableBody');
-  var badge      = document.getElementById('mdPlanesBadge');
-  var hint       = document.getElementById('mdPlanesHint');
+  // Solo 2026 en adelante; planes sin fecha se incluyen
+  var planes = (planesData.planes || []).filter(function(p) {
+    return !p.fecha || p.fecha >= '2026-01-01';
+  });
+  var tbody  = document.getElementById('mdPlanesTableBody');
+  var badge  = document.getElementById('mdPlanesBadge');
+  var hint   = document.getElementById('mdPlanesHint');
   if (!tbody) return;
 
-  // Poblar selector de clientes
+  // Poblar selector de clientes (solo la primera vez)
   var filtCliente = document.getElementById('mdPlanesFiltCliente');
   if (filtCliente && filtCliente.options.length <= 1) {
     var clientes = [];
@@ -2751,19 +2784,39 @@ function renderMondayPlanes() {
 
   if (hint) hint.style.display = '';
 
+  // Conteos por pestaña
+  var cnt = { pendiente: 0, 'en-proceso': 0, listo: 0, cerrado: 0, todos: planes.length };
+  planes.forEach(function(p) {
+    var e = p.estado || 'Pendiente';
+    if (e === 'Pendiente')                              cnt.pendiente++;
+    else if (e === 'En Proceso')                        cnt['en-proceso']++;
+    else if (e === 'Listo')                             cnt.listo++;
+    else if (e === 'No Completado' || e === 'Desestimado') cnt.cerrado++;
+  });
+  function setTabCnt(id, n) { var el = document.getElementById(id); if (el) el.textContent = n ? '(' + n + ')' : ''; }
+  setTabCnt('mdTabCntPendiente', cnt.pendiente);
+  setTabCnt('mdTabCntEnProceso', cnt['en-proceso']);
+  setTabCnt('mdTabCntListo',     cnt.listo);
+  setTabCnt('mdTabCntCerrado',   cnt.cerrado);
+  setTabCnt('mdTabCntTodos',     cnt.todos);
+
+  if (badge) { badge.textContent = cnt.todos + ' planes'; badge.style.display = cnt.todos ? '' : 'none'; }
+
   function rebuild() {
-    var filtEst   = (document.getElementById('mdPlanesFiltEstado')  || {}).value || '';
     var filtCli   = (document.getElementById('mdPlanesFiltCliente') || {}).value || '';
     var filtTexto = ((document.getElementById('mdPlanesFiltTexto')  || {}).value || '').toLowerCase();
+    var tab       = _mdPlanesActiveTab;
 
     var rows = planes.filter(function(p) {
-      if (filtEst && (p.estado || '') !== filtEst) return false;
-      if (filtCli && p.cliente !== filtCli)         return false;
+      var est = p.estado || 'Pendiente';
+      if (tab === 'pendiente'  && est !== 'Pendiente')  return false;
+      if (tab === 'en-proceso' && est !== 'En Proceso') return false;
+      if (tab === 'listo'      && est !== 'Listo')       return false;
+      if (tab === 'cerrado'    && est !== 'No Completado' && est !== 'Desestimado') return false;
+      if (filtCli && p.cliente !== filtCli) return false;
       if (filtTexto && (p.name + ' ' + p.descripcion + ' ' + p.responsable + ' ' + p.cliente + ' ' + p.movil).toLowerCase().indexOf(filtTexto) < 0) return false;
       return true;
     });
-
-    if (badge) { badge.textContent = rows.length + ' planes'; badge.style.display = rows.length ? '' : 'none'; }
 
     if (!rows.length) {
       tbody.innerHTML = '<tr><td colspan="8" class="empty-msg">Sin resultados</td></tr>';
@@ -2772,19 +2825,17 @@ function renderMondayPlanes() {
 
     var html = '';
     var hayDefault = false;
+    var ESTADOS = ['Pendiente','En Proceso','Listo','No Completado','Desestimado'];
     rows.forEach(function(p, i) {
-      var eClass   = mdEstadoClass(p.estado);
-      var fechaSup = (p.fecha    || '').substring(0, 10).split('-').reverse().join('/') || '—';
-      // Fecha límite: si vacía, +1 mes desde Fecha Sup
-      var fechaLimRaw = p.fechaLim || mdAddOneMonth(p.fecha);
-      var fechaLim    = fechaLimRaw ? fechaLimRaw.substring(0, 10).split('-').reverse().join('/') : '—';
-      var esDefault   = !p.fechaLim && !!fechaLimRaw;
+      var eClass     = mdEstadoClass(p.estado);
+      var fechaSup   = (p.fecha || '').substring(0, 10).split('-').reverse().join('/') || '—';
+      var fechaLimRaw= p.fechaLim || mdAddOneMonth(p.fecha);
+      var fechaLim   = fechaLimRaw ? fechaLimRaw.substring(0, 10).split('-').reverse().join('/') : '—';
+      var esDefault  = !p.fechaLim && !!fechaLimRaw;
       if (esDefault) hayDefault = true;
-      // Responsable: si vacío, usar jefe del móvil
-      var responsable = p.responsable || mdJefeMovil(p.cliente, p.movil) || '—';
-      var planKey = p.planKey || ('c_' + p.id);
-      var curEstado = p.estado || 'Pendiente';
-      var ESTADOS = ['Pendiente','En Proceso','Listo','No Completado','Desestimado'];
+      var responsable= p.responsable || mdJefeMovil(p.cliente, p.movil) || '—';
+      var planKey    = p.planKey || ('c_' + p.id);
+      var curEstado  = p.estado || 'Pendiente';
       var selHtml = '<select class="md-estado-select ' + eClass + '" onchange="updatePlanEstado(this,\'' + escapeHtml(planKey) + '\',this.value)">';
       ESTADOS.forEach(function(opt) {
         selHtml += '<option value="' + opt + '"' + (curEstado === opt ? ' selected' : '') + '>' + opt + '</option>';
@@ -2794,13 +2845,12 @@ function renderMondayPlanes() {
       html += '<td onclick="event.stopPropagation()">' + selHtml + '</td>';
       html += '<td style="font-size:11px;color:var(--text-2)">' + escapeHtml(p.accion || '—') + '</td>';
       html += '<td><button class="md-expand-btn" tabindex="-1" style="float:left;margin-right:6px">&#9660;</button>' + escapeHtml(p.name || '—') + '</td>';
-      html += '<td>' + escapeHtml(p.cliente     || '—') + '</td>';
-      html += '<td>' + escapeHtml(p.movil       || '—') + '</td>';
+      html += '<td>' + escapeHtml(p.cliente  || '—') + '</td>';
+      html += '<td>' + escapeHtml(p.movil    || '—') + '</td>';
       html += '<td style="white-space:nowrap">' + escapeHtml(fechaSup) + '</td>';
       html += '<td style="white-space:nowrap' + (esDefault ? ';color:var(--text-2);font-style:italic' : '') + '">' + escapeHtml(fechaLim) + (esDefault ? ' *' : '') + '</td>';
       html += '<td>' + escapeHtml(responsable) + '</td>';
       html += '</tr>';
-      // Detalle expandible — muestra la columna "¿Qué?" del tablero Monday
       var qué = p.descripcion || '';
       var detHtml = qué
         ? '<div class="md-detail-label">Detalle</div><div class="md-detail-text">' + escapeHtml(qué) + '</div>'
@@ -2809,10 +2859,10 @@ function renderMondayPlanes() {
     });
     tbody.innerHTML = html;
     var legend = document.getElementById('mdPlanesHint');
-    if (legend) legend.textContent = (hayDefault ? '* Fecha estimada (+1 mes desde supervisión). ' : '') + 'Haz clic en el estado para actualizarlo.';
+    if (legend) legend.textContent = hayDefault ? '* Fecha estimada (+1 mes desde supervisión).' : '';
   }
 
-  ['mdPlanesFiltEstado','mdPlanesFiltCliente','mdPlanesFiltTexto'].forEach(function(id) {
+  ['mdPlanesFiltCliente','mdPlanesFiltTexto'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) { el.oninput = rebuild; el.onchange = rebuild; }
   });
@@ -2833,7 +2883,8 @@ function updatePlanEstado(select, planKey, newEstado) {
         var pk = planes[i].planKey || ('c_' + planes[i].id);
         if (pk === planKey) { planes[i].estado = newEstado; break; }
       }
-      select.className = 'md-estado-select ' + mdEstadoClass(newEstado);
+      // Re-render: actualiza conteos de pestañas y mueve la fila si cambió de tab
+      renderMondayPlanes();
     } else {
       alert('Error al guardar estado: ' + (res && res.error ? res.error : 'Sin respuesta'));
     }
