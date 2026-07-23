@@ -586,6 +586,29 @@ function readMondayConsolidado_() {
   return byMovil;
 }
 
+function debugPlanes() {
+  var token = PropertiesService.getScriptProperties().getProperty('MONDAY_TOKEN');
+  if (!token) { Logger.log('SIN TOKEN'); return; }
+  var query = '{ boards(ids: [' + MONDAY_BOARD_PLANES_ + ']) { columns { id title type } items_page(limit: 3, query_params: {order_by: [{column_id: "__last_updated__", direction: desc}]}) { items { id name column_values { id text } } } } }';
+  var resp = UrlFetchApp.fetch(MONDAY_API_URL_, {
+    method: 'POST',
+    headers: { Authorization: token, 'Content-Type': 'application/json', 'API-Version': '2024-01' },
+    payload: JSON.stringify({ query: query }),
+    muteHttpExceptions: true
+  });
+  var raw = JSON.parse(resp.getContentText());
+  var board = raw.data.boards[0];
+  Logger.log('=== COLUMNAS PLANES ===');
+  board.columns.forEach(function(c){ Logger.log(c.id + ' | ' + c.type + ' | ' + c.title); });
+  Logger.log('=== ITEMS DE MUESTRA ===');
+  (board.items_page.items || []).forEach(function(item) {
+    Logger.log('Item: ' + item.name);
+    item.column_values.forEach(function(cv){
+      if (cv.text) Logger.log('  ' + cv.id + ' → "' + cv.text + '"');
+    });
+  });
+}
+
 function debugConsolidado() {
   var token = PropertiesService.getScriptProperties().getProperty('MONDAY_TOKEN');
   if (!token) { Logger.log('SIN TOKEN'); return; }
