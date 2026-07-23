@@ -358,10 +358,10 @@ var MONDAY_BOARD_CONSOLIDADO_ = '5859805996';      // tablero consolidado Superv
 var MONDAY_CONSOL_CACHE_KEY_  = 'monday_consol_v2';
 var MONDAY_CONSOL_CACHE_SEC_  = 3600;
 var MONDAY_BOARD_PLANES_      = '8505742190';
-var MONDAY_PLANES_CACHE_KEY_  = 'monday_planes_v4';
+var MONDAY_PLANES_CACHE_KEY_  = 'monday_planes_v5';
 var MONDAY_PLANES_CACHE_SEC_  = 1800;
-var MONDAY_RAPIDA_CACHE_KEY_  = 'monday_rapida_v1';
-var MONDAY_INTEGRAL_CACHE_KEY_= 'monday_integral_v1';
+var MONDAY_RAPIDA_CACHE_KEY_  = 'monday_rapida_v2';
+var MONDAY_INTEGRAL_CACHE_KEY_= 'monday_integral_v2';
 var MONDAY_SUP_CACHE_SEC_     = 1800;
 var MONDAY_PLAN_ESTADO_PFX_   = 'pe_';        // PropertiesService key prefix para estados locales
 
@@ -969,20 +969,22 @@ function fetchMondayIntegralPlanes_() {
     return m ? m[1].toLowerCase().trim() : '';
   }
 
-  // Construir triplets dinámicamente desde columnas ¿Qué? (X)
+  // Construir triplets dinámicamente desde columnas ¿Qué? (NombreItem)
   var triplets = [];
   cols.forEach(function(queCol) {
     if (!queCol.title || queCol.title.indexOf('¿Qué?') !== 0) return;
-    var suffix  = extractSuffix(queCol.title);
-    var nombre  = queCol.title.replace(/^¿Qué\?\s*/, '').replace(/^\(/, '').replace(/\)$/, '').trim() || queCol.title;
-    var respId  = null, fechaId = null;
+    var suffix = extractSuffix(queCol.title);
+    if (!suffix) return; // Saltar columnas genéricas ¿Qué? sin sufijo parentético
+    var nombre = queCol.title.replace(/^¿Qué\?\s*/, '').replace(/^\(/, '').replace(/\)$/, '').trim() || queCol.title;
+    var respId = null, fechaId = null;
     cols.forEach(function(c) {
       if (!c.title) return;
       var cs = extractSuffix(c.title);
       if (cs !== suffix) return;
       var ct = c.title.toLowerCase();
       if (ct.indexOf('responsable') >= 0 || ct.indexOf('resposable') >= 0) respId = c.id;
-      if (c.type === 'date' && ct.indexOf('fecha') >= 0) fechaId = c.id;
+      // Solo usar columnas que sean fecha LÍMITE/SOLUCIÓN, no la fecha de supervisión
+      if (c.type === 'date' && ct.indexOf('fecha') >= 0 && (ct.indexOf('límite') >= 0 || ct.indexOf('limite') >= 0 || ct.indexOf('soluci') >= 0)) fechaId = c.id;
     });
     triplets.push({ nombre: nombre, queId: queCol.id, respId: respId, fechaId: fechaId });
   });
@@ -1095,10 +1097,11 @@ function fetchMondayChecklistsRaw_() {
   (board.items_page.items || []).forEach(function(item) {
     var cv = {};
     (item.column_values || []).forEach(function(v){ cv[v.id] = v.text || ''; });
-    var accion = idAccion ? (cv[idAccion] || '').toLowerCase() : '';
-
-    // Filtrar: solo planes de checklists de ruta/mes
-    var esChecklist = KEYWORDS.some(function(k){ return accion.indexOf(k) >= 0; });
+    var accionVal  = idAccion ? (cv[idAccion] || '') : '';
+    var accionLC   = accionVal.toLowerCase();
+    var nameLC     = (item.name || '').toLowerCase();
+    // Filtrar: solo planes de checklists de ruta/mes — busca en accion Y en nombre del ítem
+    var esChecklist = KEYWORDS.some(function(k){ return accionLC.indexOf(k) >= 0 || nameLC.indexOf(k) >= 0; });
     if (!esChecklist) return;
 
     var movil = '';
@@ -1113,7 +1116,7 @@ function fetchMondayChecklistsRaw_() {
       planKey:     'c_' + item.id,
       source:      'checklist',
       name:        item.name || '',
-      accion:      idAccion ? cv[idAccion] : '',
+      accion:      accionVal || (nameLC.indexOf('inicio') >= 0 || nameLC.indexOf('fin') >= 0 || nameLC.indexOf('término') >= 0 ? item.name : ''),
       cliente:     idCliente ? cv[idCliente] : '',
       movil:       movil,
       fecha:       idFecha    ? cv[idFecha]    : '',
