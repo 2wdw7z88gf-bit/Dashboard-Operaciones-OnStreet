@@ -2668,12 +2668,22 @@ function mdAddOneMonth(fechaStr) {
 }
 
 function mdJefeMovil(cliente, movil) {
-  var moviles = (allData && allData.unificador) || [];
-  var key = (cliente + '|' + (movil || '')).toLowerCase();
+  var moviles = (allData && allData.unificador && allData.unificador.moviles) || [];
+  var cliQ = (cliente || '').toLowerCase().trim();
+  var movQ = (movil   || '').toLowerCase().trim();
+  // Primero intento exact match
   for (var i = 0; i < moviles.length; i++) {
     var m = moviles[i];
-    var mk = ((m.cliente||'') + '|' + (m.movil || m.nombre || '')).toLowerCase();
-    if (mk === key) return m.jefeOperaciones || '';
+    var mc = ((m.cliente||'')).toLowerCase().trim();
+    var mm = ((m.movil || m.nombre || '')).toLowerCase().trim();
+    if (mc === cliQ && mm === movQ) return m.jefeOperaciones || '';
+  }
+  // Fallback: match por movil solo (el cliente puede diferir en sufijo)
+  for (var j = 0; j < moviles.length; j++) {
+    var n = moviles[j];
+    var nm = ((n.movil || n.nombre || '')).toLowerCase().trim();
+    var nc = ((n.cliente||'')).toLowerCase().trim();
+    if (nm === movQ && (nc.indexOf(cliQ) >= 0 || cliQ.indexOf(nc) >= 0)) return n.jefeOperaciones || '';
   }
   return '';
 }
