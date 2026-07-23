@@ -503,6 +503,7 @@ tr:hover td{background:var(--surface-2)}
 .md-tipo-chip{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;letter-spacing:0.3px;text-transform:uppercase}
 .md-tipo-chip.integral{background:var(--info-bg);color:var(--info-fg)}
 .md-tipo-chip.rapida{background:var(--ok-bg,#d1fae5);color:var(--ok-fg,#065f46)}
+.md-tipo-chip.supervision{background:var(--surface-2);color:var(--text-2)}
 /* Planes de Acción */
 .md-estado-btn{font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;border:none;cursor:pointer;letter-spacing:0.3px;white-space:nowrap;transition:opacity 0.15s}
 .md-estado-btn:hover{opacity:0.8}
@@ -2571,19 +2572,29 @@ function renderMondaySupervisiones() {
 
     var html = '';
     rows.forEach(function(sv, i) {
-      var tipoClass = sv.tipo === 'Integral' ? 'integral' : 'rapida';
-      var fechaFmt  = sv.fecha ? sv.fecha.replace(/(\d{4})-(\d{2})-(\d{2})/, '$3/$2/$1') : '—';
+      var tipoClass = sv.tipo === 'Integral' ? 'integral' : sv.tipo === 'Rápida' ? 'rapida' : 'supervision';
+      var fechaFmt  = sv.fecha ? sv.fecha.replace(/(\d{4})-(\d{2})-(\d{2})(\s.*)?/, function(_,_2,_3,d,m,y){ return d+'/'+m+'/'+y; }).replace(/(\d{4})-(\d{2})-(\d{2})/, '$3/$2/$1') : '—';
       html += '<tr class="md-su-row" id="mdSuRow' + i + '" onclick="toggleMdSuRow(' + i + ')">';
       html += '<td><button class="md-expand-btn" tabindex="-1">&#9660;</button></td>';
       html += '<td><span class="md-tipo-chip ' + tipoClass + '">' + escapeHtml(sv.tipo) + '</span></td>';
-      html += '<td style="white-space:nowrap">' + escapeHtml(fechaFmt) + '</td>';
+      html += '<td style="white-space:nowrap">' + escapeHtml(sv.fecha ? sv.fecha.substring(0,10).split('-').reverse().join('/') : '—') + '</td>';
       html += '<td>' + escapeHtml(sv.cliente || '—') + '</td>';
       html += '<td>' + escapeHtml(sv.movil   || '—') + '</td>';
       html += '<td>' + escapeHtml(sv.supervisor || '—') + '</td>';
       html += '</tr>';
       // Detalle expandible
-      var coment = sv.comentario ? escapeHtml(sv.comentario) : '<em style="color:var(--text-2)">Sin comentario</em>';
-      html += '<tr class="md-detail-row" id="mdSuDetail' + i + '" style="display:none"><td colspan="6"><div class="md-detail-inner"><div class="md-detail-label">Comentario</div><div class="md-detail-text">' + coment + '</div></div></td></tr>';
+      var det = '';
+      if (sv.comentario && sv.comentario.trim() && sv.comentario.trim().toLowerCase() !== 'sin obs') {
+        det += '<div class="md-detail-label">Comentario / Observaciones</div><div class="md-detail-text">' + escapeHtml(sv.comentario) + '</div>';
+      }
+      if (sv.lugar) {
+        det += '<div class="md-detail-label" style="margin-top:8px">Lugar de Atención</div><div class="md-detail-text">' + escapeHtml(sv.lugar) + '</div>';
+      }
+      if (sv.conductor) {
+        det += '<div class="md-detail-label" style="margin-top:8px">Conductor</div><div class="md-detail-text">' + escapeHtml(sv.conductor) + '</div>';
+      }
+      if (!det) det = '<em style="color:var(--text-2)">Sin observaciones registradas</em>';
+      html += '<tr class="md-detail-row" id="mdSuDetail' + i + '" style="display:none"><td colspan="6"><div class="md-detail-inner">' + det + '</div></td></tr>';
     });
     tbody.innerHTML = html;
   }
