@@ -589,7 +589,7 @@ tr:hover td{background:var(--surface-2)}
 .notif-bell-btn{position:relative;background:transparent;border:none;cursor:pointer;font-size:20px;padding:4px 8px;border-radius:8px;transition:background .15s;line-height:1}
 .notif-bell-btn:hover{background:var(--surface-2)}
 .notif-badge{position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 5px;min-width:16px;text-align:center;line-height:14px;pointer-events:none}
-.notif-panel{position:absolute;top:calc(100% + 10px);right:0;width:340px;max-height:460px;overflow-y:auto;background:var(--surface-1);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.18);z-index:9999}
+.notif-panel{position:fixed;width:340px;max-height:460px;overflow-y:auto;background:var(--surface-1);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.18);z-index:100000}
 .notif-item{padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s}
 .notif-item:hover{background:var(--surface-2)}
 .notif-item:last-child{border-bottom:none}
@@ -2816,12 +2816,24 @@ function initNotifications() {
   var in7d   = d7.toISOString().substring(0, 10);
   var ACTIVE = ['Pendiente', 'En Proceso'];
 
-  // Planes urgentes: vencidos o vencen en 7 días, con fecha real, activos, desde 2026
+  // Nombre del usuario logueado (para filtrar por responsable)
+  var meNombre = (allData && allData.usuario && allData.usuario.nombre) ? allData.usuario.nombre.toLowerCase().trim() : '';
+  var meRol    = (allData && allData.usuario && allData.usuario.rol)    ? allData.usuario.rol.toLowerCase()             : '';
+  var esAdmin  = meRol === 'admin' || meRol === 'administrador';
+
+  // Planes urgentes: solo VENCIDOS (no próximos), activos, desde 2026
+  // Admin ve todos; otros usuarios solo sus planes (responsable contiene su nombre)
   var urgent = planes.filter(function(p) {
     if (!p.fechaLim) return false;
     if (p.fecha && p.fecha < '2026-01-01') return false;
     if (ACTIVE.indexOf(p.estado || 'Pendiente') < 0) return false;
-    return p.fechaLim.substring(0,10) <= in7d;
+    if (p.fechaLim.substring(0,10) >= today) return false; // solo vencidos
+    // Filtro por usuario (si no es admin)
+    if (!esAdmin && meNombre) {
+      var resp = (p.responsable || '').toLowerCase();
+      if (!resp || resp.indexOf(meNombre) < 0) return false;
+    }
+    return true;
   });
   urgent.sort(function(a, b) { return (a.fechaLim||'').localeCompare(b.fechaLim||''); });
 
@@ -2836,9 +2848,9 @@ function initNotifications() {
   var content = document.getElementById('notifPanelContent');
   if (content) {
     if (!urgent.length) {
-      content.innerHTML = '<div style="text-align:center;color:var(--text-2);padding:28px;font-size:13px">Sin planes urgentes esta semana</div>';
+      content.innerHTML = '<div style="text-align:center;color:var(--text-2);padding:28px;font-size:13px">Sin planes vencidos</div>';
     } else {
-      var html = '<div style="padding:8px 16px;font-size:11px;color:var(--text-2);font-weight:600;text-transform:uppercase;letter-spacing:.5px">' + urgent.length + ' planes urgentes</div>';
+      var html = '<div style="padding:8px 16px;font-size:11px;color:var(--text-2);font-weight:600;text-transform:uppercase;letter-spacing:.5px">' + urgent.length + ' plan' + (urgent.length === 1 ? '' : 'es') + ' vencido' + (urgent.length === 1 ? '' : 's') + '</div>';
       urgent.forEach(function(p) {
         var isOv    = p.fechaLim.substring(0,10) < today;
         var fechaFmt= p.fechaLim.substring(0,10).split('-').reverse().join('/');
@@ -2884,21 +2896,30 @@ function goToMdPlan(planKey, planId) {
 
 function toggleNotifPanel() {
   var panel = document.getElementById('notifPanel');
+  var btn   = document.getElementById('notifBellBtn');
   if (!panel) return;
   var open = panel.style.display !== 'none';
-  panel.style.display = open ? 'none' : '';
-  // Cerrar al hacer click fuera
-  if (!open) {
-    setTimeout(function() {
-      document.addEventListener('click', function _cls(e) {
-        var wrap = document.getElementById('notifWrap');
-        if (wrap && !wrap.contains(e.target)) {
-          panel.style.display = 'none';
-          document.removeEventListener('click', _cls);
-        }
-      });
-    }, 0);
+  if (open) {
+    panel.style.display = 'none';
+    return;
   }
+  // Posicionar fixed debajo del botón
+  if (btn) {
+    var r = btn.getBoundingClientRect();
+    panel.style.top  = (r.bottom + 8) + 'px';
+    panel.style.right = (window.innerWidth - r.right) + 'px';
+    panel.style.left  = 'auto';
+  }
+  panel.style.display = '';
+  // Cerrar al hacer click fuera
+  setTimeout(function() {
+    document.addEventListener('click', function _cls(e) {
+      if (!panel.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
+        panel.style.display = 'none';
+        document.removeEventListener('click', _cls);
+      }
+    });
+  }, 0);
 }
 
 function requestBrowserNotif() {
@@ -2911,7 +2932,15 @@ function requestBrowserNotif() {
         var planes = ((allData && allData.mondayPlanes) ? allData.mondayPlanes.planes : []) || [];
         var today  = new Date().toISOString().substring(0, 10);
         var d7 = new Date(); d7.setDate(d7.getDate() + 7);
-        var urgent = planes.filter(function(p) { return p.fechaLim && p.fechaLim.substring(0,10) <= d7.toISOString().substring(0,10) && ['Pendiente','En Proceso'].indexOf(p.estado||'Pendiente') >= 0; });
+        var meN    = (allData && allData.usuario && allData.usuario.nombre) ? allData.usuario.nombre.toLowerCase().trim() : '';
+        var isAdm  = (allData && allData.usuario && allData.usuario.rol) ? allData.usuario.rol.toLowerCase().indexOf('admin') >= 0 : false;
+        var urgent = planes.filter(function(p) {
+          if (!p.fechaLim) return false;
+          if (['Pendiente','En Proceso'].indexOf(p.estado||'Pendiente') < 0) return false;
+          if (p.fechaLim.substring(0,10) >= today) return false;
+          if (!isAdm && meN) { var r=(p.responsable||'').toLowerCase(); if (!r||r.indexOf(meN)<0) return false; }
+          return true;
+        });
         _showBrowserNotif(urgent, today);
       }
     });
