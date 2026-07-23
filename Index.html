@@ -604,13 +604,25 @@ tr:hover td{background:var(--surface-2)}
 
 
 /* ── LOGO TOPBAR ── */
-.logo-light{display:block;height:36px;width:auto}
-.logo-dark{display:none;height:36px;width:auto}
-@media(prefers-color-scheme:dark){.logo-light{display:none}.logo-dark{display:block}}
+.logo-light{display:block;height:38px;width:auto;max-width:220px}
+.logo-dark{display:none;height:38px;width:auto;max-width:220px}
 :root[data-theme="dark"] .logo-light{display:none}
 :root[data-theme="dark"] .logo-dark{display:block}
-:root[data-theme="light"] .logo-light{display:block}
-:root[data-theme="light"] .logo-dark{display:none}</style>
+/* ── DARK MODE (data-theme) ── */
+:root[data-theme="dark"]{
+  --bg:#111110;--surface:#1c1c1a;--surface-2:#242422;
+  --text:#e8e8e4;--text-2:#888880;--text-3:#555550;
+  --border:rgba(255,255,255,0.1);--border-2:rgba(255,255,255,0.2);
+  --ok-bg:#052e16;--ok-fg:#4ade80;
+  --warn-bg:#1c1500;--warn-fg:#fbbf24;
+  --danger-bg:#1f1010;--danger-fg:#f87171;
+  --info-bg:#3d1608;--info-fg:#fb923c;
+  --purple-bg:#2e1065;--purple-fg:#a78bfa;
+  --teal-bg:#052e16;--teal-fg:#34d399;
+}
+/* Botón toggle tema */
+.btn-theme{width:32px;height:32px;border-radius:8px;border:0.5px solid var(--border-2);background:var(--surface);color:var(--text-2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:15px;transition:background .12s;flex-shrink:0}
+.btn-theme:hover{background:var(--surface-2)}</style>
 <script>
 (function(){
   var ua = navigator.userAgent;
@@ -620,6 +632,9 @@ tr:hover td{background:var(--surface-2)}
   if(isPhone || sw < 768 || (hasTouch && sw < 1024)) {
     document.documentElement.classList.add('is-mobile');
   }
+  // Restaurar tema guardado (evita flash en dark mode)
+  var t = localStorage.getItem('os-theme') || 'light';
+  document.documentElement.setAttribute('data-theme', t);
 })();
 </script>
 </head>
@@ -755,6 +770,7 @@ tr:hover td{background:var(--surface-2)}
         <div class="status-dot loading" id="statusDot"></div>
         <span id="statusText">Cargando...</span>
         <button class="btn-refresh" onclick="loadData()">Actualizar ahora</button>
+        <button class="btn-theme" id="btnTheme" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
         <button class="btn-logout" onclick="doLogout()">Cerrar sesión</button>
       </div>
     </div>
@@ -3713,6 +3729,9 @@ function showAuthScreen(screen) {
 function hideAuthOverlay(usuario) {
   document.getElementById('auth-overlay').classList.add('hidden');
   document.getElementById('app-container').style.display = '';
+  var currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+  var btn = document.getElementById('btnTheme');
+  if (btn) btn.textContent = currentTheme === 'dark' ? '☀' : '🌙';
   if (usuario) {
     var chip = document.getElementById('user-chip');
     document.getElementById('user-chip-name').textContent = usuario.nombre;
@@ -3793,6 +3812,13 @@ function doRegister() {
   } else {
     authFetch('register', { nombre: nombre, email: email, password: pass }).then(onOk).catch(onErr);
   }
+}
+
+function toggleTheme() {
+  var t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('os-theme', t);
+  document.getElementById('btnTheme').textContent = t === 'dark' ? '☀' : '🌙';
 }
 
 function doLogout() {
