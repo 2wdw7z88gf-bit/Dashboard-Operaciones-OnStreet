@@ -596,21 +596,9 @@ function getTabSupervisiones(params) {
   function safeRead(fn) { try { return fn(); } catch(e) { return null; } }
   var flotaInfo = safeRead(function() { return getCached('flota', readFlota, CACHE_DURATION_SECONDS); }) || { flota: [], jefePorMovil: {}, jefePorNombre: {}, kams: [] };
 
-  var byMovil = safeRead(function() { return readMondaySupervisions_(); }) || {};
-
-  // Lista plana para la pestaña Supervisiones (derivada de byMovil, sin segunda llamada a la API)
-  var mondayLista = [];
-  Object.keys(byMovil).forEach(function(key) {
-    (byMovil[key] || []).forEach(function(sv) {
-      mondayLista.push(sv); // ya incluye sv.cliente y sv.movil desde v8
-    });
-  });
-  mondayLista.sort(function(a,b){ return (b.fecha||'').localeCompare(a.fecha||''); });
-
   return {
     supervisiones:       safeRead(function() { return getCached('supervisiones', function() { return readSupervisiones(flotaInfo); }, CACHE_DURATION_SECONDS); }),
-    mondaySupervisiones: byMovil,
-    mondayLista:         mondayLista,
+    mondaySupervisiones: safeRead(function() { return readMondaySupervisions_(); }),
     mondayPlanes:        safeRead(function() { return readMondayPlanesAccion_(); }) || { planes: [], colEstadoId: null },
     lastUpdated: new Date().toISOString()
   };

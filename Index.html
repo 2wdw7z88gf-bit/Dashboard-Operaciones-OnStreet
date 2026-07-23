@@ -2510,7 +2510,29 @@ function renderSuTable(){
 
 // ── MONDAY SUPERVISIONES ───────────────────────────────────────────────────
 function renderMondaySupervisiones() {
-  var lista = (allData && allData.mondayLista) || [];
+  // Derivar lista plana desde byMovil (mondaySupervisiones) para mayor robustez
+  var byMovil = (allData && allData.mondaySupervisiones) || {};
+  var lista   = [];
+  Object.keys(byMovil).forEach(function(key) {
+    var pipeIdx = key.indexOf('|');
+    var keyCliente = pipeIdx >= 0 ? key.substring(0, pipeIdx) : key;
+    var keyMovil   = pipeIdx >= 0 ? key.substring(pipeIdx + 1) : '';
+    (byMovil[key] || []).forEach(function(sv) {
+      // sv.cliente/movil vienen del campo guardado (v8+); fallback al key (v7)
+      lista.push({
+        tipo:       sv.tipo       || '',
+        fecha:      sv.fecha      || '',
+        supervisor: sv.supervisor || '',
+        comentario: sv.comentario || '',
+        cliente:    sv.cliente    || keyCliente,
+        movil:      sv.movil      || keyMovil
+      });
+    });
+  });
+  lista.sort(function(a,b){ return (b.fecha||'').localeCompare(a.fecha||''); });
+
+  console.log('[Monday] mondaySupervisiones keys:', Object.keys(byMovil).length, '| lista items:', lista.length, '| mondayPlanes:', ((allData.mondayPlanes && allData.mondayPlanes.planes) || []).length);
+
   var tbody = document.getElementById('mdSuTableBody');
   if (!tbody) return;
 
