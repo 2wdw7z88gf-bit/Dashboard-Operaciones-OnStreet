@@ -493,6 +493,8 @@ tr:hover td{background:var(--surface-2)}
 .empty-msg{text-align:center;color:var(--text-2);padding:24px;font-size:13px}
 .md-su-row{cursor:pointer;transition:background 0.15s}
 .md-su-row:hover td{background:var(--surface-2)}
+@keyframes mdHighlight{0%{background:var(--info-bg,#dbeafe)}100%{background:transparent}}
+.md-highlight td{animation:mdHighlight 1.8s ease-out forwards}
 .md-su-row td{vertical-align:middle}
 .md-expand-btn{width:24px;height:24px;border-radius:50%;border:none;background:var(--surface-2);color:var(--text-2);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform 0.2s;margin:auto}
 .md-su-row.expanded .md-expand-btn{transform:rotate(180deg)}
@@ -2602,12 +2604,13 @@ function renderMondaySupervisiones() {
           var cls = mdEstadoClass(p.estado);
           var fechaL = p.fechaLim || mdAddOneMonth(p.fecha);
           var fechaLFmt = fechaL ? fechaL.substring(0,10).split('-').reverse().join('/') : '';
-          det += '<div style="display:flex;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap">';
-          det += '<span class="md-estado-btn ' + cls + '" style="cursor:default;font-size:10px;padding:2px 8px">' + escapeHtml(p.estado || 'Pendiente') + '</span>';
-          det += '<span style="font-size:13px">' + escapeHtml(p.name || '—') + '</span>';
+          det += '<div onclick="scrollToMdPlan(\'' + escapeHtml(p.id) + '\')" style="display:flex;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap;cursor:pointer;border-radius:6px;padding:3px 4px;transition:background .15s" onmouseover="this.style.background=\'var(--surface-2)\'" onmouseout="this.style.background=\'\'">';
+          det += '<span class="md-estado-btn ' + cls + '" style="cursor:pointer;font-size:10px;padding:2px 8px">' + escapeHtml(p.estado || 'Pendiente') + '</span>';
+          det += '<span style="font-size:13px;color:var(--info-fg);text-decoration:underline;text-underline-offset:2px">' + escapeHtml(p.name || '—') + '</span>';
           if (fechaLFmt) det += '<span style="font-size:11px;color:var(--text-2)">· Límite: ' + escapeHtml(fechaLFmt) + (p.fechaLim ? '' : ' *') + '</span>';
+          det += '<span style="font-size:10px;color:var(--text-3);margin-left:auto">↓ ver plan</span>';
           det += '</div>';
-          if (p.descripcion) det += '<div style="font-size:12px;color:var(--text-2);margin-left:4px;margin-top:2px">' + escapeHtml(p.descripcion) + '</div>';
+          if (p.descripcion) det += '<div style="font-size:12px;color:var(--text-2);margin-left:4px;margin-top:2px;margin-bottom:3px">' + escapeHtml(p.descripcion) + '</div>';
         });
       }
       if (!det) det = '<em style="color:var(--text-2)">Sin observaciones registradas</em>';
@@ -2688,6 +2691,14 @@ function mdJefeMovil(cliente, movil) {
   return '';
 }
 
+function scrollToMdPlan(planId) {
+  var row = document.querySelector('[data-plan-id="' + planId + '"]');
+  if (!row) return;
+  row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  row.classList.add('md-highlight');
+  setTimeout(function() { row.classList.remove('md-highlight'); }, 1800);
+}
+
 function mdPlanesParaSupervision(sv) {
   var planes = ((allData && allData.mondayPlanes) ? allData.mondayPlanes.planes : null) || [];
   var fechaSv = (sv.fecha || '').substring(0, 10);
@@ -2758,7 +2769,7 @@ function renderMondayPlanes() {
       var btnAttr = colEstadoId
         ? 'onclick="updatePlanEstado(this,\'' + p.id + '\',\'' + colEstadoId + '\',\'' + mdNextEstado(p.estado) + '\')"'
         : 'disabled title="Sin columna Estado"';
-      html += '<tr class="md-su-row" id="mdPlanRow' + i + '" onclick="toggleMdPlanRow(' + i + ')" style="cursor:pointer">';
+      html += '<tr class="md-su-row" id="mdPlanRow' + i + '" data-plan-id="' + escapeHtml(p.id) + '" onclick="toggleMdPlanRow(' + i + ')" style="cursor:pointer">';
       html += '<td onclick="event.stopPropagation()"><button class="md-estado-btn ' + eClass + '" ' + btnAttr + '>' + escapeHtml(eLabel) + '</button></td>';
       html += '<td style="font-size:11px;color:var(--text-2)">' + escapeHtml(p.accion || '—') + '</td>';
       html += '<td><button class="md-expand-btn" tabindex="-1" style="float:left;margin-right:6px">&#9660;</button>' + escapeHtml(p.name || '—') + '</td>';
