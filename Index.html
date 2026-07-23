@@ -493,6 +493,11 @@ tr:hover td{background:var(--surface-2)}
 .empty-msg{text-align:center;color:var(--text-2);padding:24px;font-size:13px}
 .md-su-row{cursor:pointer;transition:background 0.15s}
 .md-su-row:hover td{background:var(--surface-2)}
+.md-su-row.row-vencida td{background:#fff1f2}
+.md-su-row.row-vencida:hover td{background:#fde8ea}
+@media(prefers-color-scheme:dark){.md-su-row.row-vencida td{background:#2d0a0a}.md-su-row.row-vencida:hover td{background:#3d0f0f}}
+:root[data-theme="dark"] .md-su-row.row-vencida td{background:#2d0a0a}
+:root[data-theme="dark"] .md-su-row.row-vencida:hover td{background:#3d0f0f}
 @keyframes mdHighlight{0%{background:var(--info-bg,#dbeafe)}100%{background:transparent}}
 .md-highlight td{animation:mdHighlight 1.8s ease-out forwards}
 .md-su-row td{vertical-align:middle}
@@ -544,22 +549,42 @@ tr:hover td{background:var(--surface-2)}
 /* Pestañas de Planes */
 .md-plan-tab{padding:5px 14px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--text-1);cursor:pointer;font-size:12px;font-weight:500;transition:all .15s;white-space:nowrap}
 .md-plan-tab:hover{background:var(--surface-2)}
+.md-tab-vencidos{border-color:#dc2626;color:#dc2626}
+.md-tab-vencidos:hover{background:#fee2e2}
+.md-plan-tab[data-tab="vencidos"].active{background:#dc2626;color:#fff;border-color:#dc2626}
 .md-plan-tab[data-tab="pendiente"].active{background:#92400e;color:#fef3c7;border-color:#92400e}
 .md-plan-tab[data-tab="en-proceso"].active{background:#1e40af;color:#dbeafe;border-color:#1e40af}
 .md-plan-tab[data-tab="listo"].active{background:#065f46;color:#d1fae5;border-color:#065f46}
 .md-plan-tab[data-tab="cerrado"].active{background:#991b1b;color:#fee2e2;border-color:#991b1b}
 .md-plan-tab[data-tab="todos"].active{background:var(--text-1);color:var(--surface-1);border-color:var(--text-1)}
 .md-tab-cnt{font-size:10px;font-weight:700;margin-left:4px;opacity:0.85}
+/* Colores de fecha límite */
+.td-vencido{color:#dc2626!important;font-weight:700}
+.td-proxima{color:#d97706!important;font-weight:600}
 @media(prefers-color-scheme:dark){
+  .md-plan-tab[data-tab="vencidos"].active{background:#b91c1c;color:#fff;border-color:#b91c1c}
+  .md-tab-vencidos{border-color:#f87171;color:#f87171}
   .md-plan-tab[data-tab="pendiente"].active{background:#78350f;color:#fde68a;border-color:#78350f}
   .md-plan-tab[data-tab="en-proceso"].active{background:#1e3a8a;color:#93c5fd;border-color:#1e3a8a}
   .md-plan-tab[data-tab="listo"].active{background:#064e3b;color:#6ee7b7;border-color:#064e3b}
   .md-plan-tab[data-tab="cerrado"].active{background:#7f1d1d;color:#fca5a5;border-color:#7f1d1d}
+  #mdPlanesAlertBanner{background:#450a0a;color:#fca5a5;border-color:#7f1d1d}
+  .td-vencido{color:#f87171!important}
+  .td-proxima{color:#fbbf24!important}
 }
+:root[data-theme="dark"] .md-plan-tab[data-tab="vencidos"].active{background:#b91c1c;color:#fff;border-color:#b91c1c}
+:root[data-theme="dark"] .md-tab-vencidos{border-color:#f87171;color:#f87171}
 :root[data-theme="dark"] .md-plan-tab[data-tab="pendiente"].active{background:#78350f;color:#fde68a;border-color:#78350f}
 :root[data-theme="dark"] .md-plan-tab[data-tab="en-proceso"].active{background:#1e3a8a;color:#93c5fd;border-color:#1e3a8a}
 :root[data-theme="dark"] .md-plan-tab[data-tab="listo"].active{background:#064e3b;color:#6ee7b7;border-color:#064e3b}
 :root[data-theme="dark"] .md-plan-tab[data-tab="cerrado"].active{background:#7f1d1d;color:#fca5a5;border-color:#7f1d1d}
+:root[data-theme="dark"] #mdPlanesAlertBanner{background:#450a0a;color:#fca5a5;border-color:#7f1d1d}
+:root[data-theme="dark"] .td-vencido{color:#f87171!important}
+:root[data-theme="dark"] .td-proxima{color:#fbbf24!important}
+:root[data-theme="light"] .md-plan-tab[data-tab="pendiente"].active{background:#92400e;color:#fef3c7;border-color:#92400e}
+:root[data-theme="light"] .md-plan-tab[data-tab="en-proceso"].active{background:#1e40af;color:#dbeafe;border-color:#1e40af}
+:root[data-theme="light"] .md-plan-tab[data-tab="listo"].active{background:#065f46;color:#d1fae5;border-color:#065f46}
+:root[data-theme="light"] .md-plan-tab[data-tab="cerrado"].active{background:#991b1b;color:#fee2e2;border-color:#991b1b}
 
 </style>
 <script>
@@ -1040,8 +1065,15 @@ tr:hover td{background:var(--surface-2)}
       <!-- SECCIÓN 2: Planes de Acción -->
       <div class="panel" id="mdPlanesPanel" style="margin-top:16px">
         <h2>Planes de Acción <span class="md-badge" id="mdPlanesBadge" style="display:none"></span></h2>
+        <!-- Banner de alertas -->
+        <div id="mdPlanesAlertBanner" style="display:none;align-items:center;gap:10px;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:13px;font-weight:500">
+          <span style="font-size:16px">⚠</span>
+          <span id="mdPlanesAlertText"></span>
+          <button onclick="setMdPlanesTab('vencidos',document.querySelector('.md-plan-tab[data-tab=vencidos]'))" style="margin-left:auto;background:#991b1b;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer">Ver vencidos</button>
+        </div>
         <!-- Pestañas de estado -->
         <div id="mdPlanesTabBar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+          <button class="md-plan-tab md-tab-vencidos" data-tab="vencidos" onclick="setMdPlanesTab('vencidos',this)" style="display:none">⚠ Vencidos <span class="md-tab-cnt" id="mdTabCntVencidos"></span></button>
           <button class="md-plan-tab active" data-tab="pendiente" onclick="setMdPlanesTab('pendiente',this)">Pendientes <span class="md-tab-cnt" id="mdTabCntPendiente"></span></button>
           <button class="md-plan-tab" data-tab="en-proceso" onclick="setMdPlanesTab('en-proceso',this)">En Proceso <span class="md-tab-cnt" id="mdTabCntEnProceso"></span></button>
           <button class="md-plan-tab" data-tab="listo" onclick="setMdPlanesTab('listo',this)">Listos <span class="md-tab-cnt" id="mdTabCntListo"></span></button>
@@ -2784,21 +2816,38 @@ function renderMondayPlanes() {
 
   if (hint) hint.style.display = '';
 
+  // Referencia de fecha para alertas
+  var today   = new Date().toISOString().substring(0, 10);
+  var d7      = new Date(); d7.setDate(d7.getDate() + 7);
+  var in7days = d7.toISOString().substring(0, 10);
+  var ACTIVE_ESTADOS = ['Pendiente', 'En Proceso'];
+
   // Conteos por pestaña
-  var cnt = { pendiente: 0, 'en-proceso': 0, listo: 0, cerrado: 0, todos: planes.length };
+  var cnt = { pendiente: 0, 'en-proceso': 0, listo: 0, cerrado: 0, todos: planes.length, vencidos: 0 };
   planes.forEach(function(p) {
     var e = p.estado || 'Pendiente';
-    if (e === 'Pendiente')                              cnt.pendiente++;
-    else if (e === 'En Proceso')                        cnt['en-proceso']++;
-    else if (e === 'Listo')                             cnt.listo++;
+    if (e === 'Pendiente')                               cnt.pendiente++;
+    else if (e === 'En Proceso')                         cnt['en-proceso']++;
+    else if (e === 'Listo')                              cnt.listo++;
     else if (e === 'No Completado' || e === 'Desestimado') cnt.cerrado++;
+    // Vencido: fecha límite real pasada + estado activo
+    if (p.fechaLim && p.fechaLim.substring(0,10) < today && ACTIVE_ESTADOS.indexOf(e) >= 0) cnt.vencidos++;
   });
   function setTabCnt(id, n) { var el = document.getElementById(id); if (el) el.textContent = n ? '(' + n + ')' : ''; }
+  setTabCnt('mdTabCntVencidos',  cnt.vencidos);
   setTabCnt('mdTabCntPendiente', cnt.pendiente);
   setTabCnt('mdTabCntEnProceso', cnt['en-proceso']);
   setTabCnt('mdTabCntListo',     cnt.listo);
   setTabCnt('mdTabCntCerrado',   cnt.cerrado);
   setTabCnt('mdTabCntTodos',     cnt.todos);
+
+  // Mostrar/ocultar pestaña y banner de vencidos
+  var tabVencidos   = document.querySelector('.md-plan-tab[data-tab="vencidos"]');
+  var alertBanner   = document.getElementById('mdPlanesAlertBanner');
+  var alertText     = document.getElementById('mdPlanesAlertText');
+  if (tabVencidos)  tabVencidos.style.display = cnt.vencidos ? '' : 'none';
+  if (alertBanner)  alertBanner.style.display = cnt.vencidos ? 'flex' : 'none';
+  if (alertText)    alertText.textContent = cnt.vencidos + (cnt.vencidos === 1 ? ' plan vencido sin resolver' : ' planes vencidos sin resolver');
 
   if (badge) { badge.textContent = cnt.todos + ' planes'; badge.style.display = cnt.todos ? '' : 'none'; }
 
@@ -2813,6 +2862,7 @@ function renderMondayPlanes() {
       if (tab === 'en-proceso' && est !== 'En Proceso') return false;
       if (tab === 'listo'      && est !== 'Listo')       return false;
       if (tab === 'cerrado'    && est !== 'No Completado' && est !== 'Desestimado') return false;
+      if (tab === 'vencidos'   && !(p.fechaLim && p.fechaLim.substring(0,10) < today && ACTIVE_ESTADOS.indexOf(est) >= 0)) return false;
       if (filtCli && p.cliente !== filtCli) return false;
       if (filtTexto && (p.name + ' ' + p.descripcion + ' ' + p.responsable + ' ' + p.cliente + ' ' + p.movil).toLowerCase().indexOf(filtTexto) < 0) return false;
       return true;
@@ -2829,26 +2879,32 @@ function renderMondayPlanes() {
     rows.forEach(function(p, i) {
       var eClass     = mdEstadoClass(p.estado);
       var fechaSup   = (p.fecha || '').substring(0, 10).split('-').reverse().join('/') || '—';
-      var fechaLimRaw= p.fechaLim || mdAddOneMonth(p.fecha);
-      var fechaLim   = fechaLimRaw ? fechaLimRaw.substring(0, 10).split('-').reverse().join('/') : '—';
-      var esDefault  = !p.fechaLim && !!fechaLimRaw;
+      var fechaLimRaw = p.fechaLim || mdAddOneMonth(p.fecha);
+      var fechaLim    = fechaLimRaw ? fechaLimRaw.substring(0, 10).split('-').reverse().join('/') : '—';
+      var esDefault   = !p.fechaLim && !!fechaLimRaw;
       if (esDefault) hayDefault = true;
-      var responsable= p.responsable || mdJefeMovil(p.cliente, p.movil) || '—';
-      var planKey    = p.planKey || ('c_' + p.id);
-      var curEstado  = p.estado || 'Pendiente';
+      var responsable = p.responsable || mdJefeMovil(p.cliente, p.movil) || '—';
+      var planKey     = p.planKey || ('c_' + p.id);
+      var curEstado   = p.estado || 'Pendiente';
+      var isActive    = ACTIVE_ESTADOS.indexOf(curEstado) >= 0;
+      var isVencido   = isActive && p.fechaLim && p.fechaLim.substring(0,10) < today;
+      var isProxima   = isActive && !isVencido && fechaLimRaw && fechaLimRaw.substring(0,10) >= today && fechaLimRaw.substring(0,10) <= in7days;
       var selHtml = '<select class="md-estado-select ' + eClass + '" onchange="updatePlanEstado(this,\'' + escapeHtml(planKey) + '\',this.value)">';
       ESTADOS.forEach(function(opt) {
         selHtml += '<option value="' + opt + '"' + (curEstado === opt ? ' selected' : '') + '>' + opt + '</option>';
       });
       selHtml += '</select>';
-      html += '<tr class="md-su-row" id="mdPlanRow' + i + '" data-plan-id="' + escapeHtml(p.id) + '" onclick="toggleMdPlanRow(' + i + ')" style="cursor:pointer">';
+      var fechaLimClass = isVencido ? ' td-vencido' : (isProxima ? ' td-proxima' : '');
+      var fechaLimStyle = 'white-space:nowrap' + (esDefault && !isVencido ? ';font-style:italic' : '');
+      var fechaLimLabel = fechaLim + (esDefault ? ' *' : '') + (isVencido ? ' ⚠' : '') + (isProxima ? ' ⏰' : '');
+      html += '<tr class="md-su-row' + (isVencido ? ' row-vencida' : '') + '" id="mdPlanRow' + i + '" data-plan-id="' + escapeHtml(p.id) + '" onclick="toggleMdPlanRow(' + i + ')" style="cursor:pointer">';
       html += '<td onclick="event.stopPropagation()">' + selHtml + '</td>';
       html += '<td style="font-size:11px;color:var(--text-2)">' + escapeHtml(p.accion || '—') + '</td>';
       html += '<td><button class="md-expand-btn" tabindex="-1" style="float:left;margin-right:6px">&#9660;</button>' + escapeHtml(p.name || '—') + '</td>';
       html += '<td>' + escapeHtml(p.cliente  || '—') + '</td>';
       html += '<td>' + escapeHtml(p.movil    || '—') + '</td>';
       html += '<td style="white-space:nowrap">' + escapeHtml(fechaSup) + '</td>';
-      html += '<td style="white-space:nowrap' + (esDefault ? ';color:var(--text-2);font-style:italic' : '') + '">' + escapeHtml(fechaLim) + (esDefault ? ' *' : '') + '</td>';
+      html += '<td class="' + fechaLimClass + '" style="' + fechaLimStyle + '">' + escapeHtml(fechaLimLabel) + '</td>';
       html += '<td>' + escapeHtml(responsable) + '</td>';
       html += '</tr>';
       var qué = p.descripcion || '';
