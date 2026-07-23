@@ -339,7 +339,7 @@ var MONDAY_CACHE_SEC_        = 3600;
 var MONDAY_BOARD_RAPIDA_     = '5678712035';
 var MONDAY_BOARD_INTEGRAL_   = '5623247223';
 var MONDAY_BOARD_PLANES_     = '8505742190';
-var MONDAY_PLANES_CACHE_KEY_ = 'monday_planes_v1';
+var MONDAY_PLANES_CACHE_KEY_ = 'monday_planes_v2';
 var MONDAY_PLANES_CACHE_SEC_ = 1800;
 
 function setupMondayToken() {
@@ -478,7 +478,9 @@ function readMondayPlanesAccion_() {
   var token = PropertiesService.getScriptProperties().getProperty('MONDAY_TOKEN');
   if (!token) return { planes: [], colEstadoId: null };
 
-  var query = '{ boards(ids: [' + MONDAY_BOARD_PLANES_ + ']) { columns { id title } items_page(limit: 500) { items { id name column_values { id text } } } } }';
+  // __last_updated__ es una columna especial de Monday (siempre existe) → trae los 500 más recientes
+  var ob = 'query_params: {order_by: [{column_id: "__last_updated__", direction: desc}]}';
+  var query = '{ boards(ids: [' + MONDAY_BOARD_PLANES_ + ']) { columns { id title } items_page(limit: 500, ' + ob + ') { items { id name column_values { id text } } } } }';
   var resp;
   try {
     resp = UrlFetchApp.fetch(MONDAY_API_URL_, {
