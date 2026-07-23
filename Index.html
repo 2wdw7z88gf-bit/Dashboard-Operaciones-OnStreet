@@ -585,6 +585,20 @@ tr:hover td{background:var(--surface-2)}
 :root[data-theme="light"] .md-plan-tab[data-tab="en-proceso"].active{background:#1e40af;color:#dbeafe;border-color:#1e40af}
 :root[data-theme="light"] .md-plan-tab[data-tab="listo"].active{background:#065f46;color:#d1fae5;border-color:#065f46}
 :root[data-theme="light"] .md-plan-tab[data-tab="cerrado"].active{background:#991b1b;color:#fee2e2;border-color:#991b1b}
+/* ── Centro de Notificaciones ─────────────────────────── */
+.notif-bell-btn{position:relative;background:transparent;border:none;cursor:pointer;font-size:20px;padding:4px 8px;border-radius:8px;transition:background .15s;line-height:1}
+.notif-bell-btn:hover{background:var(--surface-2)}
+.notif-badge{position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;font-size:9px;font-weight:700;border-radius:10px;padding:1px 5px;min-width:16px;text-align:center;line-height:14px;pointer-events:none}
+.notif-panel{position:absolute;top:calc(100% + 10px);right:0;width:340px;max-height:460px;overflow-y:auto;background:var(--surface-1);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.18);z-index:9999}
+.notif-item{padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s}
+.notif-item:hover{background:var(--surface-2)}
+.notif-item:last-child{border-bottom:none}
+.notif-item-tag{font-size:11px;font-weight:700}
+.notif-item-tag.vencido{color:#dc2626}
+.notif-item-tag.proxima{color:#d97706}
+.notif-item-name{font-size:13px;color:var(--text-1);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.notif-item-meta{font-size:11px;color:var(--text-2);margin-top:2px}
+@media(prefers-color-scheme:dark){.notif-panel{box-shadow:0 8px 28px rgba(0,0,0,.45)}}
 
 </style>
 <script>
@@ -713,6 +727,19 @@ tr:hover td{background:var(--surface-2)}
       <div class="user-chip" id="user-chip" style="display:none">
         <span class="user-chip-name" id="user-chip-name"></span>
         <span class="user-chip-rol" id="user-chip-rol"></span>
+      </div>
+      <!-- Centro de Notificaciones -->
+      <div style="position:relative" id="notifWrap">
+        <button class="notif-bell-btn" id="notifBellBtn" onclick="toggleNotifPanel()" title="Notificaciones de planes">
+          🔔<span class="notif-badge" id="notifBadge" style="display:none">0</span>
+        </button>
+        <div class="notif-panel" id="notifPanel" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)">
+            <span style="font-weight:700;font-size:14px">Notificaciones</span>
+            <button onclick="requestBrowserNotif()" style="font-size:11px;background:transparent;border:1px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;color:var(--text-2)" title="Activar notificaciones del navegador">🔔 Activar</button>
+          </div>
+          <div id="notifPanelContent"><div style="text-align:center;color:var(--text-2);padding:28px;font-size:13px">Cargando...</div></div>
+        </div>
       </div>
       <div class="status">
         <div class="status-dot loading" id="statusDot"></div>
@@ -1438,6 +1465,7 @@ function loadData(){
       if(allData.supervisiones) renderSupervisiones();
       renderMondaySupervisiones();
       renderMondayPlanes();
+      initNotifications();
       var ts=new Date(allData.lastUpdated||Date.now());
       var msg='Actualizado a las '+ts.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
       if(fechaGlobal) msg+=' · viendo '+formatDate(fechaGlobal);
@@ -2778,6 +2806,128 @@ function mdPlanesParaSupervision(sv) {
       && cli && cli === (p.cliente || '').toLowerCase().trim()
       && mov && mov === (p.movil   || '').toLowerCase().trim();
   });
+}
+
+// ── CENTRO DE NOTIFICACIONES ───────────────────────────────────────────────
+function initNotifications() {
+  var planes = ((allData && allData.mondayPlanes) ? allData.mondayPlanes.planes : []) || [];
+  var today  = new Date().toISOString().substring(0, 10);
+  var d7     = new Date(); d7.setDate(d7.getDate() + 7);
+  var in7d   = d7.toISOString().substring(0, 10);
+  var ACTIVE = ['Pendiente', 'En Proceso'];
+
+  // Planes urgentes: vencidos o vencen en 7 días, con fecha real, activos, desde 2026
+  var urgent = planes.filter(function(p) {
+    if (!p.fechaLim) return false;
+    if (p.fecha && p.fecha < '2026-01-01') return false;
+    if (ACTIVE.indexOf(p.estado || 'Pendiente') < 0) return false;
+    return p.fechaLim.substring(0,10) <= in7d;
+  });
+  urgent.sort(function(a, b) { return (a.fechaLim||'').localeCompare(b.fechaLim||''); });
+
+  // Badge
+  var badge = document.getElementById('notifBadge');
+  if (badge) {
+    badge.textContent = urgent.length > 99 ? '99+' : urgent.length;
+    badge.style.display = urgent.length ? '' : 'none';
+  }
+
+  // Panel
+  var content = document.getElementById('notifPanelContent');
+  if (content) {
+    if (!urgent.length) {
+      content.innerHTML = '<div style="text-align:center;color:var(--text-2);padding:28px;font-size:13px">Sin planes urgentes esta semana</div>';
+    } else {
+      var html = '<div style="padding:8px 16px;font-size:11px;color:var(--text-2);font-weight:600;text-transform:uppercase;letter-spacing:.5px">' + urgent.length + ' planes urgentes</div>';
+      urgent.forEach(function(p) {
+        var isOv    = p.fechaLim.substring(0,10) < today;
+        var fechaFmt= p.fechaLim.substring(0,10).split('-').reverse().join('/');
+        var tagClass= isOv ? 'vencido' : 'proxima';
+        var tagTxt  = isOv ? '⚠ VENCIDO · ' + fechaFmt : '⏰ Vence ' + fechaFmt;
+        var meta    = [p.cliente, p.movil, p.responsable].filter(Boolean).join(' · ');
+        html += '<div class="notif-item" onclick="goToMdPlan(\'' + escapeHtml(p.planKey || ('c_' + p.id)) + '\',\'' + escapeHtml(p.id) + '\')">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center">';
+        html += '<span class="notif-item-tag ' + tagClass + '">' + escapeHtml(tagTxt) + '</span>';
+        html += '<span style="font-size:10px;color:var(--text-2)">' + escapeHtml(p.accion || '') + '</span>';
+        html += '</div>';
+        html += '<div class="notif-item-name">' + escapeHtml(p.name || '—') + '</div>';
+        if (meta) html += '<div class="notif-item-meta">' + escapeHtml(meta) + '</div>';
+        html += '</div>';
+      });
+      content.innerHTML = html;
+    }
+  }
+
+  // Notificación del navegador (solo la primera vez por sesión)
+  if (!window._notifShown && urgent.length) {
+    window._notifShown = true;
+    _showBrowserNotif(urgent, today);
+  }
+}
+
+function goToMdPlan(planKey, planId) {
+  toggleNotifPanel();
+  // Ir a pestaña Supervisiones
+  var supBtn = document.querySelector('.tab[onclick*="supervisiones"]');
+  if (supBtn && !supBtn.classList.contains('active')) supBtn.click();
+  setTimeout(function() {
+    var tabTarget = 'vencidos';
+    var tabEl = document.querySelector('.md-plan-tab[data-tab="' + tabTarget + '"]');
+    if (tabEl && tabEl.style.display !== 'none') {
+      setMdPlanesTab(tabTarget, tabEl);
+    } else {
+      setMdPlanesTab('todos', document.querySelector('.md-plan-tab[data-tab="todos"]'));
+    }
+    setTimeout(function() { scrollToMdPlan(planId); }, 300);
+  }, 150);
+}
+
+function toggleNotifPanel() {
+  var panel = document.getElementById('notifPanel');
+  if (!panel) return;
+  var open = panel.style.display !== 'none';
+  panel.style.display = open ? 'none' : '';
+  // Cerrar al hacer click fuera
+  if (!open) {
+    setTimeout(function() {
+      document.addEventListener('click', function _cls(e) {
+        var wrap = document.getElementById('notifWrap');
+        if (wrap && !wrap.contains(e.target)) {
+          panel.style.display = 'none';
+          document.removeEventListener('click', _cls);
+        }
+      });
+    }, 0);
+  }
+}
+
+function requestBrowserNotif() {
+  if (!('Notification' in window)) { alert('Este navegador no soporta notificaciones.'); return; }
+  if (Notification.permission === 'granted') {
+    alert('Las notificaciones ya están activadas.');
+  } else {
+    Notification.requestPermission().then(function(perm) {
+      if (perm === 'granted') {
+        var planes = ((allData && allData.mondayPlanes) ? allData.mondayPlanes.planes : []) || [];
+        var today  = new Date().toISOString().substring(0, 10);
+        var d7 = new Date(); d7.setDate(d7.getDate() + 7);
+        var urgent = planes.filter(function(p) { return p.fechaLim && p.fechaLim.substring(0,10) <= d7.toISOString().substring(0,10) && ['Pendiente','En Proceso'].indexOf(p.estado||'Pendiente') >= 0; });
+        _showBrowserNotif(urgent, today);
+      }
+    });
+  }
+}
+
+function _showBrowserNotif(urgent, today) {
+  if (!('Notification' in window) || Notification.permission !== 'granted' || !urgent.length) return;
+  var ov   = urgent.filter(function(p){ return p.fechaLim.substring(0,10) < today; }).length;
+  var soon = urgent.length - ov;
+  var parts = [];
+  if (ov)   parts.push(ov   + (ov   === 1 ? ' plan vencido' : ' planes vencidos'));
+  if (soon) parts.push(soon + (soon === 1 ? ' vence esta semana' : ' vencen esta semana'));
+  try {
+    new Notification('Dashboard On Street', { body: parts.join(' · '), icon: 'https://dashboard-operaciones-on-street.vercel.app/favicon.ico' });
+  } catch(e) {}
 }
 
 // ── MONDAY PLANES DE ACCIÓN ────────────────────────────────────────────────
