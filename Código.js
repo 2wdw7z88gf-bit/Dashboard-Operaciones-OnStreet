@@ -342,7 +342,7 @@ var MONDAY_BOARD_CONSOLIDADO_ = '5859805996';      // tablero consolidado Superv
 var MONDAY_CONSOL_CACHE_KEY_  = 'monday_consol_v2';
 var MONDAY_CONSOL_CACHE_SEC_  = 3600;
 var MONDAY_BOARD_PLANES_      = '8505742190';
-var MONDAY_PLANES_CACHE_KEY_  = 'monday_planes_v2';
+var MONDAY_PLANES_CACHE_KEY_  = 'monday_planes_v3';
 var MONDAY_PLANES_CACHE_SEC_  = 1800;
 
 function setupMondayToken() {
@@ -674,14 +674,14 @@ function readMondayPlanesAccion_() {
 
   var idCliente    = colId(['Cliente']);
   var idFecha      = colId(['Fecha de Supervisión','Fecha Supervisión','Fecha']);
-  var idFechaLim   = colId(['Fecha límite','Fecha Límite','Límite','Fecha de Solución','Fecha de solución','Fecha Solución']);
+  var idFechaLim   = colId(['Fecha límite','Fecha Límite','Límite']);
   var idEstado     = colId(['Estado','Status','Estatus']);
   var idDescr      = colId(['¿Qué?','Qué','Detalle','Problema','Observación','Descripción']);
-  var idResponsable= colId(['Responsable','Encargado']);
+  var idAccion     = colId(['Checklist original','Checklist','Origen']);
   var idMovilDir   = colId(['Móvil','Nombre Móvil','Movil']);
   var movilColIds  = cols.filter(function(c){ return c.title && c.title.indexOf('Móviles ') === 0; }).map(function(c){ return c.id; });
 
-  Logger.log('[Planes] idCliente=' + idCliente + ' idFecha=' + idFecha + ' idEstado=' + idEstado + ' idMovilDir=' + idMovilDir);
+  Logger.log('[Planes] idCliente=' + idCliente + ' idFecha=' + idFecha + ' idEstado=' + idEstado + ' idMovilDir=' + idMovilDir + ' idAccion=' + idAccion);
 
   var items = (board.items_page && board.items_page.items) || [];
   var planes = [];
@@ -699,13 +699,13 @@ function readMondayPlanesAccion_() {
     planes.push({
       id:          item.id,
       name:        item.name || '',
+      accion:      idAccion     ? cv[idAccion]     : '',
       cliente:     idCliente    ? cv[idCliente]    : '',
       movil:       movil,
       fecha:       idFecha      ? cv[idFecha]      : '',
       fechaLim:    idFechaLim   ? cv[idFechaLim]   : '',
       estado:      idEstado     ? cv[idEstado]     : '',
-      descripcion: idDescr      ? cv[idDescr]      : '',
-      responsable: idResponsable ? cv[idResponsable] : ''
+      descripcion: idDescr      ? cv[idDescr]      : ''
     });
   });
 

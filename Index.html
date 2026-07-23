@@ -1022,12 +1022,12 @@ tr:hover td{background:var(--surface-2)}
               <tr>
                 <th>Estado</th>
                 <th>Acción</th>
+                <th>¿Qué se debe hacer?</th>
                 <th>Cliente</th>
                 <th>Móvil</th>
                 <th>Fecha Sup.</th>
                 <th>Fecha Límite</th>
                 <th>Responsable</th>
-                <th style="width:0"></th>
               </tr>
             </thead>
             <tbody id="mdPlanesTableBody">
@@ -2750,6 +2750,7 @@ function renderMondayPlanes() {
         : 'disabled title="Sin columna Estado"';
       html += '<tr class="md-su-row" id="mdPlanRow' + i + '" onclick="toggleMdPlanRow(' + i + ')" style="cursor:pointer">';
       html += '<td onclick="event.stopPropagation()"><button class="md-estado-btn ' + eClass + '" ' + btnAttr + '>' + escapeHtml(eLabel) + '</button></td>';
+      html += '<td style="font-size:11px;color:var(--text-2)">' + escapeHtml(p.accion || '—') + '</td>';
       html += '<td><button class="md-expand-btn" tabindex="-1" style="float:left;margin-right:6px">&#9660;</button>' + escapeHtml(p.name || '—') + '</td>';
       html += '<td>' + escapeHtml(p.cliente     || '—') + '</td>';
       html += '<td>' + escapeHtml(p.movil       || '—') + '</td>';
@@ -2757,10 +2758,10 @@ function renderMondayPlanes() {
       html += '<td style="white-space:nowrap' + (esDefault ? ';color:var(--text-2);font-style:italic' : '') + '">' + escapeHtml(fechaLim) + (esDefault ? ' *' : '') + '</td>';
       html += '<td>' + escapeHtml(responsable) + '</td>';
       html += '</tr>';
-      // Detalle expandible
+      // Detalle expandible — muestra la columna "¿Qué?" del tablero Monday
       var qué = p.descripcion || '';
       var detHtml = qué
-        ? '<div class="md-detail-label">¿Qué se debe hacer?</div><div class="md-detail-text">' + escapeHtml(qué) + '</div>'
+        ? '<div class="md-detail-label">Detalle</div><div class="md-detail-text">' + escapeHtml(qué) + '</div>'
         : '<em style="color:var(--text-2)">Sin detalle registrado</em>';
       html += '<tr class="md-detail-row" id="mdPlanDetail' + i + '" style="display:none"><td colspan="8"><div class="md-detail-inner">' + detHtml + '</div></td></tr>';
     });
