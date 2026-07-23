@@ -235,6 +235,22 @@ function doGet(e) {
         result = updateMondayPlanEstado_(itemId, colId_, newVal);
       }
 
+    } else if (source === 'monday_update_plan_local') {
+      const upToken = params.token || null;
+      const upUser  = verificarToken_(upToken);
+      if (!upUser) {
+        result = { error: 'token_invalido' };
+      } else {
+        const planKey = String(params.planKey || '');
+        const newVal  = String(params.value   || '');
+        if (!planKey || !newVal) {
+          result = { error: 'missing_params' };
+        } else {
+          PropertiesService.getScriptProperties().setProperty(MONDAY_PLAN_ESTADO_PFX_ + planKey, newVal);
+          result = { ok: true };
+        }
+      }
+
     } else {
       result = { error: 'source no reconocido' };
     }
@@ -342,8 +358,12 @@ var MONDAY_BOARD_CONSOLIDADO_ = '5859805996';      // tablero consolidado Superv
 var MONDAY_CONSOL_CACHE_KEY_  = 'monday_consol_v2';
 var MONDAY_CONSOL_CACHE_SEC_  = 3600;
 var MONDAY_BOARD_PLANES_      = '8505742190';
-var MONDAY_PLANES_CACHE_KEY_  = 'monday_planes_v3';
+var MONDAY_PLANES_CACHE_KEY_  = 'monday_planes_v4';
 var MONDAY_PLANES_CACHE_SEC_  = 1800;
+var MONDAY_RAPIDA_CACHE_KEY_  = 'monday_rapida_v1';
+var MONDAY_INTEGRAL_CACHE_KEY_= 'monday_integral_v1';
+var MONDAY_SUP_CACHE_SEC_     = 1800;
+var MONDAY_PLAN_ESTADO_PFX_   = 'pe_';        // PropertiesService key prefix para estados locales
 
 function setupMondayToken() {
   var token = 'PEGA_TU_TOKEN_AQUI';
@@ -632,6 +652,41 @@ function debugConsolidado() {
   });
 }
 
+function debugSupervisionBoard_(boardId, label) {
+  var token = PropertiesService.getScriptProperties().getProperty('MONDAY_TOKEN');
+  if (!token) { Logger.log('SIN TOKEN'); return; }
+  var ob = 'query_params: {order_by: [{column_id: "__last_updated__", direction: desc}]}';
+  var query = '{ boards(ids: [' + boardId + ']) { columns { id title type } items_page(limit: 3, ' + ob + ') { items { id name column_values { id text value } subitems { id name column_values { id text } } } } } }';
+  var resp = UrlFetchApp.fetch(MONDAY_API_URL_, {
+    method: 'POST',
+    headers: { Authorization: token, 'Content-Type': 'application/json', 'API-Version': '2024-01' },
+    payload: JSON.stringify({ query: query }),
+    muteHttpExceptions: true
+  });
+  var raw = JSON.parse(resp.getContentText());
+  if (!raw.data || !raw.data.boards || !raw.data.boards[0]) { Logger.log('ERROR: ' + resp.getContentText()); return; }
+  var board = raw.data.boards[0];
+  Logger.log('=== COLUMNAS ' + label + ' (' + boardId + ') ===');
+  board.columns.forEach(function(c){ Logger.log(c.id + ' | ' + c.type + ' | ' + c.title); });
+  Logger.log('=== ITEMS DE MUESTRA ===');
+  (board.items_page.items || []).forEach(function(item) {
+    Logger.log('Item: ' + item.name);
+    item.column_values.forEach(function(cv){
+      if (cv.text) Logger.log('  ' + cv.id + ' → "' + cv.text + '"');
+    });
+    if (item.subitems && item.subitems.length) {
+      Logger.log('  Subitems (' + item.subitems.length + '):');
+      item.subitems.slice(0, 3).forEach(function(s) {
+        Logger.log('    Subitem: ' + s.name);
+        s.column_values.forEach(function(cv){ if (cv.text) Logger.log('      ' + cv.id + ' → "' + cv.text + '"'); });
+      });
+    }
+  });
+}
+
+function debugIntegral() { debugSupervisionBoard_(MONDAY_BOARD_INTEGRAL_, 'INTEGRAL'); }
+function debugRapida()    { debugSupervisionBoard_(MONDAY_BOARD_RAPIDA_,   'RAPIDA');   }
+
 function readMondayPlanesAccion_() {
   var cache = CacheService.getScriptCache();
   var cached = cache.get(MONDAY_PLANES_CACHE_KEY_);
@@ -672,13 +727,14 @@ function readMondayPlanesAccion_() {
     return null;
   }
 
-  var idCliente    = colId(['Cliente']);
-  var idFecha      = colId(['Fecha de Supervisión','Fecha Supervisión','Fecha']);
-  var idFechaLim   = colId(['Fecha límite','Fecha Límite','Límite']);
-  var idEstado     = colId(['Estado','Status','Estatus']);
-  var idDescr      = colId(['¿Qué?','Qué','Detalle','Problema','Observación','Descripción']);
-  var idAccion     = colId(['Checklist original','Checklist','Origen']);
-  var idMovilDir   = colId(['Móvil','Nombre Móvil','Movil']);
+  var idCliente      = colId(['Cliente']);
+  var idFecha        = colId(['Fecha de Supervisión','Fecha Supervisión','Fecha']);
+  var idFechaLim     = colId(['Fecha límite','Fecha Límite','Límite']);
+  var idEstado       = colId(['Estado','Status','Estatus']);
+  var idDescr        = colId(['¿Qué?','Qué','Detalle','Problema','Observación','Descripción']);
+  var idAccion       = colId(['Checklist original','Checklist','Origen']);
+  var idResponsable  = colId(['Responsable','Encargado','Supervisor Original','Supervisor']);
+  var idMovilDir     = colId(['Móvil','Nombre Móvil','Movil']);
   var movilColIds  = cols.filter(function(c){ return c.title && c.title.indexOf('Móviles ') === 0; }).map(function(c){ return c.id; });
 
   Logger.log('[Planes] idCliente=' + idCliente + ' idFecha=' + idFecha + ' idEstado=' + idEstado + ' idMovilDir=' + idMovilDir + ' idAccion=' + idAccion);
@@ -696,16 +752,21 @@ function readMondayPlanesAccion_() {
       for (var i = 0; i < movilColIds.length; i++) { if (cv[movilColIds[i]]) { movil = cv[movilColIds[i]]; break; } }
     }
 
+    // Limpiar responsable: quitar punto y coma final (Monday concatena con ";")
+    var respRaw = idResponsable ? (cv[idResponsable] || '') : '';
+    var responsable = respRaw.replace(/\s*;\s*/g, ', ').replace(/,\s*$/, '').trim();
+
     planes.push({
       id:          item.id,
       name:        item.name || '',
-      accion:      idAccion     ? cv[idAccion]     : '',
-      cliente:     idCliente    ? cv[idCliente]    : '',
+      accion:      idAccion      ? cv[idAccion]      : '',
+      cliente:     idCliente     ? cv[idCliente]     : '',
       movil:       movil,
-      fecha:       idFecha      ? cv[idFecha]      : '',
-      fechaLim:    idFechaLim   ? cv[idFechaLim]   : '',
-      estado:      idEstado     ? cv[idEstado]     : '',
-      descripcion: idDescr      ? cv[idDescr]      : ''
+      fecha:       idFecha       ? cv[idFecha]       : '',
+      fechaLim:    idFechaLim    ? cv[idFechaLim]    : '',
+      estado:      idEstado      ? cv[idEstado]      : '',
+      descripcion: idDescr       ? cv[idDescr]       : '',
+      responsable: responsable
     });
   });
 
@@ -751,6 +812,317 @@ function updateMondayPlanEstado_(itemId, colEstadoId, value) {
   return { ok: true };
 }
 
+// ── Estado local (PropertiesService) para planes de Rápida/Integral ─────────
+function updatePlanEstadoLocalGas(params) {
+  var token   = (params && params.token)   || null;
+  var usuario = verificarToken_(token);
+  if (!usuario) return { error: 'token_invalido' };
+  var planKey = String((params && params.planKey) || '');
+  var value   = String((params && params.value)   || '');
+  if (!planKey || !value) return { error: 'missing_params' };
+  PropertiesService.getScriptProperties().setProperty(MONDAY_PLAN_ESTADO_PFX_ + planKey, value);
+  return { ok: true };
+}
+
+function getEstadoLocal_(planKey) {
+  return PropertiesService.getScriptProperties().getProperty(MONDAY_PLAN_ESTADO_PFX_ + planKey) || '';
+}
+
+// ── Helper compartido: fetch Monday board ────────────────────────────────────
+function fetchMondayBoard_(boardId, limit) {
+  var token = PropertiesService.getScriptProperties().getProperty('MONDAY_TOKEN');
+  if (!token) return null;
+  var ob    = 'query_params: {order_by: [{column_id: "__last_updated__", direction: desc}]}';
+  var query = '{ boards(ids: [' + boardId + ']) { columns { id title type } items_page(limit: ' + (limit||200) + ', ' + ob + ') { items { id name column_values { id text } } } } }';
+  var resp;
+  try {
+    resp = UrlFetchApp.fetch(MONDAY_API_URL_, {
+      method: 'POST',
+      headers: { Authorization: token, 'Content-Type': 'application/json', 'API-Version': '2024-01' },
+      payload: JSON.stringify({ query: query }),
+      muteHttpExceptions: true
+    });
+  } catch(e) { return null; }
+  if (resp.getResponseCode() !== 200) return null;
+  var raw; try { raw = JSON.parse(resp.getContentText()); } catch(e) { return null; }
+  if (!raw.data || !raw.data.boards || !raw.data.boards[0]) return null;
+  return raw.data.boards[0];
+}
+
+// ── Helper: primer móvil no vacío de columnas "Móviles X" ───────────────────
+function extractMovil_(cv, movilCols) {
+  for (var i = 0; i < movilCols.length; i++) {
+    if (cv[movilCols[i]]) return cv[movilCols[i]];
+  }
+  return '';
+}
+
+// ── Planes desde Supervisión Rápida ─────────────────────────────────────────
+function readMondayRapida_() {
+  var cache  = CacheService.getScriptCache();
+  var cached = cache.get(MONDAY_RAPIDA_CACHE_KEY_);
+  var planes;
+  if (cached) { try { planes = JSON.parse(cached); } catch(e) { planes = null; } }
+  if (!planes) {
+    planes = fetchMondayRapidaPlanes_();
+    try { cache.put(MONDAY_RAPIDA_CACHE_KEY_, JSON.stringify(planes), MONDAY_SUP_CACHE_SEC_); } catch(e) {}
+  }
+  // Merge estados locales (siempre frescos)
+  planes.forEach(function(p) {
+    var est = getEstadoLocal_(p.planKey);
+    if (est) p.estado = est;
+  });
+  return planes;
+}
+
+function fetchMondayRapidaPlanes_() {
+  var board = fetchMondayBoard_(MONDAY_BOARD_RAPIDA_, 500);
+  if (!board) return [];
+  var cols = board.columns || [];
+
+  var idCliente    = null, idFecha = null, idSupervisor = null;
+  var movilCols    = [];
+  cols.forEach(function(c) {
+    var t = c.title || '';
+    if (t === 'Cliente')           idCliente    = c.id;
+    if (t === 'Fecha')             idFecha      = c.id;
+    if (t === 'Nombre Supervisor') idSupervisor = c.id;
+    if (t.indexOf('Móviles ') === 0) movilCols.push(c.id);
+  });
+
+  // Detectar slots de Plan de Acción dinámicamente por patrón
+  // Responsable N / ¿Qué? N°N / Fecha límite para solución N°N
+  var slotMap = {};
+  cols.forEach(function(c) {
+    var t = c.title || '';
+    var tl = t.toLowerCase();
+    // Responsable N
+    var mR = t.match(/^Responsable\s+(\d+)$/i);
+    if (mR) { var n = mR[1]; slotMap[n] = slotMap[n] || {}; slotMap[n].num = parseInt(n,10); slotMap[n].respId = c.id; return; }
+    // ¿Qué? con número (N°1, N.1, #1, etc.)
+    var mQ = t.match(/qué\?.*?(\d+)/i);
+    if (mQ) { var n = mQ[1]; slotMap[n] = slotMap[n] || {}; slotMap[n].num = parseInt(n,10); slotMap[n].queId = c.id; return; }
+    // Fecha límite con número
+    var mF = tl.indexOf('fecha') >= 0 && tl.indexOf('soluci') >= 0 ? t.match(/(\d+)/) : null;
+    if (mF) { var n = mF[1]; slotMap[n] = slotMap[n] || {}; slotMap[n].num = parseInt(n,10); slotMap[n].fechaId = c.id; }
+  });
+  var slots = Object.keys(slotMap).sort().map(function(k){ return slotMap[k]; });
+
+  var planes = [];
+  (board.items_page.items || []).forEach(function(item) {
+    var cv = {};
+    (item.column_values || []).forEach(function(v){ cv[v.id] = v.text || ''; });
+    var cliente = idCliente ? cv[idCliente] : '';
+    var movil   = extractMovil_(cv, movilCols);
+    var fecha   = idFecha   ? cv[idFecha]   : '';
+
+    slots.forEach(function(s) {
+      var qué  = s.queId  ? cv[s.queId]  : '';
+      var resp = s.respId ? cv[s.respId] : '';
+      if (!qué || !resp) return;          // Rápida: ambos requeridos
+      var planKey = 'r_' + item.id + '_' + s.num;
+      planes.push({
+        id:          item.id + '_' + s.num,
+        planKey:     planKey,
+        source:      'rapida',
+        name:        qué.split('\n')[0].substring(0, 120),
+        accion:      'Supervisión Rápida',
+        cliente:     cliente,
+        movil:       movil,
+        fecha:       fecha,
+        fechaLim:    s.fechaId ? cv[s.fechaId] : '',
+        estado:      'Pendiente',
+        descripcion: qué,
+        responsable: resp
+      });
+    });
+  });
+
+  planes.sort(function(a,b){ return (b.fecha||'').localeCompare(a.fecha||''); });
+  return planes;
+}
+
+// ── Planes desde Supervisión Integral ───────────────────────────────────────
+function readMondayIntegral_() {
+  var cache  = CacheService.getScriptCache();
+  var cached = cache.get(MONDAY_INTEGRAL_CACHE_KEY_);
+  var planes;
+  if (cached) { try { planes = JSON.parse(cached); } catch(e) { planes = null; } }
+  if (!planes) {
+    planes = fetchMondayIntegralPlanes_();
+    try { cache.put(MONDAY_INTEGRAL_CACHE_KEY_, JSON.stringify(planes), MONDAY_SUP_CACHE_SEC_); } catch(e) {}
+  }
+  planes.forEach(function(p) {
+    var est = getEstadoLocal_(p.planKey);
+    if (est) p.estado = est;
+  });
+  return planes;
+}
+
+function fetchMondayIntegralPlanes_() {
+  var board = fetchMondayBoard_(MONDAY_BOARD_INTEGRAL_, 100);
+  if (!board) return [];
+  var cols = board.columns || [];
+
+  function extractSuffix(title) {
+    var m = (title || '').match(/\(([^)]+)\)$/);
+    return m ? m[1].toLowerCase().trim() : '';
+  }
+
+  // Construir triplets dinámicamente desde columnas ¿Qué? (X)
+  var triplets = [];
+  cols.forEach(function(queCol) {
+    if (!queCol.title || queCol.title.indexOf('¿Qué?') !== 0) return;
+    var suffix  = extractSuffix(queCol.title);
+    var nombre  = queCol.title.replace(/^¿Qué\?\s*/, '').replace(/^\(/, '').replace(/\)$/, '').trim() || queCol.title;
+    var respId  = null, fechaId = null;
+    cols.forEach(function(c) {
+      if (!c.title) return;
+      var cs = extractSuffix(c.title);
+      if (cs !== suffix) return;
+      var ct = c.title.toLowerCase();
+      if (ct.indexOf('responsable') >= 0 || ct.indexOf('resposable') >= 0) respId = c.id;
+      if (c.type === 'date' && ct.indexOf('fecha') >= 0) fechaId = c.id;
+    });
+    triplets.push({ nombre: nombre, queId: queCol.id, respId: respId, fechaId: fechaId });
+  });
+
+  var idCliente    = null, idFecha = null, idSupervisor = null;
+  var movilCols    = [];
+  cols.forEach(function(c) {
+    if (c.title === 'Cliente')           idCliente    = c.id;
+    if (c.title === 'Fecha')             idFecha      = c.id;
+    if (c.title === 'Nombre Supervisor') idSupervisor = c.id;
+    if (c.title && c.title.indexOf('Móviles ') === 0) movilCols.push(c.id);
+  });
+
+  var planes = [];
+  (board.items_page.items || []).forEach(function(item) {
+    var cv = {};
+    (item.column_values || []).forEach(function(v){ cv[v.id] = v.text || ''; });
+    var cliente = idCliente ? cv[idCliente] : '';
+    var movil   = extractMovil_(cv, movilCols);
+    var fecha   = idFecha   ? cv[idFecha]   : '';
+
+    triplets.forEach(function(t) {
+      var qué  = cv[t.queId] || '';
+      var resp = t.respId ? (cv[t.respId] || '') : '';
+      if (!qué && !resp) return;          // Integral: al menos uno
+      var planKey = 'i_' + item.id + '_' + t.queId;
+      planes.push({
+        id:          item.id + '_' + t.queId,
+        planKey:     planKey,
+        source:      'integral',
+        name:        t.nombre,
+        accion:      'Supervisión Integral',
+        cliente:     cliente,
+        movil:       movil,
+        fecha:       fecha,
+        fechaLim:    t.fechaId ? cv[t.fechaId] : '',
+        estado:      'Pendiente',
+        descripcion: qué,
+        responsable: resp
+      });
+    });
+  });
+
+  planes.sort(function(a,b){ return (b.fecha||'').localeCompare(a.fecha||''); });
+  return planes;
+}
+
+// ── Planes board filtrado: solo Inicio/Fin de Mes y Inicio/Término de Ruta ──
+function readMondayChecklists_() {
+  var cache  = CacheService.getScriptCache();
+  var cached = cache.get(MONDAY_PLANES_CACHE_KEY_);
+  var result;
+  if (cached) { try { result = JSON.parse(cached); } catch(e) { result = null; } }
+  if (!result) {
+    result = fetchMondayChecklistsRaw_();
+    try { cache.put(MONDAY_PLANES_CACHE_KEY_, JSON.stringify(result), MONDAY_PLANES_CACHE_SEC_); } catch(e) {}
+  }
+  return result;
+}
+
+function fetchMondayChecklistsRaw_() {
+  var token = PropertiesService.getScriptProperties().getProperty('MONDAY_TOKEN');
+  if (!token) return { planes: [], colEstadoId: null };
+  var ob    = 'query_params: {order_by: [{column_id: "__last_updated__", direction: desc}]}';
+  var query = '{ boards(ids: [' + MONDAY_BOARD_PLANES_ + ']) { columns { id title } items_page(limit: 500, ' + ob + ') { items { id name column_values { id text } } } } }';
+  var resp;
+  try {
+    resp = UrlFetchApp.fetch(MONDAY_API_URL_, {
+      method: 'POST',
+      headers: { Authorization: token, 'Content-Type': 'application/json', 'API-Version': '2024-01' },
+      payload: JSON.stringify({ query: query }),
+      muteHttpExceptions: true
+    });
+  } catch(e) { return { planes: [], colEstadoId: null }; }
+  if (resp.getResponseCode() !== 200) return { planes: [], colEstadoId: null };
+  var raw; try { raw = JSON.parse(resp.getContentText()); } catch(e) { return { planes: [], colEstadoId: null }; }
+  if (!raw.data || !raw.data.boards || !raw.data.boards[0]) return { planes: [], colEstadoId: null };
+
+  var board = raw.data.boards[0];
+  var cols  = board.columns || [];
+
+  function colId(titles) {
+    if (!Array.isArray(titles)) titles = [titles];
+    for (var i = 0; i < titles.length; i++) {
+      var c = cols.filter(function(x){ return x.title === titles[i]; })[0];
+      if (c) return c.id;
+    }
+    return null;
+  }
+
+  var idCliente    = colId(['Cliente']);
+  var idFecha      = colId(['Fecha de Supervisión','Fecha Supervisión','Fecha']);
+  var idFechaLim   = colId(['Fecha límite','Fecha Límite','Límite']);
+  var idEstado     = colId(['Estado','Status','Estatus']);
+  var idDescr      = colId(['¿Qué?','Qué','Detalle']);
+  var idAccion     = colId(['Checklist original','Checklist','Origen']);
+  var idResponsable= colId(['Responsable','Encargado','Supervisor Original','Supervisor']);
+  var idMovilDir   = colId(['Móvil','Nombre Móvil','Movil']);
+  var movilCols    = cols.filter(function(c){ return c.title && c.title.indexOf('Móviles ') === 0; }).map(function(c){ return c.id; });
+
+  // Palabras clave para filtrar solo checklists de Ruta/Mes
+  var KEYWORDS = ['inicio de ruta','inicio ruta','término de ruta','termino de ruta','inicio de mes','fin de mes','checklist inicio','checklist fin'];
+
+  var planes = [];
+  (board.items_page.items || []).forEach(function(item) {
+    var cv = {};
+    (item.column_values || []).forEach(function(v){ cv[v.id] = v.text || ''; });
+    var accion = idAccion ? (cv[idAccion] || '').toLowerCase() : '';
+
+    // Filtrar: solo planes de checklists de ruta/mes
+    var esChecklist = KEYWORDS.some(function(k){ return accion.indexOf(k) >= 0; });
+    if (!esChecklist) return;
+
+    var movil = '';
+    if (idMovilDir && cv[idMovilDir]) { movil = cv[idMovilDir]; }
+    if (!movil) { movil = extractMovil_(cv, movilCols); }
+
+    var respRaw = idResponsable ? (cv[idResponsable] || '') : '';
+    var responsable = respRaw.replace(/\s*;\s*/g, ', ').replace(/,\s*$/, '').trim();
+
+    planes.push({
+      id:          item.id,
+      planKey:     'c_' + item.id,
+      source:      'checklist',
+      name:        item.name || '',
+      accion:      idAccion ? cv[idAccion] : '',
+      cliente:     idCliente ? cv[idCliente] : '',
+      movil:       movil,
+      fecha:       idFecha    ? cv[idFecha]    : '',
+      fechaLim:    idFechaLim ? cv[idFechaLim] : '',
+      estado:      idEstado   ? cv[idEstado]   : '',
+      descripcion: idDescr    ? cv[idDescr]    : '',
+      responsable: responsable
+    });
+  });
+
+  planes.sort(function(a,b){ return (b.fecha||'').localeCompare(a.fecha||''); });
+  return { planes: planes, colEstadoId: idEstado };
+}
+
 function getTabSupervisiones(params) {
   var token = (params && params.token) || null;
   var usuario = verificarToken_(token);
@@ -761,7 +1133,14 @@ function getTabSupervisiones(params) {
   return {
     supervisiones:       safeRead(function() { return getCached('supervisiones', function() { return readSupervisiones(flotaInfo); }, CACHE_DURATION_SECONDS); }),
     mondaySupervisiones: safeRead(function() { return readMondayConsolidado_(); }),
-    mondayPlanes:        safeRead(function() { return readMondayPlanesAccion_(); }) || { planes: [], colEstadoId: null },
+    mondayPlanes: (function() {
+      var chk      = safeRead(function() { return readMondayChecklists_(); }) || { planes: [], colEstadoId: null };
+      var rapida   = safeRead(function() { return readMondayRapida_(); })    || [];
+      var integral = safeRead(function() { return readMondayIntegral_(); })  || [];
+      var all      = rapida.concat(integral).concat(chk.planes);
+      all.sort(function(a,b){ return (b.fecha||'').localeCompare(a.fecha||''); });
+      return { planes: all, colEstadoId: chk.colEstadoId };
+    })(),
     lastUpdated: new Date().toISOString()
   };
 }

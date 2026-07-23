@@ -2732,7 +2732,7 @@ function renderMondayPlanes() {
     });
   }
 
-  if (hint && colEstadoId) hint.style.display = '';
+  if (hint) hint.style.display = '';
 
   function rebuild() {
     var filtEst   = (document.getElementById('mdPlanesFiltEstado')  || {}).value || '';
@@ -2766,8 +2766,9 @@ function renderMondayPlanes() {
       if (esDefault) hayDefault = true;
       // Responsable: si vacío, usar jefe del móvil
       var responsable = p.responsable || mdJefeMovil(p.cliente, p.movil) || '—';
-      var btnAttr = colEstadoId
-        ? 'onclick="updatePlanEstado(this,\'' + p.id + '\',\'' + colEstadoId + '\',\'' + mdNextEstado(p.estado) + '\')"'
+      var canUpdate = (p.source === 'checklist' && !!colEstadoId) || p.source === 'rapida' || p.source === 'integral';
+      var btnAttr = canUpdate
+        ? 'onclick="updatePlanEstado(this,\'' + escapeHtml(p.planKey||p.id) + '\',\'' + escapeHtml(colEstadoId||'') + '\',\'' + escapeHtml(p.source||'checklist') + '\',\'' + escapeHtml(mdNextEstado(p.estado)) + '\')"'
         : 'disabled title="Sin columna Estado"';
       html += '<tr class="md-su-row" id="mdPlanRow' + i + '" data-plan-id="' + escapeHtml(p.id) + '" onclick="toggleMdPlanRow(' + i + ')" style="cursor:pointer">';
       html += '<td onclick="event.stopPropagation()"><button class="md-estado-btn ' + eClass + '" ' + btnAttr + '>' + escapeHtml(eLabel) + '</button></td>';
@@ -2788,7 +2789,7 @@ function renderMondayPlanes() {
     });
     tbody.innerHTML = html;
     var legend = document.getElementById('mdPlanesHint');
-    if (legend) legend.textContent = (hayDefault ? '* Fecha estimada (+1 mes desde supervisión). ' : '') + (colEstadoId ? 'Haz clic en el estado para actualizarlo en Monday.' : '');
+    if (legend) legend.textContent = (hayDefault ? '* Fecha estimada (+1 mes desde supervisión). ' : '') + 'Haz clic en el estado para actualizarlo.';
   }
 
   ['mdPlanesFiltEstado','mdPlanesFiltCliente','mdPlanesFiltTexto'].forEach(function(id) {
@@ -2799,31 +2800,46 @@ function renderMondayPlanes() {
   rebuild();
 }
 
-function updatePlanEstado(btn, itemId, colId, newEstado) {
+function updatePlanEstado(btn, planKey, colEstadoId, source, newEstado) {
   if (!btn || btn.classList.contains('saving')) return;
   btn.classList.add('saving');
   var oldText = btn.textContent;
 
   function doUpdate() {
-    if (IS_GAS) {
-      google.script.run
-        .withSuccessHandler(function(res) { onDone(res); })
-        .withFailureHandler(function(err) { onErr(err); })
-        .updateMondayPlanEstadoGas({ token: sessionToken, itemId: itemId, colId: colId, value: newEstado });
+    if (source === 'checklist') {
+      // Actualizar en Monday via mutation
+      var itemId = planKey.replace(/^c_/, '');
+      if (IS_GAS) {
+        google.script.run
+          .withSuccessHandler(function(res) { onDone(res, planKey); })
+          .withFailureHandler(function(err) { onErr(err); })
+          .updateMondayPlanEstadoGas({ token: sessionToken, itemId: itemId, colId: colEstadoId, value: newEstado });
+      } else {
+        authFetch('monday_update_plan', { token: sessionToken, itemId: itemId, colId: colEstadoId, value: newEstado })
+          .then(function(res) { onDone(res, planKey); })
+          .catch(function(err) { onErr(err); });
+      }
     } else {
-      authFetch('monday_update_plan', { token: sessionToken, itemId: itemId, colId: colId, value: newEstado })
-        .then(function(res) { onDone(res); })
-        .catch(function(err) { onErr(err); });
+      // Rápida / Integral: guardar en PropertiesService
+      if (IS_GAS) {
+        google.script.run
+          .withSuccessHandler(function(res) { onDone(res, planKey); })
+          .withFailureHandler(function(err) { onErr(err); })
+          .updatePlanEstadoLocalGas({ token: sessionToken, planKey: planKey, value: newEstado });
+      } else {
+        authFetch('monday_update_plan_local', { token: sessionToken, planKey: planKey, value: newEstado })
+          .then(function(res) { onDone(res, planKey); })
+          .catch(function(err) { onErr(err); });
+      }
     }
   }
 
-  function onDone(res) {
+  function onDone(res, pk) {
     btn.classList.remove('saving');
     if (res && res.ok) {
-      // Actualiza el estado en allData en memoria
       var planes = (allData.mondayPlanes && allData.mondayPlanes.planes) || [];
       for (var i = 0; i < planes.length; i++) {
-        if (planes[i].id === itemId) { planes[i].estado = newEstado; break; }
+        if ((planes[i].planKey || ('c_' + planes[i].id)) === pk) { planes[i].estado = newEstado; break; }
       }
       renderMondayPlanes();
     } else {
