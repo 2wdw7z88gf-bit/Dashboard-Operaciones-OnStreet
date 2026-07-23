@@ -514,20 +514,33 @@ tr:hover td{background:var(--surface-2)}
 .md-estado-btn.listo{background:#d1fae5;color:#065f46}
 .md-estado-btn.otro{background:var(--surface-2);color:var(--text-2)}
 .md-estado-btn.saving{opacity:0.5;cursor:default}
+/* Select desplegable de estado */
+.md-estado-select{font-size:11px;font-weight:600;padding:3px 8px;border-radius:10px;border:none;cursor:pointer;letter-spacing:0.3px;white-space:nowrap;appearance:none;-webkit-appearance:none;outline:none;transition:opacity .15s}
+.md-estado-select:hover{opacity:0.8}
+.md-estado-select:disabled{opacity:0.5;cursor:default}
+.md-estado-select.pendiente{background:#fef3c7;color:#92400e}
+.md-estado-select.en-proceso{background:#dbeafe;color:#1e40af}
+.md-estado-select.listo{background:#d1fae5;color:#065f46}
+.md-estado-select.no-completado{background:#fee2e2;color:#991b1b}
+.md-estado-select.desestimado{background:var(--surface-2);color:var(--text-2)}
+.md-estado-select.otro{background:var(--surface-2);color:var(--text-2)}
 @media(prefers-color-scheme:dark){
   .md-tipo-chip.rapida{background:#064e3b;color:#6ee7b7}
-  .md-estado-btn.pendiente{background:#78350f;color:#fde68a}
-  .md-estado-btn.en-proceso{background:#1e3a8a;color:#93c5fd}
-  .md-estado-btn.listo{background:#064e3b;color:#6ee7b7}
+  .md-estado-btn.pendiente,.md-estado-select.pendiente{background:#78350f;color:#fde68a}
+  .md-estado-btn.en-proceso,.md-estado-select.en-proceso{background:#1e3a8a;color:#93c5fd}
+  .md-estado-btn.listo,.md-estado-select.listo{background:#064e3b;color:#6ee7b7}
+  .md-estado-select.no-completado{background:#7f1d1d;color:#fca5a5}
 }
 :root[data-theme="dark"] .md-tipo-chip.rapida{background:#064e3b;color:#6ee7b7}
-:root[data-theme="dark"] .md-estado-btn.pendiente{background:#78350f;color:#fde68a}
-:root[data-theme="dark"] .md-estado-btn.en-proceso{background:#1e3a8a;color:#93c5fd}
-:root[data-theme="dark"] .md-estado-btn.listo{background:#064e3b;color:#6ee7b7}
+:root[data-theme="dark"] .md-estado-btn.pendiente,:root[data-theme="dark"] .md-estado-select.pendiente{background:#78350f;color:#fde68a}
+:root[data-theme="dark"] .md-estado-btn.en-proceso,:root[data-theme="dark"] .md-estado-select.en-proceso{background:#1e3a8a;color:#93c5fd}
+:root[data-theme="dark"] .md-estado-btn.listo,:root[data-theme="dark"] .md-estado-select.listo{background:#064e3b;color:#6ee7b7}
+:root[data-theme="dark"] .md-estado-select.no-completado{background:#7f1d1d;color:#fca5a5}
 :root[data-theme="light"] .md-tipo-chip.rapida{background:#d1fae5;color:#065f46}
-:root[data-theme="light"] .md-estado-btn.pendiente{background:#fef3c7;color:#92400e}
-:root[data-theme="light"] .md-estado-btn.en-proceso{background:#dbeafe;color:#1e40af}
-:root[data-theme="light"] .md-estado-btn.listo{background:#d1fae5;color:#065f46}
+:root[data-theme="light"] .md-estado-btn.pendiente,:root[data-theme="light"] .md-estado-select.pendiente{background:#fef3c7;color:#92400e}
+:root[data-theme="light"] .md-estado-btn.en-proceso,:root[data-theme="light"] .md-estado-select.en-proceso{background:#dbeafe;color:#1e40af}
+:root[data-theme="light"] .md-estado-btn.listo,:root[data-theme="light"] .md-estado-select.listo{background:#d1fae5;color:#065f46}
+:root[data-theme="light"] .md-estado-select.no-completado{background:#fee2e2;color:#991b1b}
 
 </style>
 <script>
@@ -1012,8 +1025,10 @@ tr:hover td{background:var(--surface-2)}
           <select id="mdPlanesFiltEstado" style="min-width:140px">
             <option value="">Todos los estados</option>
             <option value="Pendiente">Pendiente</option>
-            <option value="En proceso">En proceso</option>
+            <option value="En Proceso">En Proceso</option>
             <option value="Listo">Listo</option>
+            <option value="No Completado">No Completado</option>
+            <option value="Desestimado">Desestimado</option>
           </select>
           <select id="mdPlanesFiltCliente" style="min-width:180px"><option value="">Todos los clientes</option></select>
           <input id="mdPlanesFiltTexto" placeholder="Buscar..." style="min-width:180px" />
@@ -2651,6 +2666,8 @@ function mdEstadoClass(estado) {
   var e = (estado || '').toLowerCase();
   if (e.indexOf('listo') >= 0 || e.indexOf('done') >= 0) return 'listo';
   if (e.indexOf('proceso') >= 0 || e.indexOf('progress') >= 0 || e.indexOf('curso') >= 0) return 'en-proceso';
+  if (e.indexOf('no complet') >= 0) return 'no-completado';
+  if (e.indexOf('desestim') >= 0) return 'desestimado';
   if (e.indexOf('pendiente') >= 0 || e === '' || e === '-') return 'pendiente';
   return 'otro';
 }
@@ -2757,7 +2774,6 @@ function renderMondayPlanes() {
     var hayDefault = false;
     rows.forEach(function(p, i) {
       var eClass   = mdEstadoClass(p.estado);
-      var eLabel   = p.estado || 'Pendiente';
       var fechaSup = (p.fecha    || '').substring(0, 10).split('-').reverse().join('/') || '—';
       // Fecha límite: si vacía, +1 mes desde Fecha Sup
       var fechaLimRaw = p.fechaLim || mdAddOneMonth(p.fecha);
@@ -2766,12 +2782,16 @@ function renderMondayPlanes() {
       if (esDefault) hayDefault = true;
       // Responsable: si vacío, usar jefe del móvil
       var responsable = p.responsable || mdJefeMovil(p.cliente, p.movil) || '—';
-      var canUpdate = (p.source === 'checklist' && !!colEstadoId) || p.source === 'rapida' || p.source === 'integral';
-      var btnAttr = canUpdate
-        ? 'onclick="updatePlanEstado(this,\'' + escapeHtml(p.planKey||p.id) + '\',\'' + escapeHtml(colEstadoId||'') + '\',\'' + escapeHtml(p.source||'checklist') + '\',\'' + escapeHtml(mdNextEstado(p.estado)) + '\')"'
-        : 'disabled title="Sin columna Estado"';
+      var planKey = p.planKey || ('c_' + p.id);
+      var curEstado = p.estado || 'Pendiente';
+      var ESTADOS = ['Pendiente','En Proceso','Listo','No Completado','Desestimado'];
+      var selHtml = '<select class="md-estado-select ' + eClass + '" onchange="updatePlanEstado(this,\'' + escapeHtml(planKey) + '\',this.value)">';
+      ESTADOS.forEach(function(opt) {
+        selHtml += '<option value="' + opt + '"' + (curEstado === opt ? ' selected' : '') + '>' + opt + '</option>';
+      });
+      selHtml += '</select>';
       html += '<tr class="md-su-row" id="mdPlanRow' + i + '" data-plan-id="' + escapeHtml(p.id) + '" onclick="toggleMdPlanRow(' + i + ')" style="cursor:pointer">';
-      html += '<td onclick="event.stopPropagation()"><button class="md-estado-btn ' + eClass + '" ' + btnAttr + '>' + escapeHtml(eLabel) + '</button></td>';
+      html += '<td onclick="event.stopPropagation()">' + selHtml + '</td>';
       html += '<td style="font-size:11px;color:var(--text-2)">' + escapeHtml(p.accion || '—') + '</td>';
       html += '<td><button class="md-expand-btn" tabindex="-1" style="float:left;margin-right:6px">&#9660;</button>' + escapeHtml(p.name || '—') + '</td>';
       html += '<td>' + escapeHtml(p.cliente     || '—') + '</td>';
@@ -2800,61 +2820,41 @@ function renderMondayPlanes() {
   rebuild();
 }
 
-function updatePlanEstado(btn, planKey, colEstadoId, source, newEstado) {
-  if (!btn || btn.classList.contains('saving')) return;
-  btn.classList.add('saving');
-  var oldText = btn.textContent;
+function updatePlanEstado(select, planKey, newEstado) {
+  if (!select || select.disabled) return;
+  select.disabled = true;
+  var prevClass = select.className;
 
-  function doUpdate() {
-    if (source === 'checklist') {
-      // Actualizar en Monday via mutation
-      var itemId = planKey.replace(/^c_/, '');
-      if (IS_GAS) {
-        google.script.run
-          .withSuccessHandler(function(res) { onDone(res, planKey); })
-          .withFailureHandler(function(err) { onErr(err); })
-          .updateMondayPlanEstadoGas({ token: sessionToken, itemId: itemId, colId: colEstadoId, value: newEstado });
-      } else {
-        authFetch('monday_update_plan', { token: sessionToken, itemId: itemId, colId: colEstadoId, value: newEstado })
-          .then(function(res) { onDone(res, planKey); })
-          .catch(function(err) { onErr(err); });
-      }
-    } else {
-      // Rápida / Integral: guardar en PropertiesService
-      if (IS_GAS) {
-        google.script.run
-          .withSuccessHandler(function(res) { onDone(res, planKey); })
-          .withFailureHandler(function(err) { onErr(err); })
-          .updatePlanEstadoLocalGas({ token: sessionToken, planKey: planKey, value: newEstado });
-      } else {
-        authFetch('monday_update_plan_local', { token: sessionToken, planKey: planKey, value: newEstado })
-          .then(function(res) { onDone(res, planKey); })
-          .catch(function(err) { onErr(err); });
-      }
-    }
-  }
-
-  function onDone(res, pk) {
-    btn.classList.remove('saving');
+  function onDone(res) {
+    select.disabled = false;
     if (res && res.ok) {
       var planes = (allData.mondayPlanes && allData.mondayPlanes.planes) || [];
       for (var i = 0; i < planes.length; i++) {
-        if ((planes[i].planKey || ('c_' + planes[i].id)) === pk) { planes[i].estado = newEstado; break; }
+        var pk = planes[i].planKey || ('c_' + planes[i].id);
+        if (pk === planKey) { planes[i].estado = newEstado; break; }
       }
-      renderMondayPlanes();
+      select.className = 'md-estado-select ' + mdEstadoClass(newEstado);
     } else {
-      btn.textContent = oldText;
-      alert('Error al actualizar estado: ' + (res && res.error ? res.error : 'Sin respuesta'));
+      alert('Error al guardar estado: ' + (res && res.error ? res.error : 'Sin respuesta'));
     }
   }
 
   function onErr(err) {
-    btn.classList.remove('saving');
-    btn.textContent = oldText;
-    console.error('[Monday] updatePlanEstado error:', err);
+    select.disabled = false;
+    select.className = prevClass;
+    console.error('[Planes] updatePlanEstado error:', err);
   }
 
-  doUpdate();
+  if (IS_GAS) {
+    google.script.run
+      .withSuccessHandler(onDone)
+      .withFailureHandler(onErr)
+      .updatePlanEstadoLocalGas({ token: sessionToken, planKey: planKey, value: newEstado });
+  } else {
+    authFetch('monday_update_plan_local', { token: sessionToken, planKey: planKey, value: newEstado })
+      .then(onDone)
+      .catch(onErr);
+  }
 }
 
 // ── KILÓMETROS ─────────────────────────────────────────────────────────────

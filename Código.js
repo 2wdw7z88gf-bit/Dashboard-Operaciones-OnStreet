@@ -1040,6 +1040,11 @@ function readMondayChecklists_() {
     result = fetchMondayChecklistsRaw_();
     try { cache.put(MONDAY_PLANES_CACHE_KEY_, JSON.stringify(result), MONDAY_PLANES_CACHE_SEC_); } catch(e) {}
   }
+  // Merge estados locales: override Monday estado si el usuario guardó uno localmente
+  (result.planes || []).forEach(function(p) {
+    var est = getEstadoLocal_(p.planKey);
+    if (est) p.estado = est;
+  });
   return result;
 }
 
