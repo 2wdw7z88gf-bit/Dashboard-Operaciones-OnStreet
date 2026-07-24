@@ -32,7 +32,7 @@ function doGet(e) {
   // Manifest para PWA / Add to Home Screen
   if (source === 'manifest') {
     const url = ScriptApp.getService().getUrl();
-    const iconSvg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='114' fill='%23185FA5'/%3E%3Ctext x='256' y='338' font-family='system-ui%2C-apple-system%2Csans-serif' font-size='224' font-weight='700' fill='white' text-anchor='middle'%3EOS%3C/text%3E%3C/svg%3E";
+    const iconSvg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='114' fill='%23E8521A'/%3E%3Ctext x='256' y='338' font-family='system-ui%2C-apple-system%2Csans-serif' font-size='224' font-weight='700' fill='white' text-anchor='middle'%3EOS%3C/text%3E%3C/svg%3E";
     const manifest = {
       name: 'Dashboard On Street',
       short_name: 'Dashboard OS',
@@ -43,7 +43,7 @@ function doGet(e) {
       display: 'standalone',
       orientation: 'portrait-primary',
       background_color: '#f7f6f2',
-      theme_color: '#185FA5',
+      theme_color: '#E8521A',
       icons: [
         { src: iconSvg, sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
         { src: iconSvg, sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' }
