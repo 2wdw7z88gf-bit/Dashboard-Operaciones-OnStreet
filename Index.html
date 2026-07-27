@@ -2926,44 +2926,70 @@ function initNotifications() {
   });
   urgent.sort(function(a, b) { return (b.fechaLim||'').localeCompare(a.fechaLim||''); });
 
+  // Planes NUEVOS: asignados hace poco (usamos la fecha de supervisión como proxy de creación)
+  var d3      = new Date(); d3.setDate(d3.getDate() - 3);
+  var since3d = d3.toISOString().substring(0, 10);
+  var urgentIds = {}; urgent.forEach(function(p){ urgentIds[p.id] = true; });
+  var nuevos = planes.filter(function(p) {
+    if (urgentIds[p.id]) return false; // ya está en vencidos, no duplicar
+    if (!p.fecha || p.fecha.substring(0,10) < since3d) return false;
+    if (ACTIVE.indexOf(p.estado || 'Pendiente') < 0) return false;
+    if (!esAdmin && meNombre) {
+      var resp2 = (p.responsable || '').toLowerCase();
+      if (!resp2 || resp2.indexOf(meNombre) < 0) return false;
+    }
+    return true;
+  });
+  nuevos.sort(function(a, b) { return (b.fecha||'').localeCompare(a.fecha||''); });
+
+  var total = urgent.length + nuevos.length;
+
   // Badge
   var badge = document.getElementById('notifBadge');
   if (badge) {
-    badge.textContent = urgent.length > 99 ? '99+' : urgent.length;
-    badge.style.display = urgent.length ? '' : 'none';
+    badge.textContent = total > 99 ? '99+' : total;
+    badge.style.display = total ? '' : 'none';
+  }
+
+  function renderPlanItem(p, tagClass, tagIcon, tagTxt) {
+    var meta = [p.cliente, p.movil, p.responsable].filter(Boolean).join(' · ');
+    var html = '<div class="notif-item" onclick="goToMdPlan(\'' + escapeHtml(p.planKey || ('c_' + p.id)) + '\',\'' + escapeHtml(p.id) + '\')">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center">';
+    html += '<span class="notif-item-tag ' + tagClass + '">' + tagIcon + escapeHtml(tagTxt) + '</span>';
+    html += '<span style="font-size:10px;color:var(--text-2)">' + escapeHtml(p.accion || '') + '</span>';
+    html += '</div>';
+    html += '<div class="notif-item-name">' + escapeHtml(p.name || '—') + '</div>';
+    if (meta) html += '<div class="notif-item-meta">' + escapeHtml(meta) + '</div>';
+    html += '</div>';
+    return html;
   }
 
   // Panel
   var content = document.getElementById('notifPanelContent');
   if (content) {
-    if (!urgent.length) {
-      content.innerHTML = '<div style="text-align:center;color:var(--text-2);padding:28px;font-size:13px">Sin planes vencidos</div>';
+    if (!total) {
+      content.innerHTML = '<div style="text-align:center;color:var(--text-2);padding:28px;font-size:13px">Sin novedades</div>';
     } else {
-      var html = '<div style="padding:8px 16px;font-size:11px;color:var(--text-2);font-weight:600;text-transform:uppercase;letter-spacing:.5px">' + urgent.length + ' plan' + (urgent.length === 1 ? '' : 'es') + ' vencido' + (urgent.length === 1 ? '' : 's') + '</div>';
-      urgent.forEach(function(p) {
-        var isOv    = p.fechaLim.substring(0,10) < today;
-        var fechaFmt= p.fechaLim.substring(0,10).split('-').reverse().join('/');
-        var tagClass= isOv ? 'vencido' : 'proxima';
-        var tagIcon = isOv ? ICONS.alertTri : ICONS.clock;
-        var tagTxt  = isOv ? ' VENCIDO · ' + fechaFmt : ' Vence ' + fechaFmt;
-        var meta    = [p.cliente, p.movil, p.responsable].filter(Boolean).join(' · ');
-        html += '<div class="notif-item" onclick="goToMdPlan(\'' + escapeHtml(p.planKey || ('c_' + p.id)) + '\',\'' + escapeHtml(p.id) + '\')">';
-        html += '<div style="display:flex;justify-content:space-between;align-items:center">';
-        html += '<span class="notif-item-tag ' + tagClass + '">' + tagIcon + escapeHtml(tagTxt) + '</span>';
-        html += '<span style="font-size:10px;color:var(--text-2)">' + escapeHtml(p.accion || '') + '</span>';
-        html += '</div>';
-        html += '<div class="notif-item-name">' + escapeHtml(p.name || '—') + '</div>';
-        if (meta) html += '<div class="notif-item-meta">' + escapeHtml(meta) + '</div>';
-        html += '</div>';
-      });
+      var html = '';
+      if (nuevos.length) {
+        html += '<div style="padding:8px 16px;font-size:11px;color:var(--text-2);font-weight:600;text-transform:uppercase;letter-spacing:.5px">' + nuevos.length + ' plan' + (nuevos.length === 1 ? '' : 'es') + ' nuevo' + (nuevos.length === 1 ? '' : 's') + ' asignado' + (nuevos.length === 1 ? '' : 's') + '</div>';
+        nuevos.forEach(function(p) { html += renderPlanItem(p, 'proxima', ICONS.clock, ' NUEVO · ' + p.fecha.substring(0,10).split('-').reverse().join('/')); });
+      }
+      if (urgent.length) {
+        html += '<div style="padding:8px 16px;font-size:11px;color:var(--text-2);font-weight:600;text-transform:uppercase;letter-spacing:.5px">' + urgent.length + ' plan' + (urgent.length === 1 ? '' : 'es') + ' vencido' + (urgent.length === 1 ? '' : 's') + '</div>';
+        urgent.forEach(function(p) {
+          var fechaFmt = p.fechaLim.substring(0,10).split('-').reverse().join('/');
+          html += renderPlanItem(p, 'vencido', ICONS.alertTri, ' VENCIDO · ' + fechaFmt);
+        });
+      }
       content.innerHTML = html;
     }
   }
 
   // Notificación del navegador (solo la primera vez por sesión)
-  if (!window._notifShown && urgent.length) {
+  if (!window._notifShown && total) {
     window._notifShown = true;
-    _showBrowserNotif(urgent, today);
+    _showBrowserNotif(urgent, nuevos, today);
   }
 }
 
@@ -3041,11 +3067,13 @@ function requestBrowserNotif() {
   }
 }
 
-function _showBrowserNotif(urgent, today) {
-  if (!('Notification' in window) || Notification.permission !== 'granted' || !urgent.length) return;
+function _showBrowserNotif(urgent, nuevos, today) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (!urgent.length && !nuevos.length) return;
   var ov   = urgent.filter(function(p){ return p.fechaLim.substring(0,10) < today; }).length;
   var soon = urgent.length - ov;
   var parts = [];
+  if (nuevos.length) parts.push(nuevos.length + (nuevos.length === 1 ? ' plan de acción nuevo asignado' : ' planes de acción nuevos asignados'));
   if (ov)   parts.push(ov   + (ov   === 1 ? ' plan vencido' : ' planes vencidos'));
   if (soon) parts.push(soon + (soon === 1 ? ' vence esta semana' : ' vencen esta semana'));
   try {

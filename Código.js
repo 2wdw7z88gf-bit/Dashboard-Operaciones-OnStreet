@@ -223,6 +223,15 @@ function doGet(e) {
       const fechaFin    = String(e.parameter.fechaFin    || '');
       result = readPerdidaRutaData(cliente, fechaInicio, fechaFin);
 
+    } else if (source === 'notif_check_planes') {
+      const ncToken = params.token || null;
+      const ncUser  = verificarToken_(ncToken);
+      if (!ncUser || String(ncUser.rol || '').toLowerCase().indexOf('admin') < 0) {
+        result = { error: 'token_invalido' };
+      } else {
+        result = revisarYNotificarPlanesNuevos();
+      }
+
     } else if (source === 'monday_update_plan') {
       const upToken  = params.token || null;
       const upUser   = verificarToken_(upToken);
@@ -1129,6 +1138,145 @@ function fetchMondayChecklistsRaw_() {
 
   planes.sort(function(a,b){ return (b.fecha||'').localeCompare(a.fecha||''); });
   return { planes: planes, colEstadoId: idEstado };
+}
+
+// ============================================================================
+// NOTIFICACIONES: nuevo plan de acción asignado a un responsable
+// ============================================================================
+var NOTIF_RESPONSABLES_TAB   = 'Responsables';        // hoja: Nombre | Email
+var NOTIF_NOTIFICADOS_TAB    = 'PlanesNotificados';    // hoja: PlanId | Notificado el
+var NOTIF_SIN_EMAIL_TAB      = 'PlanesSinEmail';       // hoja: Notado el | PlanId | Responsable | Cliente | Móvil | Descripción
+var NOTIF_DASHBOARD_URL      = 'https://dashboard-operaciones-on-street.vercel.app';
+
+function getOrCreateSheet_(nombre, headers) {
+  var ss = SpreadsheetApp.openById(SHEETS.dashboardApi);
+  var sheet = ss.getSheetByName(nombre);
+  if (!sheet) {
+    sheet = ss.insertSheet(nombre);
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  }
+  return sheet;
+}
+
+// Nombre de responsable (normalizado) → email, desde la hoja "Responsables"
+function getResponsableEmailMap_() {
+  var sheet = getOrCreateSheet_(NOTIF_RESPONSABLES_TAB, ['Nombre', 'Email']);
+  var data  = sheet.getDataRange().getValues();
+  var map = {};
+  for (var i = 1; i < data.length; i++) {
+    var nombre = String(data[i][0] || '').trim();
+    var email  = String(data[i][1] || '').trim();
+    if (nombre && email) map[normalize_(nombre)] = email;
+  }
+  return map;
+}
+
+function getPlanesYaNotificados_() {
+  var sheet = getOrCreateSheet_(NOTIF_NOTIFICADOS_TAB, ['PlanId', 'Notificado el']);
+  var data  = sheet.getDataRange().getValues();
+  var set = {};
+  for (var i = 1; i < data.length; i++) { if (data[i][0]) set[String(data[i][0])] = true; }
+  return { sheet: sheet, set: set };
+}
+
+// Todas las fuentes de Planes de Acción, en una sola lista (mismo criterio que getTabSupervisiones)
+function obtenerTodosLosPlanes_() {
+  function safeRead(fn) { try { return fn(); } catch(e) { return null; } }
+  var chk      = safeRead(function() { return readMondayChecklists_(); }) || { planes: [] };
+  var rapida   = safeRead(function() { return readMondayRapida_(); })    || [];
+  var integral = safeRead(function() { return readMondayIntegral_(); })  || [];
+  return rapida.concat(integral).concat(chk.planes || []);
+}
+
+// Divide "Álvaro Arancibia, Ramón Vera" / "Álvaro Arancibia y Ramón Vera" en nombres individuales
+function splitResponsables_(responsable) {
+  return String(responsable || '')
+    .split(/,| y |&/i)
+    .map(function(s){ return s.trim(); })
+    .filter(Boolean);
+}
+
+function enviarEmailPlanNuevo_(email, nombreResp, plan) {
+  var fechaLimFmt = plan.fechaLim ? plan.fechaLim.substring(0, 10).split('-').reverse().join('/') : 'sin definir';
+  var meta = [plan.cliente, plan.movil].filter(Boolean).join(' · ');
+  MailApp.sendEmail({
+    to: email,
+    subject: 'Nuevo plan de acción asignado — ' + (plan.cliente || 'Dashboard On Street'),
+    htmlBody:
+      '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">' +
+      '<h2 style="color:#E84717;margin:0 0 16px">Dashboard On Street</h2>' +
+      '<p style="color:#333">Hola ' + nombreResp + ', te agregaron como responsable de un nuevo plan de acción:</p>' +
+      '<div style="background:#f7f6f2;border-radius:10px;padding:16px 18px;margin:16px 0">' +
+      (meta ? '<div style="font-size:12px;color:#888;margin-bottom:6px">' + meta + '</div>' : '') +
+      '<div style="font-size:15px;color:#1a1a1a;font-weight:600;margin-bottom:6px">' + (plan.descripcion || plan.name || '—') + '</div>' +
+      '<div style="font-size:13px;color:#5f5e5a">Fecha límite: <strong>' + fechaLimFmt + '</strong></div>' +
+      '</div>' +
+      '<p style="margin:24px 0"><a href="' + NOTIF_DASHBOARD_URL + '" style="background:#E84717;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block">Ver en el Dashboard</a></p>' +
+      '<p style="color:#999;font-size:12px">Dashboard On Street · notificación automática</p>' +
+      '</div>'
+  });
+}
+
+// Detecta planes de acción nuevos (no notificados aún) y avisa por email al/los responsable/s.
+// Pensada para correr con un trigger de tiempo (ver setupNotificacionesPlanesTrigger).
+function revisarYNotificarPlanesNuevos() {
+  var planes = obtenerTodosLosPlanes_();
+  var notif  = getPlanesYaNotificados_();
+  var nuevos = planes.filter(function(p) { return p.id && !notif.set[String(p.id)]; });
+  if (!nuevos.length) return { ok: true, nuevos: 0 };
+
+  var emailMap = getResponsableEmailMap_();
+  var ahora = new Date();
+  var sinEmailSheet = null;
+  var enviados = 0;
+
+  nuevos.forEach(function(p) {
+    var nombres = splitResponsables_(p.responsable);
+    var algunoEncontrado = false;
+    nombres.forEach(function(nombre) {
+      var email = emailMap[normalize_(nombre)];
+      if (email) {
+        try { enviarEmailPlanNuevo_(email, nombre, p); enviados++; algunoEncontrado = true; }
+        catch(e) { Logger.log('Error enviando email a ' + email + ': ' + e); }
+      }
+    });
+    if (!algunoEncontrado && nombres.length) {
+      if (!sinEmailSheet) sinEmailSheet = getOrCreateSheet_(NOTIF_SIN_EMAIL_TAB, ['Notado el', 'PlanId', 'Responsable', 'Cliente', 'Móvil', 'Descripción']);
+      sinEmailSheet.appendRow([ahora, p.id, p.responsable || '', p.cliente || '', p.movil || '', p.descripcion || p.name || '']);
+    }
+    notif.sheet.appendRow([p.id, ahora]);
+  });
+
+  return { ok: true, nuevos: nuevos.length, emailsEnviados: enviados };
+}
+
+// Ejecutar UNA VEZ desde el editor de Apps Script ANTES de instalar el trigger.
+// Marca todos los planes ya existentes como "ya notificados" (sin mandar mails)
+// para que revisarYNotificarPlanesNuevos() solo avise de los que se creen de ahora en más.
+function inicializarPlanesNotificados() {
+  var planes = obtenerTodosLosPlanes_();
+  var notif  = getPlanesYaNotificados_();
+  var ahora  = new Date();
+  var agregados = 0;
+  planes.forEach(function(p) {
+    if (p.id && !notif.set[String(p.id)]) {
+      notif.sheet.appendRow([p.id, ahora]);
+      notif.set[String(p.id)] = true;
+      agregados++;
+    }
+  });
+  Logger.log('Planes marcados como ya vistos (sin email): ' + agregados);
+  return { ok: true, marcados: agregados };
+}
+
+// Ejecutar UNA VEZ desde el editor de Apps Script para instalar el trigger periódico.
+function setupNotificacionesPlanesTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'revisarYNotificarPlanesNuevos') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('revisarYNotificarPlanesNuevos').timeBased().everyMinutes(15).create();
+  Logger.log('Trigger instalado: revisarYNotificarPlanesNuevos cada 15 min');
 }
 
 function getTabSupervisiones(params) {
