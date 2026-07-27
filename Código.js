@@ -356,7 +356,7 @@ var MONDAY_BOARD_RAPIDA_      = '5678712035';
 var MONDAY_BOARD_INTEGRAL_    = '5623247223';
 var MONDAY_BOARD_CONSOLIDADO_ = '5859805996';      // tablero consolidado Supervisiones
 var MONDAY_CONSOL_CACHE_KEY_  = 'monday_consol_v2';
-var MONDAY_CONSOL_CACHE_SEC_  = 3600;
+var MONDAY_CONSOL_CACHE_SEC_  = 600;
 var MONDAY_BOARD_PLANES_      = '8505742190';
 var MONDAY_PLANES_CACHE_KEY_  = 'monday_planes_v5';
 var MONDAY_PLANES_CACHE_SEC_  = 1800;
@@ -2840,6 +2840,8 @@ function clearCache() {
       dateSuffixes.forEach(s => { keys.push('os_' + v + '_' + k + '_' + s); });
     });
   });
+
+  keys.push(MONDAY_CACHE_KEY_, MONDAY_CONSOL_CACHE_KEY_, MONDAY_PLANES_CACHE_KEY_, MONDAY_RAPIDA_CACHE_KEY_, MONDAY_INTEGRAL_CACHE_KEY_);
 
   cache.removeAll(keys);
   Logger.log('Cache limpiado: ' + keys.length + ' keys');
