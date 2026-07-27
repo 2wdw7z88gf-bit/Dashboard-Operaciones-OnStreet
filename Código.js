@@ -1229,7 +1229,7 @@ function enviarEmailPlanNuevo_(email, nombreResp, plan) {
 // Ejecutar manualmente desde el editor para ver cómo llega el email de "plan nuevo" a tu correo.
 // Cambiá el email de destino en la línea de abajo si querés probar con otro.
 function probarEmailPlanNuevo() {
-  var destino = 'lucianaemilia2000@gmail.com';
+  var destino = 'lsepulveda@onstreet.cl';
   var planEjemplo = {
     cliente:     'La Araucana Móvil',
     movil:       'Agencia Coronel',
