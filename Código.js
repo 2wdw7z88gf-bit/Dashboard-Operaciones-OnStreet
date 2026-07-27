@@ -1180,6 +1180,14 @@ function getPlanesYaNotificados_() {
   return { sheet: sheet, set: set };
 }
 
+// Escribe muchas filas de una sola vez (evita cientos de appendRow() sueltos, que
+// satura el servicio Sheets y termina en "Exception: Service Spreadsheets failed").
+function appendRowsBatch_(sheet, rows) {
+  if (!rows.length) return;
+  var startRow = sheet.getLastRow() + 1;
+  sheet.getRange(startRow, 1, rows.length, rows[0].length).setValues(rows);
+}
+
 // Todas las fuentes de Planes de Acción, en una sola lista (mismo criterio que getTabSupervisiones)
 function obtenerTodosLosPlanes_() {
   function safeRead(fn) { try { return fn(); } catch(e) { return null; } }
@@ -1228,8 +1236,9 @@ function revisarYNotificarPlanesNuevos() {
 
   var emailMap = getResponsableEmailMap_();
   var ahora = new Date();
-  var sinEmailSheet = null;
   var enviados = 0;
+  var filasNotificados = [];
+  var filasSinEmail = [];
 
   nuevos.forEach(function(p) {
     var nombres = splitResponsables_(p.responsable);
@@ -1242,11 +1251,13 @@ function revisarYNotificarPlanesNuevos() {
       }
     });
     if (!algunoEncontrado && nombres.length) {
-      if (!sinEmailSheet) sinEmailSheet = getOrCreateSheet_(NOTIF_SIN_EMAIL_TAB, ['Notado el', 'PlanId', 'Responsable', 'Cliente', 'Móvil', 'Descripción']);
-      sinEmailSheet.appendRow([ahora, p.id, p.responsable || '', p.cliente || '', p.movil || '', p.descripcion || p.name || '']);
+      filasSinEmail.push([ahora, p.id, p.responsable || '', p.cliente || '', p.movil || '', p.descripcion || p.name || '']);
     }
-    notif.sheet.appendRow([p.id, ahora]);
+    filasNotificados.push([p.id, ahora]);
   });
+
+  if (filasSinEmail.length) appendRowsBatch_(getOrCreateSheet_(NOTIF_SIN_EMAIL_TAB, ['Notado el', 'PlanId', 'Responsable', 'Cliente', 'Móvil', 'Descripción']), filasSinEmail);
+  appendRowsBatch_(notif.sheet, filasNotificados);
 
   return { ok: true, nuevos: nuevos.length, emailsEnviados: enviados };
 }
@@ -1258,16 +1269,16 @@ function inicializarPlanesNotificados() {
   var planes = obtenerTodosLosPlanes_();
   var notif  = getPlanesYaNotificados_();
   var ahora  = new Date();
-  var agregados = 0;
+  var filas  = [];
   planes.forEach(function(p) {
     if (p.id && !notif.set[String(p.id)]) {
-      notif.sheet.appendRow([p.id, ahora]);
-      notif.set[String(p.id)] = true;
-      agregados++;
+      filas.push([p.id, ahora]);
+      notif.set[String(p.id)] = true; // evita duplicados si `planes` repite algún id
     }
   });
-  Logger.log('Planes marcados como ya vistos (sin email): ' + agregados);
-  return { ok: true, marcados: agregados };
+  appendRowsBatch_(notif.sheet, filas);
+  Logger.log('Planes marcados como ya vistos (sin email): ' + filas.length);
+  return { ok: true, marcados: filas.length };
 }
 
 // Ejecutar UNA VEZ desde el editor de Apps Script para instalar el trigger periódico.
