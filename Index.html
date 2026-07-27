@@ -1094,6 +1094,7 @@ tr:hover td{background:var(--surface-2)}
             <option value="Rápida">Rápida</option>
           </select>
           <select id="mdSuFiltCliente" style="min-width:180px"><option value="">Todos los clientes</option></select>
+          <select id="mdSuFiltMes" style="min-width:150px"><option value="">Todos los meses</option></select>
           <input id="mdSuFiltTexto" placeholder="Buscar móvil o supervisor..." style="min-width:200px" />
         </div>
         <div class="tabla-wrap" style="max-height:500px">
@@ -2717,14 +2718,31 @@ function renderMondaySupervisiones() {
     });
   }
 
+  // Poblar selector de meses (a partir de las fechas presentes)
+  var filtMes = document.getElementById('mdSuFiltMes');
+  if (filtMes && filtMes.options.length <= 1) {
+    var mesesSet = [];
+    lista.forEach(function(sv) {
+      var key = (sv.fecha || '').substring(0, 7); // YYYY-MM
+      if (key.length === 7 && mesesSet.indexOf(key) < 0) mesesSet.push(key);
+    });
+    mesesSet.sort().reverse().forEach(function(key) {
+      var y = key.substring(0, 4), m = parseInt(key.substring(5, 7), 10) - 1;
+      var label = (meses[m] ? meses[m].charAt(0).toUpperCase() + meses[m].slice(1) : key) + ' ' + y;
+      var o = document.createElement('option'); o.value = key; o.textContent = label; filtMes.appendChild(o);
+    });
+  }
+
   function rebuild() {
     var tipo    = (document.getElementById('mdSuFiltTipo')    || {}).value || '';
     var cliente = (document.getElementById('mdSuFiltCliente') || {}).value || '';
+    var mes     = (document.getElementById('mdSuFiltMes')     || {}).value || '';
     var texto   = ((document.getElementById('mdSuFiltTexto')  || {}).value || '').toLowerCase();
 
     var rows = lista.filter(function(sv) {
       if (tipo    && sv.tipo    !== tipo)                          return false;
       if (cliente && sv.cliente !== cliente)                       return false;
+      if (mes     && (sv.fecha || '').substring(0, 7) !== mes)      return false;
       if (texto   && (sv.movil  || '').toLowerCase().indexOf(texto) < 0
                   && (sv.supervisor || '').toLowerCase().indexOf(texto) < 0
                   && (sv.cliente   || '').toLowerCase().indexOf(texto) < 0) return false;
@@ -2785,7 +2803,7 @@ function renderMondaySupervisiones() {
   }
 
   // Filtros
-  ['mdSuFiltTipo','mdSuFiltCliente','mdSuFiltTexto'].forEach(function(id) {
+  ['mdSuFiltTipo','mdSuFiltCliente','mdSuFiltMes','mdSuFiltTexto'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) { el.oninput = rebuild; el.onchange = rebuild; }
   });
