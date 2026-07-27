@@ -1226,6 +1226,21 @@ function enviarEmailPlanNuevo_(email, nombreResp, plan) {
   });
 }
 
+// Ejecutar manualmente desde el editor para ver cómo llega el email de "plan nuevo" a tu correo.
+// Cambiá el email de destino en la línea de abajo si querés probar con otro.
+function probarEmailPlanNuevo() {
+  var destino = 'lucianaemilia2000@gmail.com';
+  var planEjemplo = {
+    cliente:     'La Araucana Móvil',
+    movil:       'Agencia Coronel',
+    descripcion: '(PRUEBA) Reparar puerta mampara porque no cierra',
+    name:        '(PRUEBA) Reparar puerta mampara porque no cierra',
+    fechaLim:    formatDateISO(new Date(new Date().getTime() + 5 * 24 * 60 * 60 * 1000))
+  };
+  enviarEmailPlanNuevo_(destino, 'Luciana', planEjemplo);
+  Logger.log('Email de prueba enviado a ' + destino);
+}
+
 // Detecta planes de acción nuevos (no notificados aún) y avisa por email al/los responsable/s.
 // Pensada para correr con un trigger de tiempo (ver setupNotificacionesPlanesTrigger).
 function revisarYNotificarPlanesNuevos() {
