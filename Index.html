@@ -1021,8 +1021,8 @@ tr:hover td{background:var(--surface-2)}
       <div id="biContingChart"></div>
     </div>
     <div class="panel">
-      <h2>Detalle de contingencias <span style="font-weight:400;font-size:12px;color:var(--text-2)">(desde ene. año pasado)</span></h2>
-      <div class="tabla-wrap" style="max-height:280px">
+      <h2>Detalle de contingencias <span style="font-weight:400;font-size:12px;color:var(--text-2)" id="biContingMesLabel">(este mes)</span></h2>
+      <div style="overflow-x:auto">
         <table>
           <thead><tr><th>Cliente</th><th>Sucursal</th><th>Fecha</th><th>Responsable</th><th>Detalle</th></tr></thead>
           <tbody id="biContingTableBody"></tbody>
@@ -2617,10 +2617,17 @@ function renderBiContingencias(){
   const wrap=document.getElementById('biContingChart');
   if(wrap) wrap.innerHTML=buildContingLineChart_(serie);
 
-  const filas=applyKamFilter(b.contingenciasDetalle||[]);
+  const hoy=new Date(),mesHoy=hoy.getMonth()+1,anioHoy=hoy.getFullYear();
+  const filas=applyKamFilter(b.contingenciasDetalle||[]).filter(e=>{
+    if(!e.fecha) return false;
+    const d=new Date(e.fecha+'T00:00:00');
+    return (d.getMonth()+1)===mesHoy && d.getFullYear()===anioHoy;
+  });
+  const mesLabel=document.getElementById('biContingMesLabel');
+  if(mesLabel) mesLabel.textContent='('+meses[mesHoy-1]+' '+anioHoy+')';
   const tbody=document.getElementById('biContingTableBody');
   if(!tbody) return;
-  if(!filas.length){tbody.innerHTML='<tr><td colspan="5" class="empty-msg">Sin contingencias en la ventana</td></tr>';return;}
+  if(!filas.length){tbody.innerHTML='<tr><td colspan="5" class="empty-msg">Sin contingencias este mes</td></tr>';return;}
   tbody.innerHTML=filas.map(e=>
     '<tr><td>'+escapeHtml(e.cliente||'—')+'</td><td>'+escapeHtml(e.sucursal||'—')+'</td><td style="white-space:nowrap">'+formatDate(e.fecha)+'</td><td>'+escapeHtml(e.responsable||'—')+'</td><td style="font-size:12.5px;color:var(--text-2)">'+escapeHtml(e.detalle||'—')+'</td></tr>'
   ).join('');
@@ -2629,7 +2636,7 @@ function renderBiContingencias(){
 function buildContingLineChart_(serie){
   if(!serie.length) return '<div class="empty" style="padding:40px 0">Sin datos de contingencias</div>';
 
-  const W=Math.max(560,serie.length*46),H=220,padL=32,padR=16,padT=24,padB=40;
+  const W=900,H=220,padL=32,padR=16,padT=24,padB=40;
   const innerW=W-padL-padR,innerH=H-padT-padB;
   const maxVal=Math.max(1,...serie.map(d=>d.total));
   const stepX=serie.length>1?innerW/(serie.length-1):0;
@@ -2684,7 +2691,7 @@ function buildContingLineChart_(serie){
   });
 
   svg+='</svg>';
-  return '<div style="overflow-x:auto">'+svg+'</div>';
+  return svg;
 }
 
 // ── SUPERVISIONES ──────────────────────────────────────────────────────────
