@@ -2612,12 +2612,11 @@ function readBitacora(fechaFinParam) {
   const idx = {};
   headers.forEach((h, i) => { idx[String(h).trim()] = i; });
 
-  // Ventana: 12 meses terminados en fechaFinParam (o hoy)
+  // Ventana: fija desde el 1 de enero de 2025 hasta fechaFinParam (o hoy)
   const fechaFin = fechaFinParam ? parseFlexibleDate(fechaFinParam) : new Date();
   if (!fechaFin || isNaN(fechaFin.getTime())) throw new Error('Fecha inválida en readBitacora: ' + fechaFinParam);
   fechaFin.setHours(23, 59, 59, 999);
-  const cutoff = new Date(fechaFin);
-  cutoff.setMonth(cutoff.getMonth() - BITACORA_MONTHS_BACK);
+  const cutoff = new Date(2025, 0, 1);
   cutoff.setHours(0, 0, 0, 0);
 
   // Ventana ampliada para Contingencias: desde el 1 de enero del año pasado hasta fechaFin

@@ -995,25 +995,10 @@ tr:hover td{background:var(--surface-2)}
   <!-- ============= TAB: BITÁCORA ============= -->
   <div class="tab-content" id="tab-bitacora">
     <div class="kpi-grid">
-      <div class="kpi info"><div class="kpi-label">Eventos en ventana</div><div class="kpi-val" id="biTotal">—</div><div class="kpi-sub" id="biTotalSub">últimos 12 meses</div></div>
+      <div class="kpi info"><div class="kpi-label">Eventos en ventana</div><div class="kpi-val" id="biTotal">—</div><div class="kpi-sub" id="biTotalSub">—</div></div>
       <div class="kpi ok"><div class="kpi-label">Este mes</div><div class="kpi-val" id="biMes">—</div><div class="kpi-sub" id="biMesSub">—</div></div>
       <div class="kpi warn"><div class="kpi-label">Atrasos / Contingencias</div><div class="kpi-val" id="biCrit">—</div><div class="kpi-sub">en ventana</div></div>
       <div class="kpi danger"><div class="kpi-label">Reclamos</div><div class="kpi-val" id="biRec">—</div><div class="kpi-sub">en ventana</div></div>
-    </div>
-    <div class="tend-grid">
-      <div class="panel">
-        <h2>Contingencias por mes</h2>
-        <div id="biContingChart"></div>
-      </div>
-      <div class="panel">
-        <h2>Detalle de contingencias <span style="font-weight:400;font-size:12px;color:var(--text-2)">(desde ene. año pasado)</span></h2>
-        <div class="tabla-wrap" style="max-height:280px">
-          <table>
-            <thead><tr><th>Cliente</th><th>Sucursal</th><th>Fecha</th><th>Responsable</th><th>Detalle</th></tr></thead>
-            <tbody id="biContingTableBody"></tbody>
-          </table>
-        </div>
-      </div>
     </div>
     <div class="body-grid">
       <div class="panel">
@@ -1028,6 +1013,20 @@ tr:hover td{background:var(--surface-2)}
       <div>
         <div class="panel" style="margin-bottom:14px"><h2>Por tipo</h2><div id="biTipoList"></div></div>
         <div class="panel"><h2>Por cliente</h2><div id="biClientList"></div></div>
+      </div>
+    </div>
+    <div class="panel" style="margin-bottom:14px">
+      <h2>Contingencias por mes</h2>
+      <div class="filter-row" id="biContingYearFilter" style="margin-bottom:10px"></div>
+      <div id="biContingChart"></div>
+    </div>
+    <div class="panel">
+      <h2>Detalle de contingencias <span style="font-weight:400;font-size:12px;color:var(--text-2)">(desde ene. año pasado)</span></h2>
+      <div class="tabla-wrap" style="max-height:280px">
+        <table>
+          <thead><tr><th>Cliente</th><th>Sucursal</th><th>Fecha</th><th>Responsable</th><th>Detalle</th></tr></thead>
+          <tbody id="biContingTableBody"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -2557,7 +2556,8 @@ function renderBitacora(){
   const CRITICOS_TIPOS=['Atraso','Contingencia','Suspensión de ruta','Incidente'];
   const criticos=eventos.filter(e=>(e.tipos||[e.tipo]).some(t=>CRITICOS_TIPOS.includes(t)));
   const reclamos=eventos.filter(e=>(e.tipos||[e.tipo]).includes('Reclamo'));
-  document.getElementById('biTotal').textContent=total;document.getElementById('biTotalSub').textContent='desde '+formatDate(b.desde||'');
+  document.getElementById('biTotal').textContent=total;
+  if(b.desde){const dDesde=new Date(b.desde+'T00:00:00');document.getElementById('biTotalSub').textContent='desde el '+dDesde.getDate()+' de '+meses[dDesde.getMonth()]+' de '+dDesde.getFullYear();}
   document.getElementById('biMes').textContent=delMes.length;document.getElementById('biMesSub').textContent=mesesShort[mes-1]+' '+anio;
   document.getElementById('biCrit').textContent=criticos.length;document.getElementById('biRec').textContent=reclamos.length;
   const selC=document.getElementById('biFiltCliente');
@@ -2592,9 +2592,28 @@ function renderBiSidebar(){
 }
 
 // ── CONTINGENCIAS: gráfico mensual + detalle ───────────────────────────────
+let _bitContingYearsSel=null; // Set de años seleccionados en el filtro del gráfico
+
+function toggleBiContingYear(y){
+  if(_bitContingYearsSel.has(y)) _bitContingYearsSel.delete(y); else _bitContingYearsSel.add(y);
+  renderBiContingencias();
+}
+
 function renderBiContingencias(){
   const b=allData.bitacora||{};
-  const serie=b.contingenciasPorMes||[];
+  const serieFull=b.contingenciasPorMes||[];
+  const years=[...new Set(serieFull.map(d=>d.mes.substring(0,4)))].sort();
+  if(!_bitContingYearsSel) _bitContingYearsSel=new Set(years); // todos seleccionados por defecto
+
+  const yearWrap=document.getElementById('biContingYearFilter');
+  if(yearWrap){
+    yearWrap.innerHTML=years.map(y=>{
+      const active=_bitContingYearsSel.has(y);
+      return '<button type="button" class="subtab'+(active?' active':'')+'" onclick="toggleBiContingYear(\''+y+'\')">'+y+'</button>';
+    }).join('');
+  }
+
+  const serie=serieFull.filter(d=>_bitContingYearsSel.has(d.mes.substring(0,4)));
   const wrap=document.getElementById('biContingChart');
   if(wrap) wrap.innerHTML=buildContingLineChart_(serie);
 
