@@ -1000,6 +1000,21 @@ tr:hover td{background:var(--surface-2)}
       <div class="kpi warn"><div class="kpi-label">Atrasos / Contingencias</div><div class="kpi-val" id="biCrit">—</div><div class="kpi-sub">en ventana</div></div>
       <div class="kpi danger"><div class="kpi-label">Reclamos</div><div class="kpi-val" id="biRec">—</div><div class="kpi-sub">en ventana</div></div>
     </div>
+    <div class="tend-grid">
+      <div class="panel">
+        <h2>Contingencias por mes</h2>
+        <div id="biContingChart"></div>
+      </div>
+      <div class="panel">
+        <h2>Detalle de contingencias <span style="font-weight:400;font-size:12px;color:var(--text-2)">(desde ene. año pasado)</span></h2>
+        <div class="tabla-wrap" style="max-height:280px">
+          <table>
+            <thead><tr><th>Cliente</th><th>Sucursal</th><th>Fecha</th><th>Responsable</th><th>Detalle</th></tr></thead>
+            <tbody id="biContingTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
     <div class="body-grid">
       <div class="panel">
         <h2>Eventos recientes</h2>
@@ -2539,39 +2554,118 @@ function renderBitacora(){
   const b=allData.bitacora;let eventos=b.eventos||[];eventos=applyKamFilter(eventos);
   const total=eventos.length,today=new Date(),mes=today.getMonth()+1,anio=today.getFullYear();
   const delMes=eventos.filter(e=>parseInt(e.mes)===mes&&parseInt(e.anio)===anio);
-  const criticos=eventos.filter(e=>['Atraso','Contingencia','Suspensión de ruta','Incidente'].includes(e.tipo));
-  const reclamos=eventos.filter(e=>e.tipo==='Reclamo');
+  const CRITICOS_TIPOS=['Atraso','Contingencia','Suspensión de ruta','Incidente'];
+  const criticos=eventos.filter(e=>(e.tipos||[e.tipo]).some(t=>CRITICOS_TIPOS.includes(t)));
+  const reclamos=eventos.filter(e=>(e.tipos||[e.tipo]).includes('Reclamo'));
   document.getElementById('biTotal').textContent=total;document.getElementById('biTotalSub').textContent='desde '+formatDate(b.desde||'');
   document.getElementById('biMes').textContent=delMes.length;document.getElementById('biMesSub').textContent=mesesShort[mes-1]+' '+anio;
   document.getElementById('biCrit').textContent=criticos.length;document.getElementById('biRec').textContent=reclamos.length;
   const selC=document.getElementById('biFiltCliente');
   if(selC.options.length<=1){selC.innerHTML='<option value="">Todos los clientes</option>';[...new Set(eventos.map(e=>e.cliente).filter(Boolean))].sort().forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;selC.appendChild(o);});}
   const selT=document.getElementById('biFiltTipo');
-  if(selT.options.length<=1){selT.innerHTML='<option value="">Todos los tipos</option>';[...new Set(eventos.map(e=>e.tipo).filter(Boolean))].sort().forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;selT.appendChild(o);});}
-  renderBiList();renderBiSidebar();
+  if(selT.options.length<=1){selT.innerHTML='<option value="">Todos los tipos</option>';[...new Set([].concat(...eventos.map(e=>e.tipos||[e.tipo])).filter(Boolean))].sort().forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;selT.appendChild(o);});}
+  renderBiList();renderBiSidebar();renderBiContingencias();
 }
 function renderBiList(){
   if(!allData||!allData.bitacora) return;
   const fc=document.getElementById('biFiltCliente').value,ft2=document.getElementById('biFiltTipo').value,tx=document.getElementById('biFiltTexto').value.toLowerCase().trim();
   let r=applyKamFilter(allData.bitacora.eventos||[]);
-  if(fc) r=r.filter(e=>e.cliente===fc);if(ft2) r=r.filter(e=>e.tipo===ft2);if(tx) r=r.filter(e=>(e.conductor||'').toLowerCase().includes(tx)||(e.sucursal||'').toLowerCase().includes(tx)||(e.detalle||'').toLowerCase().includes(tx));
+  if(fc) r=r.filter(e=>e.cliente===fc);if(ft2) r=r.filter(e=>(e.tipos||[e.tipo]).includes(ft2));if(tx) r=r.filter(e=>(e.conductor||'').toLowerCase().includes(tx)||(e.sucursal||'').toLowerCase().includes(tx)||(e.detalle||'').toLowerCase().includes(tx));
   const list=document.getElementById('biEventosList');list.innerHTML='';
   if(r.length===0){list.innerHTML='<div class="empty">Sin eventos en la selección</div>';return;}
   r.slice(0,80).forEach(e=>{
-    const cls=tipoColors[e.tipo]||'badge-info';
+    const tiposEv=e.tipos&&e.tipos.length?e.tipos:[e.tipo];
+    const badges=tiposEv.map(t=>'<span class="badge '+(tipoColors[t]||'badge-info')+'">'+escapeHtml(t)+'</span>').join(' ');
     const item=document.createElement('div');item.className='evento-item';
-    item.innerHTML='<div class="evento-head"><span class="evento-fecha">'+formatDate(e.fecha)+'</span><span class="badge '+cls+'">'+e.tipo+'</span></div><div class="evento-cliente"><b style="color:var(--text)">'+e.cliente+'</b> · '+e.sucursal+(e.conductor?' · '+e.conductor:'')+'</div>'+(e.detalle?'<div class="evento-detalle">'+e.detalle+'</div>':'');
+    item.innerHTML='<div class="evento-head"><span class="evento-fecha">'+formatDate(e.fecha)+'</span>'+badges+'</div><div class="evento-cliente"><b style="color:var(--text)">'+escapeHtml(e.cliente)+'</b> · '+escapeHtml(e.sucursal)+(e.conductor?' · '+escapeHtml(e.conductor):'')+'</div>'+(e.detalle?'<div class="evento-detalle">'+escapeHtml(e.detalle)+'</div>':'');
     list.appendChild(item);
   });
 }
 function renderBiSidebar(){
   const eventos=applyKamFilter(allData.bitacora.eventos||[]);
-  const byT={};eventos.forEach(e=>{if(e.tipo)byT[e.tipo]=(byT[e.tipo]||0)+1;});
+  const byT={};eventos.forEach(e=>{(e.tipos&&e.tipos.length?e.tipos:[e.tipo]).forEach(t=>{if(t)byT[t]=(byT[t]||0)+1;});});
   const tl=document.getElementById('biTipoList');tl.innerHTML='';
   Object.entries(byT).sort((a,b)=>b[1]-a[1]).slice(0,10).forEach(([n,v])=>{const cls=tipoColors[n]||'badge-info';const row=document.createElement('div');row.className='client-row';row.innerHTML='<div class="client-name"><span class="badge '+cls+'" style="font-size:10px">'+n+'</span></div><div class="client-count">'+v+'</div>';tl.appendChild(row);});
   const byC={};eventos.forEach(e=>{if(e.cliente)byC[e.cliente]=(byC[e.cliente]||0)+1;});
   const cl=document.getElementById('biClientList');cl.innerHTML='';
   Object.entries(byC).sort((a,b)=>b[1]-a[1]).slice(0,10).forEach(([n,v])=>{const dot='<span class="dot" style="background:'+(clientColors[n]||'#888')+'"></span>';const row=document.createElement('div');row.className='client-row';row.innerHTML='<div class="client-name">'+dot+'<span class="tx">'+n+'</span></div><div class="client-count">'+v+'</div>';cl.appendChild(row);});
+}
+
+// ── CONTINGENCIAS: gráfico mensual + detalle ───────────────────────────────
+function renderBiContingencias(){
+  const b=allData.bitacora||{};
+  const serie=b.contingenciasPorMes||[];
+  const wrap=document.getElementById('biContingChart');
+  if(wrap) wrap.innerHTML=buildContingLineChart_(serie);
+
+  const filas=applyKamFilter(b.contingenciasDetalle||[]);
+  const tbody=document.getElementById('biContingTableBody');
+  if(!tbody) return;
+  if(!filas.length){tbody.innerHTML='<tr><td colspan="5" class="empty-msg">Sin contingencias en la ventana</td></tr>';return;}
+  tbody.innerHTML=filas.map(e=>
+    '<tr><td>'+escapeHtml(e.cliente||'—')+'</td><td>'+escapeHtml(e.sucursal||'—')+'</td><td style="white-space:nowrap">'+formatDate(e.fecha)+'</td><td>'+escapeHtml(e.responsable||'—')+'</td><td style="font-size:12.5px;color:var(--text-2)">'+escapeHtml(e.detalle||'—')+'</td></tr>'
+  ).join('');
+}
+
+function buildContingLineChart_(serie){
+  if(!serie.length) return '<div class="empty" style="padding:40px 0">Sin datos de contingencias</div>';
+
+  const W=Math.max(560,serie.length*46),H=220,padL=32,padR=16,padT=24,padB=40;
+  const innerW=W-padL-padR,innerH=H-padT-padB;
+  const maxVal=Math.max(1,...serie.map(d=>d.total));
+  const stepX=serie.length>1?innerW/(serie.length-1):0;
+  const yFor=v=>padT+innerH-(v/maxVal)*innerH;
+  const xFor=i=>padL+stepX*i;
+
+  const pts=serie.map((d,i)=>[xFor(i),yFor(d.total)]);
+  const pathD=pts.map((p,i)=>(i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+
+  const color='var(--info-fg)';
+  let svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:'+H+'px;display:block" preserveAspectRatio="xMinYMid meet">';
+
+  // Gridlines horizontales (recesivas)
+  const ticks=4;
+  for(let t=0;t<=ticks;t++){
+    const v=Math.round(maxVal*t/ticks);
+    const y=yFor(v);
+    svg+='<line x1="'+padL+'" y1="'+y.toFixed(1)+'" x2="'+(W-padR)+'" y2="'+y.toFixed(1)+'" stroke="var(--border)" stroke-width="1"/>';
+    svg+='<text x="'+(padL-8)+'" y="'+(y+3).toFixed(1)+'" font-size="10" text-anchor="end" fill="var(--text-3)">'+v+'</text>';
+  }
+
+  // Separadores + etiqueta de año al cambiar de año
+  let prevYear=null;
+  serie.forEach((d,i)=>{
+    const year=d.mes.substring(0,4);
+    if(prevYear!==null && year!==prevYear){
+      const x=xFor(i)-stepX/2;
+      svg+='<line x1="'+x.toFixed(1)+'" y1="'+padT+'" x2="'+x.toFixed(1)+'" y2="'+(H-padB)+'" stroke="var(--border-2)" stroke-width="1" stroke-dasharray="3,3"/>';
+    }
+    prevYear=year;
+  });
+
+  // Línea + puntos + etiquetas de valor
+  svg+='<path d="'+pathD+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+  serie.forEach((d,i)=>{
+    const [x,y]=pts[i];
+    svg+='<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="3" fill="'+color+'"><title>'+mesesShort[parseInt(d.mes.substring(5,7),10)-1]+' '+d.mes.substring(0,4)+': '+d.total+' contingencias</title></circle>';
+    svg+='<text x="'+x.toFixed(1)+'" y="'+(y-8).toFixed(1)+'" font-size="10" text-anchor="middle" fill="var(--text-2)">'+d.total+'</text>';
+  });
+
+  // Eje X: mes abreviado + año (solo cuando cambia)
+  prevYear=null;
+  serie.forEach((d,i)=>{
+    const x=xFor(i);
+    const year=d.mes.substring(0,4);
+    const mLabel=mesesShort[parseInt(d.mes.substring(5,7),10)-1];
+    svg+='<text x="'+x.toFixed(1)+'" y="'+(H-padB+14)+'" font-size="9" text-anchor="middle" fill="var(--text-3)">'+mLabel+'</text>';
+    if(year!==prevYear){
+      svg+='<text x="'+x.toFixed(1)+'" y="'+(H-padB+27)+'" font-size="9" font-weight="600" text-anchor="middle" fill="var(--text-2)">'+year+'</text>';
+    }
+    prevYear=year;
+  });
+
+  svg+='</svg>';
+  return '<div style="overflow-x:auto">'+svg+'</div>';
 }
 
 // ── SUPERVISIONES ──────────────────────────────────────────────────────────

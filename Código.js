@@ -2620,13 +2620,43 @@ function readBitacora(fechaFinParam) {
   cutoff.setMonth(cutoff.getMonth() - BITACORA_MONTHS_BACK);
   cutoff.setHours(0, 0, 0, 0);
 
+  // Ventana ampliada para Contingencias: desde el 1 de enero del año pasado hasta fechaFin
+  const cutoffConting = new Date(fechaFin.getFullYear() - 1, 0, 1);
+
   const eventos = [];
+  const contingenciasDetalle = [];
+  // Conteo mensual de "Contingencia" sobre TODO el histórico (no acotado a la ventana de 12 meses)
+  const contingPorMes = {}; // 'YYYY-MM' -> total
+
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
     const fechaRaw = row[idx['Fecha']];
     if (!fechaRaw) continue;
     const fecha = parseFlexibleDate(fechaRaw);
     if (!fecha || isNaN(fecha.getTime())) continue;
+
+    // La columna "Tipo de Acontecimiento" puede traer varios tipos separados por coma
+    // (ej. "Contingencia, Atraso") — se separan para que cada uno cuente donde corresponde.
+    const tipoRaw = String(row[idx['Tipo de Acontecimiento']] || '').trim();
+    const tipos = tipoRaw.split(',').map(function(t){ return t.trim(); }).filter(Boolean);
+    const esContingencia = tipos.indexOf('Contingencia') >= 0;
+
+    if (esContingencia) {
+      const key = fecha.getFullYear() + '-' + String(fecha.getMonth() + 1).padStart(2, '0');
+      contingPorMes[key] = (contingPorMes[key] || 0) + 1;
+
+      if (fecha >= cutoffConting && fecha <= fechaFin) {
+        contingenciasDetalle.push({
+          fecha: formatDateISO(fecha),
+          cliente: String(row[idx['Cliente']] || '').trim(),
+          sucursal: String(row[idx['Sucursal']] || '').trim(),
+          responsable: String(row[idx['Responsable']] || '').trim(),
+          detalle: String(row[idx['Detalle Acontecimiento']] || '').trim().slice(0, 150),
+          kam: String(row[idx['KAM']] || '').trim()
+        });
+      }
+    }
+
     if (fecha < cutoff || fecha > fechaFin) continue;
 
     eventos.push({
@@ -2636,13 +2666,29 @@ function readBitacora(fechaFinParam) {
       cliente: String(row[idx['Cliente']] || '').trim(),
       sucursal: String(row[idx['Sucursal']] || '').trim(),
       conductor: String(row[idx['Conductor']] || '').trim().slice(0, 60),
-      tipo: String(row[idx['Tipo de Acontecimiento']] || '').trim(),
+      responsable: String(row[idx['Responsable']] || '').trim(),
+      tipo: tipoRaw,
+      tipos: tipos,
       detalle: String(row[idx['Detalle Acontecimiento']] || '').trim().slice(0, 150),
       kam: String(row[idx['KAM']] || '').trim()
     });
   }
   eventos.sort((a, b) => b.fecha.localeCompare(a.fecha));
-  return { eventos: eventos.slice(0, 500), totalVentana: eventos.length, desde: formatDateISO(cutoff), hasta: formatDateISO(fechaFin), ventanaMeses: BITACORA_MONTHS_BACK };
+  contingenciasDetalle.sort((a, b) => b.fecha.localeCompare(a.fecha));
+
+  const contingenciasPorMes = Object.keys(contingPorMes).sort().map(function(key) {
+    return { mes: key, total: contingPorMes[key] };
+  });
+
+  return {
+    eventos: eventos.slice(0, 500),
+    totalVentana: eventos.length,
+    desde: formatDateISO(cutoff),
+    hasta: formatDateISO(fechaFin),
+    ventanaMeses: BITACORA_MONTHS_BACK,
+    contingenciasPorMes: contingenciasPorMes,
+    contingenciasDetalle: contingenciasDetalle.slice(0, 500)
+  };
 }
 
 // ============================================================================
