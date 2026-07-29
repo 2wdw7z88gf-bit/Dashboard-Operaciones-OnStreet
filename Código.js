@@ -1210,6 +1210,7 @@ function enviarEmailPlanNuevo_(email, nombreResp, plan) {
   var meta = [plan.cliente, plan.movil].filter(Boolean).join(' · ');
   MailApp.sendEmail({
     to: email,
+    name: 'Dashboard On Street',
     subject: 'Nuevo plan de acción asignado — ' + (plan.cliente || 'Dashboard On Street'),
     htmlBody:
       '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">' +
