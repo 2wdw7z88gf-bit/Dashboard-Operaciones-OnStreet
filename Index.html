@@ -48,6 +48,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .planif-sup-chip{display:inline-flex;align-items:center;gap:6px;background:var(--info-bg);color:var(--info-fg);font-size:12.5px;font-weight:500;padding:4px 6px 4px 10px;border-radius:20px}
 .planif-sup-chip button{width:16px;height:16px;border-radius:50%;border:none;background:rgba(0,0,0,0.08);color:inherit;cursor:pointer;font-size:11px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
 .planif-sup-chip button:hover{background:rgba(0,0,0,0.16)}
+#planifAddForm input,#planifAddForm select{font-size:13.5px;padding:8px 11px;border-radius:8px;border:0.5px solid var(--border-2);background:var(--surface);color:var(--text);font-family:inherit;transition:border-color .12s}
+#planifAddForm input:focus,#planifAddForm select:focus{outline:none;border-color:var(--info-fg)}
+#planifAddForm select{cursor:pointer}
+.planif-sup-suggest{display:none;position:absolute;top:calc(100% + 4px);left:0;right:96px;max-height:180px;overflow-y:auto;background:var(--surface);border:0.5px solid var(--border-2);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);z-index:20}
+.planif-sup-suggest.open{display:block}
+.planif-sup-suggest-item{padding:8px 12px;font-size:13px;color:var(--text);cursor:pointer}
+.planif-sup-suggest-item:hover{background:var(--surface-2)}
+.planif-sup-suggest-empty{padding:8px 12px;font-size:12.5px;color:var(--text-3)}
 .icon-btn-cal{width:28px;height:28px;border-radius:6px;border:0.5px solid var(--border-2);background:var(--surface);color:var(--text-2);cursor:pointer;font-size:13px}
 .icon-btn-cal:hover{background:var(--surface-2)}
 .planif-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden}
@@ -1244,10 +1252,12 @@ tr:hover td{background:var(--surface-2)}
             <div style="grid-column:span 2">
               <label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Supervisores</label>
               <div id="planifSupChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
-              <div style="display:flex;gap:6px">
-                <input id="planifSupInput" list="planifSupList" placeholder="Nombre del supervisor..." style="flex:1" />
-                <datalist id="planifSupList"></datalist>
+              <div style="display:flex;gap:6px;position:relative">
+                <input id="planifSupInput" placeholder="Nombre del supervisor..." style="flex:1" autocomplete="off"
+                  oninput="planifMostrarSugerencias()" onfocus="planifMostrarSugerencias()" onblur="setTimeout(planifOcultarSugerencias,150)"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();planifAgregarSupervisorChip();}" />
                 <button type="button" class="btn-refresh" onclick="planifAgregarSupervisorChip()">+ Agregar</button>
+                <div id="planifSupSugerencias" class="planif-sup-suggest"></div>
               </div>
             </div>
           </div>
@@ -3514,11 +3524,32 @@ function planifPoblarMoviles(){
   sel.innerHTML = opciones.map(function(m){ return '<option value="' + escapeHtml(m) + '">' + escapeHtml(m) + '</option>'; }).join('');
 }
 
+var _planifSupOpciones = [];
+
 function planifPoblarSupervisoresList(){
-  var supList = document.getElementById('planifSupList');
   var kams = (allData && allData.kams) || [];
-  var todos = [...new Set(kams.concat(PLANIF_SUPERVISORES_EXTRA))].sort();
-  supList.innerHTML = todos.map(function(s){ return '<option value="' + escapeHtml(s) + '">'; }).join('');
+  _planifSupOpciones = [...new Set(kams.concat(PLANIF_SUPERVISORES_EXTRA))].sort();
+}
+
+function planifMostrarSugerencias(){
+  var input = document.getElementById('planifSupInput');
+  var box = document.getElementById('planifSupSugerencias');
+  var q = input.value.toLowerCase().trim();
+  var opciones = _planifSupOpciones.filter(function(s){ return _planifChips.indexOf(s) < 0; });
+  if (q) opciones = opciones.filter(function(s){ return s.toLowerCase().indexOf(q) >= 0; });
+  if (!opciones.length) {
+    box.innerHTML = '<div class="planif-sup-suggest-empty">' + (q ? 'Sin coincidencias — se agregará como nombre nuevo' : 'Sin sugerencias') + '</div>';
+  } else {
+    box.innerHTML = opciones.map(function(s){ return '<div class="planif-sup-suggest-item" onmousedown="planifElegirSugerencia(\'' + s.replace(/'/g,"\\'") + '\')">' + escapeHtml(s) + '</div>'; }).join('');
+  }
+  box.classList.add('open');
+}
+function planifOcultarSugerencias(){
+  document.getElementById('planifSupSugerencias').classList.remove('open');
+}
+function planifElegirSugerencia(nombre){
+  document.getElementById('planifSupInput').value = nombre;
+  planifAgregarSupervisorChip();
 }
 
 function planifAsegurarFlota(cb){
@@ -3570,6 +3601,7 @@ function planifAgregarSupervisorChip(){
   _planifChips.push(val);
   input.value = '';
   planifRenderChips();
+  planifOcultarSugerencias();
 }
 function planifQuitarSupervisorChip(i){
   _planifChips.splice(i, 1);
