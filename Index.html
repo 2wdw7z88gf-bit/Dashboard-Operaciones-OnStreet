@@ -1197,6 +1197,21 @@ tr:hover td{background:var(--surface-2)}
       <div class="panel">
         <div class="filter-row" style="justify-content:space-between;margin-bottom:14px">
           <div>
+            <h2 style="margin-bottom:2px">Calendario de supervisiones planificadas</h2>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button type="button" class="icon-btn-cal" onclick="planifCalMes(-1)">‹</button>
+            <div id="planifCalTitulo" style="font-size:14px;font-weight:600;min-width:120px;text-align:center">—</div>
+            <button type="button" class="icon-btn-cal" onclick="planifCalMes(1)">›</button>
+          </div>
+        </div>
+        <div id="planifCalGrid" class="planif-cal-grid"></div>
+        <div id="planifCalLegend" style="display:flex;gap:14px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)"></div>
+      </div>
+
+      <div class="panel">
+        <div class="filter-row" style="justify-content:space-between;margin-bottom:14px">
+          <div>
             <h2 style="margin-bottom:2px">Supervisiones planificadas</h2>
             <div style="font-size:12.5px;color:var(--text-2)" id="planifCount">Cargando...</div>
           </div>
@@ -1243,27 +1258,12 @@ tr:hover td{background:var(--surface-2)}
           <div id="planifFormError" style="display:none;color:var(--danger-fg);font-size:12.5px;margin-top:8px"></div>
         </div>
 
-        <div style="overflow-x:auto">
+        <div class="tabla-wrap" style="max-height:420px">
           <table>
             <thead><tr><th>Fecha</th><th>Cliente / Móvil</th><th>Supervisor(es)</th><th>Estado</th></tr></thead>
             <tbody id="planifTableBody"><tr><td colspan="4" class="empty-msg">Cargando planificación...</td></tr></tbody>
           </table>
         </div>
-      </div>
-
-      <div class="panel">
-        <div class="filter-row" style="justify-content:space-between;margin-bottom:14px">
-          <div>
-            <h2 style="margin-bottom:2px">Calendario de supervisiones planificadas</h2>
-          </div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <button type="button" class="icon-btn-cal" onclick="planifCalMes(-1)">‹</button>
-            <div id="planifCalTitulo" style="font-size:14px;font-weight:600;min-width:120px;text-align:center">—</div>
-            <button type="button" class="icon-btn-cal" onclick="planifCalMes(1)">›</button>
-          </div>
-        </div>
-        <div id="planifCalGrid" class="planif-cal-grid"></div>
-        <div id="planifCalLegend" style="display:flex;gap:14px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)"></div>
       </div>
     </div><!-- /sub-su-planificacion -->
   </div>
