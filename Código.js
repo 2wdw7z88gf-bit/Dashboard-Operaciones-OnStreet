@@ -2762,9 +2762,10 @@ function getTabPlanificacion(params) {
   };
 }
 
-// Agrega una fila a la hoja Planificación. Copia la fila anterior primero para que las
-// columnas con fórmulas (Concatenar, Mes, Lista Supervisores, Última Supervisión) se
-// autocompleten igual que en cualquier fila nueva, y solo pisa los campos manuales.
+// Agrega una fila a la hoja Planificación. Las columnas H:K (Concatenar, Mes, Lista
+// Supervisores, Última Supervisión) están protegidas como solo-lectura y tienen fórmulas
+// que se autocompletan solas — el script no las toca en absoluto, solo escribe en las
+// columnas editables (Fecha, Móvil, Supervisor 1-3, Estado).
 function agregarPlanificacionSupervision(params) {
   var token = (params && params.token) || null;
   var usuario = verificarToken_(token);
@@ -2783,17 +2784,19 @@ function agregarPlanificacionSupervision(params) {
   var movil = (cliente + ' ' + movilNombre).trim();
 
   var sheet = getPlanificacionSheet_();
-  var lastRow = sheet.getLastRow();
   var lastCol = sheet.getLastColumn();
-  var srcRange = sheet.getRange(lastRow, 1, 1, lastCol);
-  sheet.insertRowAfter(lastRow);
-  var destRange = sheet.getRange(lastRow + 1, 1, 1, lastCol);
-  srcRange.copyTo(destRange); // trae fórmulas (referencias relativas) y formato de la fila anterior
-
   var idx = planifIdx_(sheet.getRange(1, 1, 1, lastCol).getValues()[0]);
+
+  // Última fila con Fecha real (más confiable que getLastRow(), que puede quedar inflado
+  // por fórmulas o validaciones de datos precargadas en filas vacías).
+  var colFecha = sheet.getRange(1, idx['Fecha'] + 1, sheet.getMaxRows(), 1).getValues();
+  var lastDataRow = 1;
+  for (var r = colFecha.length - 1; r >= 1; r--) { if (colFecha[r][0]) { lastDataRow = r + 1; break; } }
+  var newRow = lastDataRow + 1;
+
   function setCell(headerName, value) {
     if (idx[headerName] == null) return;
-    destRange.getCell(1, idx[headerName] + 1).setValue(value);
+    sheet.getRange(newRow, idx[headerName] + 1).setValue(value);
   }
   setCell('Fecha', new Date(fecha + 'T00:00:00'));
   setCell('Móvil', movil);
@@ -2803,7 +2806,7 @@ function agregarPlanificacionSupervision(params) {
   setCell('Estado', estado);
 
   CacheService.getScriptCache().remove('os_v18_planificacion');
-  return { ok: true, rowIndex: lastRow + 1 };
+  return { ok: true, rowIndex: newRow };
 }
 
 // ============================================================================
