@@ -3521,14 +3521,33 @@ function planifPoblarSupervisoresList(){
   supList.innerHTML = todos.map(function(s){ return '<option value="' + escapeHtml(s) + '">'; }).join('');
 }
 
+function planifAsegurarFlota(cb){
+  if (allData && allData.unificador && allData.unificador.moviles && allData.unificador.moviles.length) { cb(); return; }
+  var onOk = function(d){
+    if (!allData) allData = {};
+    if (d) Object.assign(allData, d);
+    cb();
+  };
+  if (IS_GAS) {
+    google.script.run.withSuccessHandler(onOk).withFailureHandler(cb).getTabOperacion({ token: sessionToken });
+  } else {
+    authFetch('tab_operacion', { token: sessionToken }).then(onOk).catch(cb);
+  }
+}
+
 function togglePlanifForm(){
   var form = document.getElementById('planifAddForm');
   var open = form.style.display !== 'none';
   if (open) { form.style.display = 'none'; return; }
   form.style.display = 'block';
-  planifPoblarClientesForm();
-  planifPoblarMoviles();
-  planifPoblarSupervisoresList();
+  document.getElementById('planifCliente').innerHTML = '<option>Cargando...</option>';
+  document.getElementById('planifMovil').innerHTML = '';
+  planifAsegurarFlota(function(){
+    document.getElementById('planifCliente').innerHTML = '';
+    planifPoblarClientesForm();
+    planifPoblarMoviles();
+    planifPoblarSupervisoresList();
+  });
   document.getElementById('planifFecha').value = new Date().toISOString().substring(0,10);
   document.getElementById('planifEstado').value = 'Programado';
   document.getElementById('planifSupInput').value = '';
