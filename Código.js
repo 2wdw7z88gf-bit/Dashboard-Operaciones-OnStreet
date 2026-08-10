@@ -142,6 +142,14 @@ function doGet(e) {
         supervisores: params.supervisores || null
       });
 
+    } else if (source === 'planificacion_delete') {
+      result = eliminarPlanificacionSupervision({
+        token: params.token || null,
+        rowIndex: params.rowIndex || null,
+        fecha: params.fecha || null,
+        movil: params.movil || null
+      });
+
     } else if (source === 'unificador') {
       result = {
         unificador: getCached(
@@ -2807,6 +2815,40 @@ function agregarPlanificacionSupervision(params) {
 
   CacheService.getScriptCache().remove('os_v18_planificacion');
   return { ok: true, rowIndex: newRow };
+}
+
+// Elimina una fila de Planificación. Antes de borrar, verifica que la fila todavía
+// corresponda a lo que el cliente cree que está borrando (fecha + móvil), por si la
+// hoja cambió entre que se cargó la tabla y que se apretó eliminar.
+function eliminarPlanificacionSupervision(params) {
+  var token = (params && params.token) || null;
+  var usuario = verificarToken_(token);
+  if (!usuario) return { error: 'token_invalido' };
+
+  var rowIndex = parseInt((params && params.rowIndex) || '0', 10);
+  if (!rowIndex || rowIndex < 2) return { error: 'rowIndex_invalido' };
+
+  var fechaEsperada = String((params && params.fecha) || '').trim();
+  var movilEsperado = String((params && params.movil) || '').trim();
+
+  var sheet = getPlanificacionSheet_();
+  var lastCol = sheet.getLastColumn();
+  var idx = planifIdx_(sheet.getRange(1, 1, 1, lastCol).getValues()[0]);
+
+  if (rowIndex > sheet.getMaxRows()) return { error: 'fila_no_existe' };
+
+  var rowVals = sheet.getRange(rowIndex, 1, 1, lastCol).getValues()[0];
+  var fechaCell = rowVals[idx['Fecha']];
+  var movilCell = String(rowVals[idx['Móvil']] || '').trim();
+  var fechaCellISO = '';
+  if (fechaCell) { var fParsed = parseFlexibleDate(fechaCell); if (fParsed && !isNaN(fParsed.getTime())) fechaCellISO = formatDateISO(fParsed); }
+
+  if (fechaEsperada && fechaCellISO !== fechaEsperada) return { error: 'fila_no_coincide' };
+  if (movilEsperado && movilCell !== movilEsperado) return { error: 'fila_no_coincide' };
+
+  sheet.deleteRow(rowIndex);
+  CacheService.getScriptCache().remove('os_v18_planificacion');
+  return { ok: true };
 }
 
 // ============================================================================
