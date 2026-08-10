@@ -1227,6 +1227,7 @@ tr:hover td{background:var(--surface-2)}
         </div>
 
         <div class="filter-row" style="margin-bottom:14px">
+          <select id="planifFiltMes" style="min-width:150px"><option value="actual">Mes actual</option><option value="">Todos los meses</option></select>
           <select id="planifFiltCliente"><option value="">Todos los clientes</option></select>
           <select id="planifFiltEstado">
             <option value="">Todos los estados</option>
@@ -3660,9 +3661,6 @@ function renderPlanificacion(){
   var rows = (allData && allData.planificacion) || [];
   if (!Array.isArray(rows)) rows = []; // por si vino {error:...}
 
-  var count = document.getElementById('planifCount');
-  if (count) count.textContent = rows.length + ' supervisiones planificadas';
-
   // Filtros: cliente (derivado del texto "Móvil" comparando contra clientes conocidos)
   var clientesConocidos = Object.keys(clientColors);
   function splitMovil(texto){
@@ -3676,17 +3674,34 @@ function renderPlanificacion(){
     var clientesUsados = [...new Set(rows.map(function(r){ return splitMovil(r.movil).cliente; }).filter(Boolean))].sort();
     clientesUsados.forEach(function(c){ var o = document.createElement('option'); o.value = c; o.textContent = c; selC.appendChild(o); });
   }
+  var selMes = document.getElementById('planifFiltMes');
+  if (selMes && selMes.options.length <= 2) {
+    var mesesUsados = [...new Set(rows.map(function(r){ return (r.fecha||'').substring(0,7); }).filter(function(k){ return k.length === 7; }))].sort().reverse();
+    mesesUsados.forEach(function(key){
+      var y = key.substring(0,4), m = parseInt(key.substring(5,7), 10) - 1;
+      var label = (meses[m] ? meses[m].charAt(0).toUpperCase() + meses[m].slice(1) : key) + ' ' + y;
+      var o = document.createElement('option'); o.value = key; o.textContent = label; selMes.appendChild(o);
+    });
+  }
+
   var fc = (selC && selC.value) || '';
   var fe = (document.getElementById('planifFiltEstado') || {}).value || '';
+  var fm = (selMes && selMes.value) || '';
   var tx = ((document.getElementById('planifFiltTexto') || {}).value || '').toLowerCase().trim();
+  var mesActualKey = new Date().toISOString().substring(0,7);
 
   var filtered = rows.filter(function(r){
     var sp = splitMovil(r.movil);
     if (fc && sp.cliente !== fc) return false;
     if (fe && r.estado !== fe) return false;
+    if (fm === 'actual') { if ((r.fecha||'').substring(0,7) !== mesActualKey) return false; }
+    else if (fm) { if ((r.fecha||'').substring(0,7) !== fm) return false; }
     if (tx && r.movil.toLowerCase().indexOf(tx) < 0 && (r.supervisores||[]).join(' ').toLowerCase().indexOf(tx) < 0) return false;
     return true;
   });
+
+  var count = document.getElementById('planifCount');
+  if (count) count.textContent = filtered.length + ' de ' + rows.length + ' supervisiones planificadas';
 
   var tbody = document.getElementById('planifTableBody');
   if (tbody) {
@@ -4108,7 +4123,7 @@ function populateKamSelector(){
 ['suFiltCliente','suFiltEstado','suFiltTexto','suOrden'].forEach(id=>{document.getElementById(id).addEventListener(id==='suFiltTexto'?'input':'change',renderSuTable);});
 ['kmFiltCliente','kmFiltJefe','kmFiltTexto'].forEach(id=>{document.getElementById(id).addEventListener(id==='kmFiltTexto'?'input':'change',renderKmRankingHoy);});
 ['kmMesFiltCliente','kmMesFiltTexto'].forEach(id=>{document.getElementById(id).addEventListener(id==='kmMesFiltTexto'?'input':'change',renderKmRankingMes);});
-['planifFiltCliente','planifFiltEstado','planifFiltTexto'].forEach(id=>{document.getElementById(id).addEventListener(id==='planifFiltTexto'?'input':'change',renderPlanificacion);});
+['planifFiltMes','planifFiltCliente','planifFiltEstado','planifFiltTexto'].forEach(id=>{document.getElementById(id).addEventListener(id==='planifFiltTexto'?'input':'change',renderPlanificacion);});
 
 // ── MOBILE LAYOUT ──────────────────────────────────────────────────────────
 (function applyMobileIfNeeded(){
