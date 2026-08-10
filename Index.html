@@ -45,6 +45,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .btn-toggle{font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border-2);background:var(--surface);color:var(--text-2);cursor:pointer;font-family:inherit;transition:background 0.15s,color 0.15s}
 .btn-toggle:hover{background:var(--surface-2)}
 .btn-toggle.active{background:var(--info-bg);color:var(--info-fg);border-color:var(--info-fg);font-weight:500}
+.planif-sup-chip{display:inline-flex;align-items:center;gap:6px;background:var(--info-bg);color:var(--info-fg);font-size:12.5px;font-weight:500;padding:4px 6px 4px 10px;border-radius:20px}
+.planif-sup-chip button{width:16px;height:16px;border-radius:50%;border:none;background:rgba(0,0,0,0.08);color:inherit;cursor:pointer;font-size:11px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+.planif-sup-chip button:hover{background:rgba(0,0,0,0.16)}
+.icon-btn-cal{width:28px;height:28px;border-radius:6px;border:0.5px solid var(--border-2);background:var(--surface);color:var(--text-2);cursor:pointer;font-size:13px}
+.icon-btn-cal:hover{background:var(--surface-2)}
+.planif-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.planif-cal-dow{background:var(--surface-2);color:var(--text-2);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;padding:7px 8px;text-align:center}
+.planif-cal-cell{background:var(--surface);min-height:92px;padding:6px 7px;display:flex;flex-direction:column;gap:3px}
+.planif-cal-cell.out{background:var(--surface-2)}
+.planif-cal-daynum{font-size:11.5px;color:var(--text-3);font-weight:500}
+.planif-cal-cell.today .planif-cal-daynum{color:#fff;background:var(--info-fg);width:19px;height:19px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.planif-cal-chip{font-size:10px;padding:2px 6px;border-radius:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:4px;cursor:default}
+.planif-cal-more{font-size:10px;color:var(--text-3);padding:1px 6px}
 .tabs{display:flex;gap:2px;margin-bottom:18px;border-bottom:0.5px solid var(--border);overflow-x:auto}
 .tab{padding:10px 18px;font-size:14px;color:var(--text-2);cursor:pointer;background:none;border:none;border-bottom:2px solid transparent;font-family:inherit;white-space:nowrap}
 .tab:hover{color:var(--text)}
@@ -178,7 +191,7 @@ table tfoot td{font-weight:500;background:var(--surface-2);border-top:1px solid 
 .client-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--border);font-size:14px}
 .client-row:last-child{border-bottom:none}
 .client-name{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
-.client-name .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .client-name .tx{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .client-count{font-weight:500;font-size:14px;display:flex;align-items:center;gap:6px}
 .badge{display:inline-block;font-size:12px;padding:3px 8px;border-radius:6px;font-weight:500}
@@ -1037,6 +1050,7 @@ tr:hover td{background:var(--surface-2)}
       <button class="subtab active" onclick="switchSubtab(event,'su-kpi')">KPI del mes</button>
       <button class="subtab" onclick="switchSubtab(event,'su-anual')">Vista anual</button>
       <button class="subtab" onclick="switchSubtab(event,'su-monday')">Monday</button>
+      <button class="subtab" onclick="switchSubtab(event,'su-planificacion')">Planificación</button>
     </div>
     <div class="subtab-content active" id="sub-su-kpi">
       <div id="suAlertBox"></div>
@@ -1177,6 +1191,81 @@ tr:hover td{background:var(--surface-2)}
       </div>
 
     </div><!-- /sub-su-monday -->
+
+    <!-- SUB: PLANIFICACIÓN -->
+    <div class="subtab-content" id="sub-su-planificacion">
+      <div class="panel">
+        <div class="filter-row" style="justify-content:space-between;margin-bottom:14px">
+          <div>
+            <h2 style="margin-bottom:2px">Supervisiones planificadas</h2>
+            <div style="font-size:12.5px;color:var(--text-2)" id="planifCount">Cargando...</div>
+          </div>
+          <button class="btn-refresh" type="button" onclick="togglePlanifForm()">+ Nueva supervisión planificada</button>
+        </div>
+
+        <div class="filter-row" style="margin-bottom:14px">
+          <select id="planifFiltCliente"><option value="">Todos los clientes</option></select>
+          <select id="planifFiltEstado">
+            <option value="">Todos los estados</option>
+            <option value="Programado">Programado</option>
+            <option value="Realizado">Realizado</option>
+            <option value="Pendiente">Pendiente</option>
+          </select>
+          <input id="planifFiltTexto" placeholder="Buscar móvil o supervisor..." style="min-width:200px" />
+        </div>
+
+        <div id="planifAddForm" style="display:none;background:var(--surface-2);border:1px dashed var(--border-2);border-radius:10px;padding:16px;margin-bottom:16px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px">
+            <div><label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Fecha</label><input type="date" id="planifFecha" style="width:100%" /></div>
+            <div><label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Cliente</label><select id="planifCliente" style="width:100%"></select></div>
+            <div><label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Móvil</label><input id="planifMovil" placeholder="Ej: Agencia Coronel" style="width:100%" /></div>
+            <div><label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Estado</label>
+              <select id="planifEstado" style="width:100%">
+                <option value="Programado">Programado</option>
+                <option value="Pendiente">Pendiente</option>
+                <option value="Realizado">Realizado</option>
+              </select>
+            </div>
+            <div style="grid-column:span 2">
+              <label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Supervisores</label>
+              <div id="planifSupChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+              <div style="display:flex;gap:6px">
+                <input id="planifSupInput" list="planifSupList" placeholder="Nombre del supervisor..." style="flex:1" />
+                <datalist id="planifSupList"></datalist>
+                <button type="button" class="btn-refresh" onclick="planifAgregarSupervisorChip()">+ Agregar</button>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button type="button" class="btn-refresh" onclick="togglePlanifForm()">Cancelar</button>
+            <button type="button" class="btn-refresh" id="planifBtnGuardar" style="background:var(--info-fg);color:#fff;border-color:var(--info-fg)" onclick="guardarPlanificacion()">Guardar en Planificación</button>
+          </div>
+          <div id="planifFormError" style="display:none;color:var(--danger-fg);font-size:12.5px;margin-top:8px"></div>
+        </div>
+
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Fecha</th><th>Cliente / Móvil</th><th>Supervisor(es)</th><th>Estado</th></tr></thead>
+            <tbody id="planifTableBody"><tr><td colspan="4" class="empty-msg">Cargando planificación...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="filter-row" style="justify-content:space-between;margin-bottom:14px">
+          <div>
+            <h2 style="margin-bottom:2px">Calendario de supervisiones planificadas</h2>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button type="button" class="icon-btn-cal" onclick="planifCalMes(-1)">‹</button>
+            <div id="planifCalTitulo" style="font-size:14px;font-weight:600;min-width:120px;text-align:center">—</div>
+            <button type="button" class="icon-btn-cal" onclick="planifCalMes(1)">›</button>
+          </div>
+        </div>
+        <div id="planifCalGrid" class="planif-cal-grid"></div>
+        <div id="planifCalLegend" style="display:flex;gap:14px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)"></div>
+      </div>
+    </div><!-- /sub-su-planificacion -->
   </div>
 
   <!-- ============= TAB: KILÓMETROS ============= -->
@@ -1602,6 +1691,7 @@ function switchSubtab(ev,name){
   wrap.parentElement.querySelectorAll('.subtab-content').forEach(t=>t.classList.remove('active'));
   ev.target.classList.add('active');
   document.getElementById('sub-'+name).classList.add('active');
+  if(name==='su-planificacion'&&allData&&!allData.planificacion){loadPlanificacion();}
 }
 function switchOpDay(ev,day){
   const prev=fechaGlobal;
@@ -3388,6 +3478,217 @@ function updatePlanEstado(select, planKey, newEstado) {
   }
 }
 
+// ── PLANIFICACIÓN DE SUPERVISIONES ─────────────────────────────────────────
+var PLANIF_ESTADO_BADGE = { Realizado: 'badge-ok', Programado: 'badge-info', Pendiente: 'badge-warn' };
+var _planifCalYear = null, _planifCalMonth = null; // mes que se está mostrando en el calendario
+var _planifChips = []; // supervisores agregados en el form abierto
+
+function loadPlanificacion(){
+  var onOk = function(d){
+    if (!allData) allData = {};
+    allData.planificacion = (d && d.planificacion) || [];
+    renderPlanificacion();
+  };
+  if (IS_GAS) {
+    google.script.run.withSuccessHandler(onOk).withFailureHandler(function(){}).getTabPlanificacion({ token: sessionToken });
+  } else {
+    authFetch('tab_planificacion', { token: sessionToken }).then(onOk).catch(function(){});
+  }
+}
+
+function togglePlanifForm(){
+  var form = document.getElementById('planifAddForm');
+  var open = form.style.display !== 'none';
+  if (open) { form.style.display = 'none'; return; }
+  form.style.display = 'block';
+  document.getElementById('planifFecha').value = new Date().toISOString().substring(0,10);
+  document.getElementById('planifMovil').value = '';
+  document.getElementById('planifEstado').value = 'Programado';
+  document.getElementById('planifSupInput').value = '';
+  document.getElementById('planifFormError').style.display = 'none';
+  _planifChips = [];
+  planifRenderChips();
+}
+
+function planifRenderChips(){
+  var wrap = document.getElementById('planifSupChips');
+  wrap.innerHTML = _planifChips.map(function(n, i){
+    return '<span class="planif-sup-chip">' + escapeHtml(n) + ' <button type="button" title="Quitar" onclick="planifQuitarSupervisorChip(' + i + ')">×</button></span>';
+  }).join('');
+}
+function planifAgregarSupervisorChip(){
+  var input = document.getElementById('planifSupInput');
+  var val = input.value.trim();
+  if (!val || _planifChips.indexOf(val) >= 0) return;
+  if (_planifChips.length >= 3) { return; } // la hoja solo tiene 3 columnas de supervisor
+  _planifChips.push(val);
+  input.value = '';
+  planifRenderChips();
+}
+function planifQuitarSupervisorChip(i){
+  _planifChips.splice(i, 1);
+  planifRenderChips();
+}
+
+function guardarPlanificacion(){
+  var fecha = document.getElementById('planifFecha').value;
+  var cliente = document.getElementById('planifCliente').value;
+  var movil = document.getElementById('planifMovil').value.trim();
+  var estado = document.getElementById('planifEstado').value;
+  var errEl = document.getElementById('planifFormError');
+  errEl.style.display = 'none';
+
+  if (!fecha || !cliente || !movil || !_planifChips.length) {
+    errEl.textContent = 'Completá fecha, cliente, móvil y al menos un supervisor.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  var btn = document.getElementById('planifBtnGuardar');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+
+  var params = { token: sessionToken, fecha: fecha, cliente: cliente, movil: movil, estado: estado, supervisores: JSON.stringify(_planifChips) };
+  var onDone = function(res){
+    btn.disabled = false; btn.textContent = 'Guardar en Planificación';
+    if (!res || res.error) {
+      errEl.textContent = 'No se pudo guardar. Intentá de nuevo.';
+      errEl.style.display = 'block';
+      return;
+    }
+    togglePlanifForm();
+    loadPlanificacion();
+  };
+  var onErr = function(){
+    btn.disabled = false; btn.textContent = 'Guardar en Planificación';
+    errEl.textContent = 'No se pudo guardar. Intentá de nuevo.';
+    errEl.style.display = 'block';
+  };
+  if (IS_GAS) {
+    google.script.run.withSuccessHandler(onDone).withFailureHandler(onErr).agregarPlanificacionSupervision(params);
+  } else {
+    authFetch('planificacion_add', params).then(onDone).catch(onErr);
+  }
+}
+
+function renderPlanificacion(){
+  var rows = (allData && allData.planificacion) || [];
+  if (!Array.isArray(rows)) rows = []; // por si vino {error:...}
+
+  var count = document.getElementById('planifCount');
+  if (count) count.textContent = rows.length + ' supervisiones planificadas';
+
+  // Filtros: cliente (derivado del texto "Móvil" comparando contra clientes conocidos)
+  var clientesConocidos = Object.keys(clientColors);
+  function splitMovil(texto){
+    var match = clientesConocidos.filter(function(c){ return texto.indexOf(c) === 0; }).sort(function(a,b){ return b.length - a.length; })[0];
+    if (match) return { cliente: match, movil: texto.substring(match.length).trim() };
+    return { cliente: '', movil: texto };
+  }
+
+  var selC = document.getElementById('planifFiltCliente');
+  if (selC && selC.options.length <= 1) {
+    var clientesUsados = [...new Set(rows.map(function(r){ return splitMovil(r.movil).cliente; }).filter(Boolean))].sort();
+    clientesUsados.forEach(function(c){ var o = document.createElement('option'); o.value = c; o.textContent = c; selC.appendChild(o); });
+  }
+  var selCliente = document.getElementById('planifCliente');
+  if (selCliente && selCliente.options.length === 0) {
+    clientesConocidos.sort().forEach(function(c){ var o = document.createElement('option'); o.value = c; o.textContent = c; selCliente.appendChild(o); });
+  }
+  var supList = document.getElementById('planifSupList');
+  if (supList) {
+    var supsConocidos = [...new Set([].concat(...rows.map(function(r){ return r.supervisores || []; })))].sort();
+    supList.innerHTML = supsConocidos.map(function(s){ return '<option value="' + escapeHtml(s) + '">'; }).join('');
+  }
+
+  var fc = (selC && selC.value) || '';
+  var fe = (document.getElementById('planifFiltEstado') || {}).value || '';
+  var tx = ((document.getElementById('planifFiltTexto') || {}).value || '').toLowerCase().trim();
+
+  var filtered = rows.filter(function(r){
+    var sp = splitMovil(r.movil);
+    if (fc && sp.cliente !== fc) return false;
+    if (fe && r.estado !== fe) return false;
+    if (tx && r.movil.toLowerCase().indexOf(tx) < 0 && (r.supervisores||[]).join(' ').toLowerCase().indexOf(tx) < 0) return false;
+    return true;
+  });
+
+  var tbody = document.getElementById('planifTableBody');
+  if (tbody) {
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty-msg">Sin supervisiones planificadas</td></tr>';
+    } else {
+      tbody.innerHTML = filtered.map(function(r){
+        var sp = splitMovil(r.movil);
+        var badgeCls = PLANIF_ESTADO_BADGE[r.estado] || 'badge-info';
+        return '<tr><td style="white-space:nowrap">' + formatDate(r.fecha) + '</td>'
+          + '<td><div class="mv-name" style="font-weight:500">' + escapeHtml(sp.cliente || r.movil) + '</div>' + (sp.movil ? '<div style="font-size:11.5px;color:var(--text-3)">' + escapeHtml(sp.movil) + '</div>' : '') + '</td>'
+          + '<td>' + escapeHtml((r.supervisores||[]).join(', ') || '—') + '</td>'
+          + '<td><span class="badge ' + badgeCls + '">' + escapeHtml(r.estado) + '</span></td></tr>';
+      }).join('');
+    }
+  }
+
+  if (_planifCalYear === null) { var hoy = new Date(); _planifCalYear = hoy.getFullYear(); _planifCalMonth = hoy.getMonth(); }
+  planifRenderCalendario(rows, splitMovil);
+}
+
+function planifCalMes(delta){
+  _planifCalMonth += delta;
+  if (_planifCalMonth < 0) { _planifCalMonth = 11; _planifCalYear--; }
+  if (_planifCalMonth > 11) { _planifCalMonth = 0; _planifCalYear++; }
+  renderPlanificacion();
+}
+
+function planifRenderCalendario(rows, splitMovil){
+  var titulo = document.getElementById('planifCalTitulo');
+  if (titulo) titulo.textContent = (meses[_planifCalMonth].charAt(0).toUpperCase() + meses[_planifCalMonth].slice(1)) + ' ' + _planifCalYear;
+
+  var porDia = {};
+  rows.forEach(function(r){
+    if (r.fecha && r.fecha.substring(0,7) === _planifCalYear + '-' + String(_planifCalMonth+1).padStart(2,'0')) {
+      var d = parseInt(r.fecha.substring(8,10), 10);
+      (porDia[d] = porDia[d] || []).push(r);
+    }
+  });
+
+  var first = new Date(_planifCalYear, _planifCalMonth, 1);
+  var startOffset = (first.getDay() + 6) % 7; // lunes=0
+  var daysInMonth = new Date(_planifCalYear, _planifCalMonth+1, 0).getDate();
+  var daysInPrevMonth = new Date(_planifCalYear, _planifCalMonth, 0).getDate();
+  var today = new Date();
+  var isCurrentMonth = today.getFullYear() === _planifCalYear && today.getMonth() === _planifCalMonth;
+
+  var cells = '<div class="planif-cal-dow">Lun</div><div class="planif-cal-dow">Mar</div><div class="planif-cal-dow">Mié</div><div class="planif-cal-dow">Jue</div><div class="planif-cal-dow">Vie</div><div class="planif-cal-dow">Sáb</div><div class="planif-cal-dow">Dom</div>';
+
+  for (var i = 0; i < startOffset; i++) cells += '<div class="planif-cal-cell out"><div class="planif-cal-daynum">' + (daysInPrevMonth - startOffset + i + 1) + '</div></div>';
+
+  for (var d = 1; d <= daysInMonth; d++) {
+    var isToday = isCurrentMonth && today.getDate() === d;
+    cells += '<div class="planif-cal-cell' + (isToday ? ' today' : '') + '"><div class="planif-cal-daynum">' + d + '</div>';
+    var items = (porDia[d] || []).slice(0, 3);
+    items.forEach(function(r){
+      var sp = splitMovil(r.movil);
+      var color = clientColors[sp.cliente] || '#888';
+      cells += '<div class="planif-cal-chip" style="background:' + color + '22;color:' + color + '"><span class="dot" style="background:' + color + '"></span>' + escapeHtml(sp.movil || r.movil) + '</div>';
+    });
+    if ((porDia[d] || []).length > 3) cells += '<div class="planif-cal-more">+' + ((porDia[d].length) - 3) + ' más</div>';
+    cells += '</div>';
+  }
+
+  var totalCells = startOffset + daysInMonth;
+  var trailing = (7 - (totalCells % 7)) % 7;
+  for (var j = 1; j <= trailing; j++) cells += '<div class="planif-cal-cell out"><div class="planif-cal-daynum">' + j + '</div></div>';
+
+  var grid = document.getElementById('planifCalGrid');
+  if (grid) grid.innerHTML = cells;
+
+  var clientesEnMes = [...new Set(rows.filter(function(r){ return r.fecha && r.fecha.substring(0,7) === _planifCalYear + '-' + String(_planifCalMonth+1).padStart(2,'0'); }).map(function(r){ return splitMovil(r.movil).cliente; }).filter(Boolean))];
+  var legend = document.getElementById('planifCalLegend');
+  if (legend) legend.innerHTML = clientesEnMes.map(function(c){
+    return '<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2)"><span class="dot" style="background:' + (clientColors[c]||'#888') + '"></span>' + escapeHtml(c) + '</div>';
+  }).join('');
+}
+
 // ── KILÓMETROS ─────────────────────────────────────────────────────────────
 function renderKilometros(){
   const km=allData.kilometros;
@@ -3728,6 +4029,7 @@ function populateKamSelector(){
 ['suFiltCliente','suFiltEstado','suFiltTexto','suOrden'].forEach(id=>{document.getElementById(id).addEventListener(id==='suFiltTexto'?'input':'change',renderSuTable);});
 ['kmFiltCliente','kmFiltJefe','kmFiltTexto'].forEach(id=>{document.getElementById(id).addEventListener(id==='kmFiltTexto'?'input':'change',renderKmRankingHoy);});
 ['kmMesFiltCliente','kmMesFiltTexto'].forEach(id=>{document.getElementById(id).addEventListener(id==='kmMesFiltTexto'?'input':'change',renderKmRankingMes);});
+['planifFiltCliente','planifFiltEstado','planifFiltTexto'].forEach(id=>{document.getElementById(id).addEventListener(id==='planifFiltTexto'?'input':'change',renderPlanificacion);});
 
 // ── MOBILE LAYOUT ──────────────────────────────────────────────────────────
 (function applyMobileIfNeeded(){

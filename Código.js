@@ -129,6 +129,19 @@ function doGet(e) {
     } else if (source === 'tab_supervisiones') {
       result = getTabSupervisiones({ token: params.token || null });
 
+    } else if (source === 'tab_planificacion') {
+      result = getTabPlanificacion({ token: params.token || null });
+
+    } else if (source === 'planificacion_add') {
+      result = agregarPlanificacionSupervision({
+        token: params.token || null,
+        fecha: params.fecha || null,
+        cliente: params.cliente || null,
+        movil: params.movil || null,
+        estado: params.estado || null,
+        supervisores: params.supervisores || null
+      });
+
     } else if (source === 'unificador') {
       result = {
         unificador: getCached(
@@ -2688,6 +2701,109 @@ function readBitacora(fechaFinParam) {
     contingenciasPorMes: contingenciasPorMes,
     contingenciasDetalle: contingenciasDetalle.slice(0, 500)
   };
+}
+
+// ============================================================================
+// PLANIFICACIÓN DE SUPERVISIONES (hoja "Planificación" en el spreadsheet de Supervisiones)
+// ============================================================================
+var PLANIFICACION_SHEET_GID_ = 2070853659;
+
+function getPlanificacionSheet_() {
+  var ss = SpreadsheetApp.openById(SHEETS.supervisiones);
+  var sheet = ss.getSheets().filter(function(s){ return s.getSheetId() === PLANIFICACION_SHEET_GID_; })[0];
+  if (!sheet) throw new Error('Hoja de Planificación no encontrada (gid ' + PLANIFICACION_SHEET_GID_ + ')');
+  return sheet;
+}
+
+function planifIdx_(headers) {
+  var idx = {};
+  headers.forEach(function(h, i) { var k = String(h).trim(); if (!(k in idx)) idx[k] = i; });
+  return idx;
+}
+
+function readPlanificacionSupervisiones_() {
+  var sheet = getPlanificacionSheet_();
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) return [];
+  var idx = planifIdx_(values[0]);
+
+  var rows = [];
+  for (var i = 1; i < values.length; i++) {
+    var row = values[i];
+    var fechaRaw = row[idx['Fecha']];
+    if (!fechaRaw) continue;
+    var fecha = parseFlexibleDate(fechaRaw);
+    if (!fecha || isNaN(fecha.getTime())) continue;
+
+    var supervisores = [row[idx['Supervisor 1']], row[idx['Supervisor 2']], row[idx['Supervisor 3']]]
+      .map(function(s) { return String(s || '').trim(); })
+      .filter(Boolean);
+
+    rows.push({
+      rowIndex: i + 1,
+      fecha: formatDateISO(fecha),
+      movil: String(row[idx['Móvil']] || '').trim(),
+      supervisores: supervisores,
+      estado: String(row[idx['Estado']] || '').trim() || 'Programado'
+    });
+  }
+  rows.sort(function(a, b) { return b.fecha.localeCompare(a.fecha); });
+  return rows;
+}
+
+function getTabPlanificacion(params) {
+  var token = (params && params.token) || null;
+  var usuario = verificarToken_(token);
+  if (!usuario) return { authError: 'token_invalido' };
+  function safeRead(fn) { try { return fn(); } catch (e) { return { error: e.toString() }; } }
+  return {
+    planificacion: safeRead(function() { return getCached('planificacion', readPlanificacionSupervisiones_, CACHE_DURATION_SECONDS); }),
+    lastUpdated: new Date().toISOString()
+  };
+}
+
+// Agrega una fila a la hoja Planificación. Copia la fila anterior primero para que las
+// columnas con fórmulas (Concatenar, Mes, Lista Supervisores, Última Supervisión) se
+// autocompleten igual que en cualquier fila nueva, y solo pisa los campos manuales.
+function agregarPlanificacionSupervision(params) {
+  var token = (params && params.token) || null;
+  var usuario = verificarToken_(token);
+  if (!usuario) return { error: 'token_invalido' };
+
+  var fecha = String((params && params.fecha) || '').trim();
+  var cliente = String((params && params.cliente) || '').trim();
+  var movilNombre = String((params && params.movil) || '').trim();
+  var estado = String((params && params.estado) || 'Programado').trim();
+  var supervisores = [];
+  try { supervisores = JSON.parse((params && params.supervisores) || '[]'); } catch (e) {}
+  supervisores = supervisores.map(function(s) { return String(s || '').trim(); }).filter(Boolean).slice(0, 3);
+
+  if (!fecha || !cliente || !movilNombre || !supervisores.length) return { error: 'faltan_datos' };
+
+  var movil = (cliente + ' ' + movilNombre).trim();
+
+  var sheet = getPlanificacionSheet_();
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  var srcRange = sheet.getRange(lastRow, 1, 1, lastCol);
+  sheet.insertRowAfter(lastRow);
+  var destRange = sheet.getRange(lastRow + 1, 1, 1, lastCol);
+  srcRange.copyTo(destRange); // trae fórmulas (referencias relativas) y formato de la fila anterior
+
+  var idx = planifIdx_(sheet.getRange(1, 1, 1, lastCol).getValues()[0]);
+  function setCell(headerName, value) {
+    if (idx[headerName] == null) return;
+    destRange.getCell(1, idx[headerName] + 1).setValue(value);
+  }
+  setCell('Fecha', new Date(fecha + 'T00:00:00'));
+  setCell('Móvil', movil);
+  setCell('Supervisor 1', supervisores[0] || '');
+  setCell('Supervisor 2', supervisores[1] || '');
+  setCell('Supervisor 3', supervisores[2] || '');
+  setCell('Estado', estado);
+
+  CacheService.getScriptCache().remove('os_v18_planificacion');
+  return { ok: true, rowIndex: lastRow + 1 };
 }
 
 // ============================================================================
