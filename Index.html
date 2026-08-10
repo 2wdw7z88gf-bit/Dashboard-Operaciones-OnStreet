@@ -3669,7 +3669,8 @@ function planifRenderCalendario(rows, splitMovil){
     items.forEach(function(r){
       var sp = splitMovil(r.movil);
       var color = clientColors[sp.cliente] || '#888';
-      cells += '<div class="planif-cal-chip" style="background:' + color + '22;color:' + color + '"><span class="dot" style="background:' + color + '"></span>' + escapeHtml(sp.movil || r.movil) + '</div>';
+      var texto = sp.cliente ? (sp.cliente + (sp.movil ? ' · ' + sp.movil : '')) : r.movil;
+      cells += '<div class="planif-cal-chip" title="' + escapeHtml(texto) + '" style="background:' + color + '22;color:' + color + '"><span class="dot" style="background:' + color + '"></span>' + escapeHtml(texto) + '</div>';
     });
     if ((porDia[d] || []).length > 3) cells += '<div class="planif-cal-more">+' + ((porDia[d].length) - 3) + ' más</div>';
     cells += '</div>';
