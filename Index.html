@@ -1484,8 +1484,16 @@ const clientColors = {
   "Fundación Acrux":"#993C1D","Mutual":"#5F5E5A","Minera Los Pelambres":"#D4537E",
   "Los Pelambres":"#D4537E","Centinela":"#639922","Lampa":"#7F77DD","Naranjo y Asociados":"#E24B4A",
   "Survías":"#7A5C3F","SURVIAS":"#7A5C3F","Entel":"#1A8FCE","BancoEstado - Express":"#003B73",
-  "Servicio de Salud Metropolitano Sur":"#287F58","Redelcom":"#9C2E5E"
+  "Servicio de Salud Metropolitano Sur":"#287F58","Redelcom":"#9C2E5E","AFP ProVida":"#0E7C7B"
 };
+// Color estable (no gris) para clientes que todavía no están en clientColors
+function colorClienteAuto(nombre){
+  if (!nombre) return '#888';
+  if (clientColors[nombre]) return clientColors[nombre];
+  var hash = 0;
+  for (var i = 0; i < nombre.length; i++) { hash = (hash * 31 + nombre.charCodeAt(i)) >>> 0; }
+  return 'hsl(' + (hash % 360) + ',55%,38%)';
+}
 const tipoColors = {
   "Mantención":"badge-info","Reparación":"badge-warn","Supervisión":"badge-purple",
   "Atraso":"badge-warn","Contingencia":"badge-pend","Reclamo":"badge-pend",
@@ -3733,14 +3741,16 @@ function planifRenderCalendario(rows, splitMovil){
   for (var d = 1; d <= daysInMonth; d++) {
     var isToday = isCurrentMonth && today.getDate() === d;
     cells += '<div class="planif-cal-cell' + (isToday ? ' today' : '') + '"><div class="planif-cal-daynum">' + d + '</div>';
-    var items = (porDia[d] || []).slice(0, 3);
+    var validos = (porDia[d] || []).filter(function(r){ return r.movil; });
+    var items = validos.slice(0, 3);
     items.forEach(function(r){
       var sp = splitMovil(r.movil);
-      var color = clientColors[sp.cliente] || '#888';
+      var colorKey = sp.cliente || r.movil;
+      var color = colorClienteAuto(colorKey);
       var texto = sp.cliente ? (sp.cliente + (sp.movil ? ' · ' + sp.movil : '')) : r.movil;
       cells += '<div class="planif-cal-chip" title="' + escapeHtml(texto) + '" style="background:' + color + '22;color:' + color + '"><span class="dot" style="background:' + color + '"></span>' + escapeHtml(texto) + '</div>';
     });
-    if ((porDia[d] || []).length > 3) cells += '<div class="planif-cal-more">+' + ((porDia[d].length) - 3) + ' más</div>';
+    if (validos.length > 3) cells += '<div class="planif-cal-more">+' + (validos.length - 3) + ' más</div>';
     cells += '</div>';
   }
 
@@ -3751,10 +3761,10 @@ function planifRenderCalendario(rows, splitMovil){
   var grid = document.getElementById('planifCalGrid');
   if (grid) grid.innerHTML = cells;
 
-  var clientesEnMes = [...new Set(rows.filter(function(r){ return r.fecha && r.fecha.substring(0,7) === _planifCalYear + '-' + String(_planifCalMonth+1).padStart(2,'0'); }).map(function(r){ return splitMovil(r.movil).cliente; }).filter(Boolean))];
+  var clavesEnMes = [...new Set(rows.filter(function(r){ return r.movil && r.fecha && r.fecha.substring(0,7) === _planifCalYear + '-' + String(_planifCalMonth+1).padStart(2,'0'); }).map(function(r){ var sp = splitMovil(r.movil); return sp.cliente || r.movil; }))];
   var legend = document.getElementById('planifCalLegend');
-  if (legend) legend.innerHTML = clientesEnMes.map(function(c){
-    return '<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2)"><span class="dot" style="background:' + (clientColors[c]||'#888') + '"></span>' + escapeHtml(c) + '</div>';
+  if (legend) legend.innerHTML = clavesEnMes.map(function(c){
+    return '<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2)"><span class="dot" style="background:' + colorClienteAuto(c) + '"></span>' + escapeHtml(c) + '</div>';
   }).join('');
 }
 
