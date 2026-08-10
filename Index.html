@@ -1232,8 +1232,8 @@ tr:hover td{background:var(--surface-2)}
         <div id="planifAddForm" style="display:none;background:var(--surface-2);border:1px dashed var(--border-2);border-radius:10px;padding:16px;margin-bottom:16px">
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px">
             <div><label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Fecha</label><input type="date" id="planifFecha" style="width:100%" /></div>
-            <div><label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Cliente</label><select id="planifCliente" style="width:100%"></select></div>
-            <div><label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Móvil</label><input id="planifMovil" placeholder="Ej: Agencia Coronel" style="width:100%" /></div>
+            <div><label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Cliente</label><select id="planifCliente" style="width:100%" onchange="planifPoblarMoviles()"></select></div>
+            <div><label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Móvil</label><select id="planifMovil" style="width:100%"></select></div>
             <div><label style="display:block;font-size:11px;color:var(--text-2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Estado</label>
               <select id="planifEstado" style="width:100%">
                 <option value="Programado">Programado</option>
@@ -3496,13 +3496,40 @@ function loadPlanificacion(){
   }
 }
 
+var PLANIF_SUPERVISORES_EXTRA = ['Eduardo Behrmann', 'Álvaro Arancibia', 'Montserrat Minoletti'];
+
+function planifPoblarClientesForm(){
+  var sel = document.getElementById('planifCliente');
+  if (sel.options.length) return; // ya poblado
+  var moviles = (allData && allData.unificador && allData.unificador.moviles) || [];
+  var clientes = [...new Set(moviles.map(function(m){ return m.cliente; }).filter(Boolean))].sort();
+  sel.innerHTML = clientes.map(function(c){ return '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + '</option>'; }).join('');
+}
+
+function planifPoblarMoviles(){
+  var cliente = document.getElementById('planifCliente').value;
+  var sel = document.getElementById('planifMovil');
+  var moviles = (allData && allData.unificador && allData.unificador.moviles) || [];
+  var opciones = [...new Set(moviles.filter(function(m){ return m.cliente === cliente; }).map(function(m){ return m.movil; }).filter(Boolean))].sort();
+  sel.innerHTML = opciones.map(function(m){ return '<option value="' + escapeHtml(m) + '">' + escapeHtml(m) + '</option>'; }).join('');
+}
+
+function planifPoblarSupervisoresList(){
+  var supList = document.getElementById('planifSupList');
+  var kams = (allData && allData.kams) || [];
+  var todos = [...new Set(kams.concat(PLANIF_SUPERVISORES_EXTRA))].sort();
+  supList.innerHTML = todos.map(function(s){ return '<option value="' + escapeHtml(s) + '">'; }).join('');
+}
+
 function togglePlanifForm(){
   var form = document.getElementById('planifAddForm');
   var open = form.style.display !== 'none';
   if (open) { form.style.display = 'none'; return; }
   form.style.display = 'block';
+  planifPoblarClientesForm();
+  planifPoblarMoviles();
+  planifPoblarSupervisoresList();
   document.getElementById('planifFecha').value = new Date().toISOString().substring(0,10);
-  document.getElementById('planifMovil').value = '';
   document.getElementById('planifEstado').value = 'Programado';
   document.getElementById('planifSupInput').value = '';
   document.getElementById('planifFormError').style.display = 'none';
@@ -3590,16 +3617,6 @@ function renderPlanificacion(){
     var clientesUsados = [...new Set(rows.map(function(r){ return splitMovil(r.movil).cliente; }).filter(Boolean))].sort();
     clientesUsados.forEach(function(c){ var o = document.createElement('option'); o.value = c; o.textContent = c; selC.appendChild(o); });
   }
-  var selCliente = document.getElementById('planifCliente');
-  if (selCliente && selCliente.options.length === 0) {
-    clientesConocidos.sort().forEach(function(c){ var o = document.createElement('option'); o.value = c; o.textContent = c; selCliente.appendChild(o); });
-  }
-  var supList = document.getElementById('planifSupList');
-  if (supList) {
-    var supsConocidos = [...new Set([].concat(...rows.map(function(r){ return r.supervisores || []; })))].sort();
-    supList.innerHTML = supsConocidos.map(function(s){ return '<option value="' + escapeHtml(s) + '">'; }).join('');
-  }
-
   var fc = (selC && selC.value) || '';
   var fe = (document.getElementById('planifFiltEstado') || {}).value || '';
   var tx = ((document.getElementById('planifFiltTexto') || {}).value || '').toLowerCase().trim();
