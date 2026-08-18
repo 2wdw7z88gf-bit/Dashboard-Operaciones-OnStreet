@@ -1492,8 +1492,8 @@ th.fp-mes-actual,td.fp-mes-actual{background:var(--info-bg)}
         <h2>Clientes potenciales</h2>
         <div class="tabla-wrap" style="max-height:600px;overflow-x:auto">
           <table>
-            <thead><tr><th>Cliente potencial</th><th>Marca / Modelo</th><th>Formato</th><th>Patente</th><th>Prob.</th><th>Tipo de negocio</th></tr></thead>
-            <tbody id="fpPotTableBody"><tr><td colspan="6" class="empty-msg">Cargando...</td></tr></tbody>
+            <thead><tr><th>Cliente potencial</th><th>Marca / Modelo</th><th>Formato</th><th>Patente</th><th>Prob.</th><th>Tipo de negocio</th><th></th></tr></thead>
+            <tbody id="fpPotTableBody"><tr><td colspan="7" class="empty-msg">Cargando...</td></tr></tbody>
           </table>
         </div>
         <div style="display:flex;gap:8px;margin-top:12px">
@@ -1807,6 +1807,7 @@ function fpRunOrFetch_(source, params, onOk){
     if(source==='flota_mes_update') call.actualizarFlotaMes(params);
     else if(source==='flota_potencial_update') call.actualizarFlotaPotencial(params);
     else if(source==='flota_potencial_add') call.agregarFlotaPotencial(params);
+    else if(source==='flota_potencial_delete') call.eliminarFlotaPotencial(params);
   } else {
     const qs=Object.keys(params).map(k=>encodeURIComponent(k)+'='+encodeURIComponent(params[k]==null?'':params[k])).join('&');
     fetch(GAS_API_URL+'?source='+source+'&'+qs).then(function(r){return r.json();}).then(onOk).catch(function(){});
@@ -1934,15 +1935,34 @@ function renderFlotaPotenciales(){
   const tbody=document.getElementById('fpPotTableBody');
   if(!tbody) return;
   const items=(fp&&fp.items)||[];
-  if(!items.length){ tbody.innerHTML='<tr><td colspan="6" class="empty-msg">Sin clientes potenciales</td></tr>'; return; }
+  if(!items.length){ tbody.innerHTML='<tr><td colspan="7" class="empty-msg">Sin clientes potenciales</td></tr>'; return; }
   const campo=function(fila,nombre,valor){
     return '<input class="fp-pot-input" value="'+escapeHtml(valor||'')+'" onchange="fpGuardarPotencial('+fila+',\''+nombre+'\',this)">';
   };
   tbody.innerHTML=items.map(function(it){
     return '<tr><td>'+campo(it.fila,'nombre',it.nombre)+'</td><td>'+campo(it.fila,'marcaModelo',it.marcaModelo)+'</td>'
       +'<td>'+campo(it.fila,'formato',it.formato)+'</td><td>'+campo(it.fila,'patente',it.patente)+'</td>'
-      +'<td>'+campo(it.fila,'prob',it.prob)+'</td><td>'+campo(it.fila,'tipoNegocio',it.tipoNegocio)+'</td></tr>';
+      +'<td>'+campo(it.fila,'prob',it.prob)+'</td><td>'+campo(it.fila,'tipoNegocio',it.tipoNegocio)+'</td>'
+      +'<td><button type="button" class="planif-del-btn" title="Eliminar" onclick="fpEliminarPotencial('+it.fila+',\''+escapeHtml(it.nombre).replace(/'/g,"\\'")+'\',this)">'+ICONS.trash+'</button></td></tr>';
   }).join('');
+}
+
+function fpEliminarPotencial(fila, nombre, btn){
+  if(!confirm('¿Eliminar este cliente potencial? Esta acción no se puede deshacer.')) return;
+  btn.disabled=true; btn.innerHTML='…';
+  fpRunOrFetch_('flota_potencial_delete',{token:sessionToken,fila:fila,nombre:nombre},function(d){
+    if(!d||d.error){
+      btn.disabled=false; btn.innerHTML=ICONS.trash;
+      alert('No se pudo eliminar. Puede que la fila haya cambiado, recarga e intenta de nuevo.');
+      return;
+    }
+    if(allData&&allData.flotaPotenciales){
+      allData.flotaPotenciales.items=allData.flotaPotenciales.items
+        .filter(x=>x.fila!==fila)
+        .map(x=>x.fila>fila?Object.assign({},x,{fila:x.fila-1}):x);
+    }
+    renderFlotaPotenciales();
+  });
 }
 
 function fpAgregarPotencial(){

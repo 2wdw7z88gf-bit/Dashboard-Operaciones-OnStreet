@@ -242,6 +242,9 @@ function doGet(e) {
     } else if (source === 'flota_potencial_add') {
       result = agregarFlotaPotencial({ token: params.token || null, nombre: params.nombre || '' });
 
+    } else if (source === 'flota_potencial_delete') {
+      result = eliminarFlotaPotencial({ token: params.token || null, fila: params.fila || null, nombre: params.nombre || '' });
+
     } else if (source === 'update_inicio') {
       const rowIdx    = parseInt(e.parameter.rowIdx    || '0', 10);
       const conductor = e.parameter.conductor != null ? String(e.parameter.conductor) : null;
@@ -544,6 +547,32 @@ function agregarFlotaPotencial(params) {
 
   CacheService.getScriptCache().remove('os_v18_flota_potenciales');
   return { ok: true, fila: filaSheet, nombre: nombre };
+}
+
+// ── Escritura: eliminar un cliente potencial ─────────────────────────────────
+function eliminarFlotaPotencial(params) {
+  const token = (params && params.token) || null;
+  const usuario = verificarToken_(token);
+  if (!usuario) return { error: 'token_invalido' };
+
+  const fila = parseInt((params && params.fila) || '0', 10);
+  const nombreEsperado = String((params && params.nombre) || '').trim();
+  if (!fila || fila < 2) return { error: 'fila_invalida' };
+
+  const ss = SpreadsheetApp.openById(SHEETS.flotaPanel);
+  const sheet = ss.getSheets()[0];
+  const values = sheet.getDataRange().getValues();
+  const header = encontrarEncabezadoFlotaPotenciales_(values);
+  if (!header) return { error: 'tabla_no_encontrada' };
+  if (fila - 1 >= values.length) return { error: 'fila_no_existe' };
+
+  const colMap = mapearColumnasFlotaPotenciales_(values[header.row], header.col);
+  const nombreCelda = String(values[fila - 1][colMap.nombre] || '').trim();
+  if (nombreEsperado && nombreCelda !== nombreEsperado) return { error: 'fila_no_coincide' };
+
+  sheet.deleteRow(fila);
+  CacheService.getScriptCache().remove('os_v18_flota_potenciales');
+  return { ok: true };
 }
 
 function getFlotaPanelData() {
