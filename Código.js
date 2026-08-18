@@ -362,18 +362,33 @@ function getKilometrosData() {
 var FLOTA_PANEL_MESES_ = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
 var FLOTA_PANEL_COL_ = { cliente:0, om:1, oficina:2, marcaModelo:3, anio:4, patente:5, formato:6, kms:7, mesInicio:8 };
 
+// Busca en una fila el inicio de una sección (por texto de marcador) y
+// devuelve su índice de fila, o -1 si no aparece en esa hoja.
+function buscarFilaMarcador_(values, textoMarcador) {
+  const t = textoMarcador.toLowerCase();
+  for (let i = 0; i < values.length; i++) {
+    for (let j = 0; j < values[i].length; j++) {
+      if (String(values[i][j] || '').trim().toLowerCase().indexOf(t) === 0) return i;
+    }
+  }
+  return -1;
+}
+
 function readFlotaPanel() {
   const ss = SpreadsheetApp.openById(SHEETS.flotaPanel);
   const sheet = ss.getSheets()[0];
   const values = sheet.getDataRange().getValues();
   const C = FLOTA_PANEL_COL_;
 
-  // La tabla de vehículos termina donde empieza "Clientes Potenciales" (otra
-  // sección más abajo, en la misma hoja, con columnas totalmente distintas).
-  // Sin este límite, esas filas se leían con el mapeo de columnas equivocado
-  // y quedaban pegadas al último cliente real (el grupo "Reemplazo").
-  const headerPotenciales = encontrarEncabezadoFlotaPotenciales_(values);
-  const limiteFilas = headerPotenciales ? headerPotenciales.row : values.length;
+  // La tabla de vehículos puede venir seguida, en la misma hoja, de secciones
+  // con columnas totalmente distintas ("Desglose Flota Total", "Clientes
+  // Potenciales"). Si están en otra pestaña ya no aparecen acá y esto no
+  // recorta nada; si siguen en esta misma hoja, hay que cortar antes de
+  // llegar a ellas o se leen como vehículos falsos.
+  const filaDesglose = buscarFilaMarcador_(values, 'desglose flota total');
+  const filaPotenciales = buscarFilaMarcador_(values, 'clientes potenciales');
+  const candidatos = [filaDesglose, filaPotenciales].filter(function(f){ return f >= 0; });
+  const limiteFilas = candidatos.length ? Math.min.apply(null, candidatos) : values.length;
 
   const vehiculos = [];
   const clientesSet = {};
@@ -437,17 +452,22 @@ function actualizarFlotaMes(params) {
 }
 
 // ============================================================================
-// LECTOR: CLIENTES POTENCIALES (tabla dentro del mismo spreadsheet de Flota)
-// Ubicación y columnas variables (celdas fusionadas): se detecta la fila de
-// encabezado buscando "Clientes Potenciales" y se mapean las columnas por
-// el texto de esa misma fila, en vez de asumir índices fijos.
+// LECTOR: CLIENTES POTENCIALES (tabla dentro del spreadsheet de Flota — en
+// su propia pestaña o al pie de la principal, según cómo se haya organizado
+// el sheet). Se busca en TODAS las pestañas y se mapean las columnas por el
+// texto de la fila de encabezado, en vez de asumir índices fijos.
 // ============================================================================
-function encontrarEncabezadoFlotaPotenciales_(values) {
-  for (let i = 0; i < values.length; i++) {
-    for (let j = 0; j < values[i].length; j++) {
-      const v = String(values[i][j] || '').trim().toLowerCase();
-      if (v.indexOf('clientes potenciales') === 0) return { row: i, col: j };
+function encontrarHojaFlotaPotenciales_(ss) {
+  const sheets = ss.getSheets();
+  for (let s = 0; s < sheets.length; s++) {
+    const values = sheets[s].getDataRange().getValues();
+    const row = buscarFilaMarcador_(values, 'clientes potenciales');
+    if (row < 0) continue;
+    let col = -1;
+    for (let j = 0; j < values[row].length; j++) {
+      if (String(values[row][j] || '').trim().toLowerCase().indexOf('clientes potenciales') === 0) { col = j; break; }
     }
+    return { sheet: sheets[s], values: values, row: row, col: col };
   }
   return null;
 }
@@ -467,12 +487,10 @@ function mapearColumnasFlotaPotenciales_(headerRow, colInicio) {
 
 function readFlotaClientesPotenciales() {
   const ss = SpreadsheetApp.openById(SHEETS.flotaPanel);
-  const sheet = ss.getSheets()[0];
-  const values = sheet.getDataRange().getValues();
-
-  const header = encontrarEncabezadoFlotaPotenciales_(values);
+  const header = encontrarHojaFlotaPotenciales_(ss);
   if (!header) return { items: [] };
 
+  const values = header.values;
   const colMap = mapearColumnasFlotaPotenciales_(values[header.row], header.col);
 
   const items = [];
@@ -509,16 +527,14 @@ function actualizarFlotaPotencial(params) {
   if (!fila || fila < 1 || FLOTA_POTENCIAL_CAMPOS_.indexOf(campo) < 0) return { error: 'parametros_invalidos' };
 
   const ss = SpreadsheetApp.openById(SHEETS.flotaPanel);
-  const sheet = ss.getSheets()[0];
-  const values = sheet.getDataRange().getValues();
-  const header = encontrarEncabezadoFlotaPotenciales_(values);
+  const header = encontrarHojaFlotaPotenciales_(ss);
   if (!header) return { error: 'tabla_no_encontrada' };
 
-  const colMap = mapearColumnasFlotaPotenciales_(values[header.row], header.col);
+  const colMap = mapearColumnasFlotaPotenciales_(header.values[header.row], header.col);
   const colIdx = colMap[campo];
   if (colIdx == null) return { error: 'columna_no_encontrada' };
 
-  sheet.getRange(fila, colIdx + 1).setValue(valor);
+  header.sheet.getRange(fila, colIdx + 1).setValue(valor);
   CacheService.getScriptCache().remove('os_v18_flota_potenciales');
   return { ok: true, fila: fila, campo: campo, valor: valor };
 }
@@ -533,11 +549,10 @@ function agregarFlotaPotencial(params) {
   if (!nombre) return { error: 'nombre_requerido' };
 
   const ss = SpreadsheetApp.openById(SHEETS.flotaPanel);
-  const sheet = ss.getSheets()[0];
-  const values = sheet.getDataRange().getValues();
-  const header = encontrarEncabezadoFlotaPotenciales_(values);
+  const header = encontrarHojaFlotaPotenciales_(ss);
   if (!header) return { error: 'tabla_no_encontrada' };
 
+  const values = header.values;
   const colMap = mapearColumnasFlotaPotenciales_(values[header.row], header.col);
 
   // Busca la primera fila vacía o "Total" para insertar justo antes (empuja esa fila hacia abajo).
@@ -549,8 +564,8 @@ function agregarFlotaPotencial(params) {
   }
 
   const filaSheet = insertAt + 1; // 1-based
-  if (hayQuePushear) sheet.insertRowBefore(filaSheet);
-  sheet.getRange(filaSheet, colMap.nombre + 1).setValue(nombre);
+  if (hayQuePushear) header.sheet.insertRowBefore(filaSheet);
+  header.sheet.getRange(filaSheet, colMap.nombre + 1).setValue(nombre);
 
   CacheService.getScriptCache().remove('os_v18_flota_potenciales');
   return { ok: true, fila: filaSheet, nombre: nombre };
@@ -567,17 +582,15 @@ function eliminarFlotaPotencial(params) {
   if (!fila || fila < 2) return { error: 'fila_invalida' };
 
   const ss = SpreadsheetApp.openById(SHEETS.flotaPanel);
-  const sheet = ss.getSheets()[0];
-  const values = sheet.getDataRange().getValues();
-  const header = encontrarEncabezadoFlotaPotenciales_(values);
+  const header = encontrarHojaFlotaPotenciales_(ss);
   if (!header) return { error: 'tabla_no_encontrada' };
-  if (fila - 1 >= values.length) return { error: 'fila_no_existe' };
+  if (fila - 1 >= header.values.length) return { error: 'fila_no_existe' };
 
-  const colMap = mapearColumnasFlotaPotenciales_(values[header.row], header.col);
-  const nombreCelda = String(values[fila - 1][colMap.nombre] || '').trim();
+  const colMap = mapearColumnasFlotaPotenciales_(header.values[header.row], header.col);
+  const nombreCelda = String(header.values[fila - 1][colMap.nombre] || '').trim();
   if (nombreEsperado && nombreCelda !== nombreEsperado) return { error: 'fila_no_coincide' };
 
-  sheet.deleteRow(fila);
+  header.sheet.deleteRow(fila);
   CacheService.getScriptCache().remove('os_v18_flota_potenciales');
   return { ok: true };
 }
