@@ -459,15 +459,28 @@ function actualizarFlotaMes(params) {
 // ============================================================================
 function encontrarHojaFlotaPotenciales_(ss) {
   const sheets = ss.getSheets();
-  for (let s = 0; s < sheets.length; s++) {
-    const values = sheets[s].getDataRange().getValues();
-    const row = buscarFilaMarcador_(values, 'clientes potenciales');
-    if (row < 0) continue;
-    let col = -1;
-    for (let j = 0; j < values[row].length; j++) {
-      if (String(values[row][j] || '').trim().toLowerCase().indexOf('clientes potenciales') === 0) { col = j; break; }
+  // Preferir la(s) pestaña(s) cuyo nombre incluya "potencial" (p.ej. "Potenciales"),
+  // y si ninguna califica, revisar todas igual — por si el nombre de la pestaña cambia.
+  const conNombre = sheets.filter(function(s){ return s.getName().toLowerCase().indexOf('potencial') >= 0; });
+  const candidatas = conNombre.length ? conNombre : sheets;
+
+  for (let s = 0; s < candidatas.length; s++) {
+    const values = candidatas[s].getDataRange().getValues();
+    for (let i = 0; i < Math.min(values.length, 10); i++) {
+      const row = values[i];
+      let col = -1;
+      for (let j = 0; j < row.length; j++) {
+        const v = String(row[j] || '').trim().toLowerCase();
+        if (v === 'patente' || v.indexOf('clientes potenciales') === 0) { col = j; break; }
+      }
+      if (col < 0) continue;
+      // La columna del nombre es la primera celda no vacía de esa misma fila
+      // (el marcador "Clientes Potenciales..." o, si ya no está, el encabezado
+      // del propio nombre del cliente potencial).
+      let colNombre = 0;
+      for (let k = 0; k < row.length; k++) { if (String(row[k] || '').trim()) { colNombre = k; break; } }
+      return { sheet: candidatas[s], values: values, row: i, col: colNombre };
     }
-    return { sheet: sheets[s], values: values, row: row, col: col };
   }
   return null;
 }
