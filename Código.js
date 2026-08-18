@@ -2023,8 +2023,14 @@ function readUnificador(flotaInfo, fechaParam) {
 
   const totalInicios = inicios.length;
   const totalTerminos = terminos.length;
-  const movilesConInicio = Object.keys(iniciosPorMovil).length;
-  const movilesConTermino = Object.keys(terminosPorMovil).length;
+  // Ojo: NO usar Object.keys(iniciosPorMovil/terminosPorMovil).length acá —
+  // esos mapas incluyen entradas de "Inicio de Ruta" que no matchean ningún
+  // vehículo de Flota (los que terminan en movilesDeReemplazo), así que
+  // inflan el conteo respecto al total real de la flota (moviles.length) y
+  // desincronizan la tarjeta KPI del tooltip de detalle (que sí filtra sobre
+  // `moviles`). Se cuenta directo sobre `moviles` para que ambos coincidan.
+  const movilesConInicio = moviles.filter(function(m){ return m.inicio === 1; }).length;
+  const movilesConTermino = moviles.filter(function(m){ return m.termino === 1; }).length;
   const movilesConDobles = moviles.filter(function(m){ return m.multiplesRutas; }).length;
   const movilesConReemplazo = moviles.filter(function(m){ return m.tieneReemplazo; }).length;
   const movilesConDobleInicioSinTermino = moviles.filter(function(m){ return m.dobleInicioSinTermino; }).length;
