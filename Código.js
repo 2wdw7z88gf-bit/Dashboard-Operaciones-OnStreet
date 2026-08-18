@@ -11,7 +11,8 @@ const SHEETS = {
   dashboardApi:         '1sr4hSF3GJwdvoOqCSL8lDOUhvt2uPHjiB8vA16VncXw',
   gpsRealTime:          '1r5r9p2byBh15ovWwpgL75FTLUxD6Zlb-HmFtCqPhu3k',
   informesGPS:          '1sbkeem-7PiPpfYsZByzosdrcacsdKQqSYbiQRKuRakY',
-  transformCalendarios: '1vtTdj3RSdTNhYPVlpuzQ5bY7_D3aMRFyTiQWlb2oMRI'
+  transformCalendarios: '1vtTdj3RSdTNhYPVlpuzQ5bY7_D3aMRFyTiQWlb2oMRI',
+  flotaPanel:           '1wcSDazwh82as49Ti1tFKiFdPY1D8od42dxGUHFWFW_A'
 };
 
 const SUPERVISIONES_TAB = 'Resumen Supervisiones 2026';
@@ -225,6 +226,22 @@ function doGet(e) {
         lastUpdated: new Date().toISOString()
       };
 
+    } else if (source === 'flotaPanel') {
+      result = {
+        flotaPanel: getCached('flota_panel', readFlotaPanel, CACHE_DURATION_SECONDS),
+        flotaPotenciales: getCached('flota_potenciales', readFlotaClientesPotenciales, CACHE_DURATION_SECONDS),
+        lastUpdated: new Date().toISOString()
+      };
+
+    } else if (source === 'flota_mes_update') {
+      result = actualizarFlotaMes({ token: params.token || null, fila: params.fila || null, mes: params.mes || null, valor: params.valor || '' });
+
+    } else if (source === 'flota_potencial_update') {
+      result = actualizarFlotaPotencial({ token: params.token || null, fila: params.fila || null, campo: params.campo || null, valor: params.valor || '' });
+
+    } else if (source === 'flota_potencial_add') {
+      result = agregarFlotaPotencial({ token: params.token || null, nombre: params.nombre || '' });
+
     } else if (source === 'update_inicio') {
       const rowIdx    = parseInt(e.parameter.rowIdx    || '0', 10);
       const conductor = e.parameter.conductor != null ? String(e.parameter.conductor) : null;
@@ -327,6 +344,214 @@ function getKilometrosData() {
   const flotaInfo = safeRead(function() { return getCached('flota', readFlota, CACHE_DURATION_SECONDS); });
   return {
     kilometros: safeRead(function() { return getCached('kilometros', function() { return readKilometros(flotaInfo); }, CACHE_DURATION_SECONDS); })
+  };
+}
+
+// ============================================================================
+// LECTOR: PANEL FLOTA (spreadsheet externo "Panel Flota On Street")
+// Estructura real (confirmada por captura del sheet): bloques por cliente,
+// cada uno con filas de vehículos y, al cierre del bloque, filas "Contrato"
+// con datos/subtotales. Columnas: A Cliente, B N°OM, C Nombre Oficina,
+// D Marca Modelo, E Año, F Patente, G Formato, H KMs, I..T ENE..DIC.
+// Los móviles "Disponibles" y "Reemplazo" están al final del mismo listado,
+// bajo los pseudo-clientes "On Street" y "Reemplazo", con el mismo formato.
+// ============================================================================
+var FLOTA_PANEL_MESES_ = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+var FLOTA_PANEL_COL_ = { cliente:0, om:1, oficina:2, marcaModelo:3, anio:4, patente:5, formato:6, kms:7, mesInicio:8 };
+
+function readFlotaPanel() {
+  const ss = SpreadsheetApp.openById(SHEETS.flotaPanel);
+  const sheet = ss.getSheets()[0];
+  const values = sheet.getDataRange().getValues();
+  const C = FLOTA_PANEL_COL_;
+
+  const vehiculos = [];
+  const clientesSet = {};
+  let currentClient = '';
+
+  for (let i = 0; i < values.length; i++) {
+    const row = values[i];
+    const c0 = String(row[C.cliente] || '').trim();
+    const patente = String(row[C.patente] || '').trim();
+
+    if (patente.toLowerCase() === 'patente') continue; // fila de encabezado repetida
+    if (!patente) continue; // fila de contrato/subtotales, separador, o vacía
+
+    if (c0) currentClient = c0.replace(/^\d+\.?-?\s*/, '').trim() || c0;
+    if (!currentClient) continue;
+
+    const meses = {};
+    FLOTA_PANEL_MESES_.forEach(function(m, idx) { meses[m] = String(row[C.mesInicio + idx] || '').trim(); });
+
+    vehiculos.push({
+      fila: i + 1,
+      cliente: currentClient,
+      om: row[C.om],
+      oficina: String(row[C.oficina] || '').trim(),
+      marcaModelo: String(row[C.marcaModelo] || '').trim(),
+      anio: row[C.anio],
+      patente: patente,
+      formato: String(row[C.formato] || '').trim(),
+      kms: parseInt(String(row[C.kms] || '0').replace(/\./g, ''), 10) || 0,
+      meses: meses
+    });
+    clientesSet[currentClient] = true;
+  }
+
+  return {
+    vehiculos: vehiculos,
+    clientes: Object.keys(clientesSet).sort(),
+    mesActual: FLOTA_PANEL_MESES_[new Date().getMonth()],
+    lastUpdated: new Date().toISOString()
+  };
+}
+
+// ── Escritura: cambiar el estado (OP/D/RT/etc.) de un vehículo en un mes ────
+function actualizarFlotaMes(params) {
+  const token = (params && params.token) || null;
+  const usuario = verificarToken_(token);
+  if (!usuario) return { error: 'token_invalido' };
+
+  const fila = parseInt((params && params.fila) || '0', 10);
+  const mes = String((params && params.mes) || '').trim().toUpperCase();
+  const valor = String((params && params.valor) || '').trim().toUpperCase();
+  const mesIdx = FLOTA_PANEL_MESES_.indexOf(mes);
+  if (!fila || fila < 2 || mesIdx < 0) return { error: 'parametros_invalidos' };
+
+  const ss = SpreadsheetApp.openById(SHEETS.flotaPanel);
+  const sheet = ss.getSheets()[0];
+  const col = FLOTA_PANEL_COL_.mesInicio + mesIdx + 1; // 1-based para getRange
+  sheet.getRange(fila, col).setValue(valor);
+  CacheService.getScriptCache().remove('os_v18_flota_panel');
+  return { ok: true, fila: fila, mes: mes, valor: valor };
+}
+
+// ============================================================================
+// LECTOR: CLIENTES POTENCIALES (tabla dentro del mismo spreadsheet de Flota)
+// Ubicación y columnas variables (celdas fusionadas): se detecta la fila de
+// encabezado buscando "Clientes Potenciales" y se mapean las columnas por
+// el texto de esa misma fila, en vez de asumir índices fijos.
+// ============================================================================
+function encontrarEncabezadoFlotaPotenciales_(values) {
+  for (let i = 0; i < values.length; i++) {
+    for (let j = 0; j < values[i].length; j++) {
+      const v = String(values[i][j] || '').trim().toLowerCase();
+      if (v.indexOf('clientes potenciales') === 0) return { row: i, col: j };
+    }
+  }
+  return null;
+}
+
+function mapearColumnasFlotaPotenciales_(headerRow, colInicio) {
+  const colMap = { nombre: colInicio };
+  for (let j = colInicio + 1; j < headerRow.length; j++) {
+    const label = String(headerRow[j] || '').trim().toLowerCase();
+    if (label === 'marca modelo') colMap.marcaModelo = j;
+    else if (label === 'formato') colMap.formato = j;
+    else if (label === 'patente') colMap.patente = j;
+    else if (label.indexOf('prob') === 0) colMap.prob = j;
+    else if (label.indexOf('tipo negocio') === 0) colMap.tipoNegocio = j;
+  }
+  return colMap;
+}
+
+function readFlotaClientesPotenciales() {
+  const ss = SpreadsheetApp.openById(SHEETS.flotaPanel);
+  const sheet = ss.getSheets()[0];
+  const values = sheet.getDataRange().getValues();
+
+  const header = encontrarEncabezadoFlotaPotenciales_(values);
+  if (!header) return { items: [] };
+
+  const colMap = mapearColumnasFlotaPotenciales_(values[header.row], header.col);
+
+  const items = [];
+  for (let i = header.row + 1; i < values.length; i++) {
+    const row = values[i];
+    const nombre = String(row[colMap.nombre] || '').trim();
+    if (!nombre) break; // fin de la tabla (fila vacía)
+    if (nombre.toLowerCase() === 'total') break;
+    items.push({
+      fila: i + 1,
+      nombre: nombre,
+      marcaModelo: colMap.marcaModelo != null ? String(row[colMap.marcaModelo] || '').trim() : '',
+      formato: colMap.formato != null ? String(row[colMap.formato] || '').trim() : '',
+      patente: colMap.patente != null ? String(row[colMap.patente] || '').trim() : '',
+      prob: colMap.prob != null ? String(row[colMap.prob] || '').trim() : '',
+      tipoNegocio: colMap.tipoNegocio != null ? String(row[colMap.tipoNegocio] || '').trim() : ''
+    });
+  }
+
+  return { items: items };
+}
+
+// ── Escritura: editar un campo de un cliente potencial ──────────────────────
+var FLOTA_POTENCIAL_CAMPOS_ = ['nombre','marcaModelo','formato','patente','prob','tipoNegocio'];
+
+function actualizarFlotaPotencial(params) {
+  const token = (params && params.token) || null;
+  const usuario = verificarToken_(token);
+  if (!usuario) return { error: 'token_invalido' };
+
+  const fila = parseInt((params && params.fila) || '0', 10);
+  const campo = String((params && params.campo) || '').trim();
+  const valor = (params && params.valor != null) ? String(params.valor) : '';
+  if (!fila || fila < 1 || FLOTA_POTENCIAL_CAMPOS_.indexOf(campo) < 0) return { error: 'parametros_invalidos' };
+
+  const ss = SpreadsheetApp.openById(SHEETS.flotaPanel);
+  const sheet = ss.getSheets()[0];
+  const values = sheet.getDataRange().getValues();
+  const header = encontrarEncabezadoFlotaPotenciales_(values);
+  if (!header) return { error: 'tabla_no_encontrada' };
+
+  const colMap = mapearColumnasFlotaPotenciales_(values[header.row], header.col);
+  const colIdx = colMap[campo];
+  if (colIdx == null) return { error: 'columna_no_encontrada' };
+
+  sheet.getRange(fila, colIdx + 1).setValue(valor);
+  CacheService.getScriptCache().remove('os_v18_flota_potenciales');
+  return { ok: true, fila: fila, campo: campo, valor: valor };
+}
+
+// ── Escritura: agregar un nuevo cliente potencial (fila nueva) ──────────────
+function agregarFlotaPotencial(params) {
+  const token = (params && params.token) || null;
+  const usuario = verificarToken_(token);
+  if (!usuario) return { error: 'token_invalido' };
+
+  const nombre = String((params && params.nombre) || '').trim();
+  if (!nombre) return { error: 'nombre_requerido' };
+
+  const ss = SpreadsheetApp.openById(SHEETS.flotaPanel);
+  const sheet = ss.getSheets()[0];
+  const values = sheet.getDataRange().getValues();
+  const header = encontrarEncabezadoFlotaPotenciales_(values);
+  if (!header) return { error: 'tabla_no_encontrada' };
+
+  const colMap = mapearColumnasFlotaPotenciales_(values[header.row], header.col);
+
+  // Busca la primera fila vacía o "Total" para insertar justo antes (empuja esa fila hacia abajo).
+  let insertAt = values.length;
+  let hayQuePushear = false;
+  for (let i = header.row + 1; i < values.length; i++) {
+    const v = String(values[i][colMap.nombre] || '').trim();
+    if (!v || v.toLowerCase() === 'total') { insertAt = i; hayQuePushear = true; break; }
+  }
+
+  const filaSheet = insertAt + 1; // 1-based
+  if (hayQuePushear) sheet.insertRowBefore(filaSheet);
+  sheet.getRange(filaSheet, colMap.nombre + 1).setValue(nombre);
+
+  CacheService.getScriptCache().remove('os_v18_flota_potenciales');
+  return { ok: true, fila: filaSheet, nombre: nombre };
+}
+
+function getFlotaPanelData() {
+  function safeRead(fn) { try { return fn(); } catch (e) { return { error: e.toString() }; } }
+  return {
+    flotaPanel: safeRead(function() { return getCached('flota_panel', readFlotaPanel, CACHE_DURATION_SECONDS); }),
+    flotaPotenciales: safeRead(function() { return getCached('flota_potenciales', readFlotaClientesPotenciales, CACHE_DURATION_SECONDS); }),
+    lastUpdated: new Date().toISOString()
   };
 }
 
