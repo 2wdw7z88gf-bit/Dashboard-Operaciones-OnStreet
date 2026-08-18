@@ -368,11 +368,18 @@ function readFlotaPanel() {
   const values = sheet.getDataRange().getValues();
   const C = FLOTA_PANEL_COL_;
 
+  // La tabla de vehículos termina donde empieza "Clientes Potenciales" (otra
+  // sección más abajo, en la misma hoja, con columnas totalmente distintas).
+  // Sin este límite, esas filas se leían con el mapeo de columnas equivocado
+  // y quedaban pegadas al último cliente real (el grupo "Reemplazo").
+  const headerPotenciales = encontrarEncabezadoFlotaPotenciales_(values);
+  const limiteFilas = headerPotenciales ? headerPotenciales.row : values.length;
+
   const vehiculos = [];
   const clientesSet = {};
   let currentClient = '';
 
-  for (let i = 0; i < values.length; i++) {
+  for (let i = 0; i < limiteFilas; i++) {
     const row = values[i];
     const c0 = String(row[C.cliente] || '').trim();
     const patente = String(row[C.patente] || '').trim();
