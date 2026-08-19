@@ -1889,6 +1889,35 @@ function fpKmsNormalizado_(valor){
   return n>=1000000 ? Math.round(n/1000) : Math.round(n);
 }
 
+function fpPatenteKey_(valor){
+  return String(valor||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+}
+
+function fpCompletarPotencial_(item){
+  if(!item) return {};
+  const out=Object.assign({}, item);
+  const vehiculos=(allData&&allData.flotaPanel&&allData.flotaPanel.vehiculos)||[];
+  const patente=fpPatenteKey_(out.patente);
+  const match=patente ? vehiculos.find(function(v){ return fpPatenteKey_(v.patente)===patente; }) : null;
+  if(match){
+    if(!out.anio) out.anio=match.anio||'';
+    if(!fpKmsNormalizado_(out.kms)) out.kms=match.kms||0;
+    if(!out.formato) out.formato=match.formato||'';
+    if(!out.marcaModelo) out.marcaModelo=match.marcaModelo||'';
+  }
+  return out;
+}
+
+function fpProbabilidadDisplay_(valor){
+  const raw=String(valor||'').trim();
+  if(!raw) return '';
+  if(raw.indexOf('%')>=0) return raw;
+  const n=Number(raw.replace(',','.'));
+  if(!isFinite(n)) return raw;
+  if(n>0&&n<=1) return Math.round(n*100)+'%';
+  return raw;
+}
+
 function renderFlotaPanel(){
   const fp=allData.flotaPanel;
   if(!fp||!fp.vehiculos) return;
@@ -1986,7 +2015,7 @@ function renderFlotaPotenciales(){
   const fp=allData&&allData.flotaPotenciales;
   const tbody=document.getElementById('fpPotTableBody');
   if(!tbody) return;
-  const items=(fp&&fp.items)||[];
+  const items=((fp&&fp.items)||[]).map(fpCompletarPotencial_);
   if(!items.length){ tbody.innerHTML='<tr><td colspan="9" class="empty-msg">Sin clientes potenciales</td></tr>'; return; }
   const campo=function(fila,nombre,valor){
     return '<input class="fp-pot-input" value="'+escapeHtml(valor||'')+'" onchange="fpGuardarPotencial('+fila+',\''+nombre+'\',this)">';
@@ -1999,7 +2028,7 @@ function renderFlotaPotenciales(){
     return '<tr><td>'+campo(it.fila,'nombre',it.nombre)+'</td><td>'+campo(it.fila,'marcaModelo',it.marcaModelo)+'</td>'
       +'<td>'+campo(it.fila,'anio',it.anio)+'</td><td>'+campo(it.fila,'patente',it.patente)+'</td>'
       +'<td>'+campo(it.fila,'formato',it.formato)+'</td><td class="right">'+kmsCampo(it.fila,it.kms)+'</td>'
-      +'<td>'+campo(it.fila,'prob',it.prob)+'</td><td>'+campo(it.fila,'tipoNegocio',it.tipoNegocio)+'</td>'
+      +'<td>'+campo(it.fila,'prob',fpProbabilidadDisplay_(it.prob))+'</td><td>'+campo(it.fila,'tipoNegocio',it.tipoNegocio)+'</td>'
       +'<td><button type="button" class="planif-del-btn" title="Eliminar" onclick="fpEliminarPotencial('+it.fila+',\''+escapeHtml(it.nombre).replace(/'/g,"\\'")+'\',this)">'+ICONS.trash+'</button></td></tr>';
   }).join('');
 }
