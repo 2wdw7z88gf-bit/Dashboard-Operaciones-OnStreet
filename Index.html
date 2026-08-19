@@ -1471,7 +1471,8 @@ th.fp-mes-actual,td.fp-mes-actual{background:var(--info-bg)}
       <div class="kpi-grid">
         <div class="kpi info"><div class="kpi-label">Vehículos totales</div><div class="kpi-val" id="fpTotal">—</div><div class="kpi-sub">en el panel</div></div>
         <div class="kpi ok"><div class="kpi-label">Operativos</div><div class="kpi-val" id="fpOperativos">—</div><div class="kpi-sub" id="fpOperativosSub">—</div></div>
-        <div class="kpi warn"><div class="kpi-label">En otro estado</div><div class="kpi-val" id="fpOtros">—</div><div class="kpi-sub" id="fpOtrosSub">mes en curso</div></div>
+        <div class="kpi warn"><div class="kpi-label">Disponibles</div><div class="kpi-val" id="fpDisponibles">—</div><div class="kpi-sub" id="fpDisponiblesSub">mes en curso</div></div>
+        <div class="kpi danger"><div class="kpi-label">Reemplazos</div><div class="kpi-val" id="fpReemplazos">—</div><div class="kpi-sub" id="fpReemplazosSub">mes en curso</div></div>
         <div class="kpi teal"><div class="kpi-label">Clientes activos</div><div class="kpi-val" id="fpClientes">—</div><div class="kpi-sub" id="fpClientesSub">con flota asignada</div></div>
       </div>
       <div class="panel" style="margin-bottom:14px">
@@ -1803,6 +1804,44 @@ const FP_MESES_=['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NO
 const FP_MESES_LETRA_=['E','F','M','A','M','J','J','A','S','O','N','D'];
 const FP_GRUPOS_INTERNOS_=['On Street','Reemplazo'];
 function fpSlug_(s){return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');}
+const FP_OFICINA_COORDS_=[
+  ['iquique',-20.22,-70.14],['calama',-22.46,-68.93],['antofagasta',-23.65,-70.40],
+  ['copiapo',-27.37,-70.33],['la serena',-29.91,-71.25],['coquimbo',-29.96,-71.34],
+  ['mlp',-31.77,-70.96],['los pelambres',-31.77,-70.96],
+  ['quinta cordillera',-32.83,-70.60],['quillota',-32.88,-71.25],['quilpue',-33.05,-71.44],
+  ['vina del mar',-33.03,-71.55],['valparaiso',-33.05,-71.63],['quinta costa',-33.05,-71.63],
+  ['lampa',-33.28,-70.87],['santiago',-33.45,-70.66],['merced',-33.44,-70.65],['rm',-33.45,-70.66],
+  ['maipu',-33.51,-70.76],['talagante',-33.66,-70.93],['san bernardo',-33.59,-70.70],
+  ['san antonio',-33.59,-71.61],['rancagua',-34.17,-70.74],['o higgins',-34.17,-70.74],
+  ['san fernando',-34.58,-70.99],['curico',-34.98,-71.24],['talca',-35.43,-71.66],
+  ['linares',-35.85,-71.60],['san carlos',-36.42,-71.96],['nuble',-36.61,-72.10],
+  ['chillan',-36.61,-72.10],['concepcion',-36.83,-73.05],['coronel',-37.02,-73.14],
+  ['los angeles',-37.46,-72.35],['temuco',-38.73,-72.60],['valdivia',-39.82,-73.24],
+  ['osorno',-40.57,-73.13],['puerto montt',-41.47,-72.93],['pto montt',-41.47,-72.93],
+  ['castro',-42.48,-73.76],['coyhaique',-45.57,-72.07]
+];
+function fpNorm_(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/ñ/g,'n').replace(/[^a-z0-9]+/g,' ').trim();}
+function fpCoordsOficina_(oficina, cliente){
+  const n=fpNorm_((cliente||'')+' '+(oficina||''));
+  for(let i=0;i<FP_OFICINA_COORDS_.length;i++){
+    const c=FP_OFICINA_COORDS_[i];
+    if(n.indexOf(c[0])>=0) return {lat:c[1],lng:c[2],match:c[0]};
+  }
+  return null;
+}
+function fpOrdenNorteSur_(v){
+  if(typeof v.ordenNorteSur==='number') return v.ordenNorteSur;
+  if(v.ubicacion&&typeof v.ubicacion.lat==='number') return v.ubicacion.lat;
+  const c=fpCoordsOficina_(v.oficina, v.cliente);
+  return c ? c.lat : null;
+}
+function fpCompararOficinas_(a,b){
+  const oa=fpOrdenNorteSur_(a), ob=fpOrdenNorteSur_(b);
+  if(oa!==null&&ob!==null&&oa!==ob) return ob-oa; // latitud mayor = más al norte
+  if(oa!==null&&ob===null) return -1;
+  if(oa===null&&ob!==null) return 1;
+  return String(a.oficina||'').localeCompare(String(b.oficina||''),'es',{numeric:true,sensitivity:'base'}) || ((a.fila||0)-(b.fila||0));
+}
 
 function fpRunOrFetch_(source, params, onOk){
   if(IS_GAS){
@@ -1852,11 +1891,15 @@ function renderFlotaPanel(){
   const vehiculos=fp.vehiculos;
   const total=vehiculos.length;
   const operativos=vehiculos.filter(v=>(v.meses&&v.meses[mesActual])==='OP').length;
-  const conEstado=vehiculos.filter(v=>v.meses&&v.meses[mesActual]).length;
+  const disponibles=vehiculos.filter(v=>(v.meses&&v.meses[mesActual])==='D').length;
+  const reemplazos=vehiculos.filter(v=>(v.meses&&v.meses[mesActual])==='R').length;
   document.getElementById('fpTotal').textContent=total;
   document.getElementById('fpOperativos').textContent=operativos;
   document.getElementById('fpOperativosSub').textContent=mesActual+' · '+(total?Math.round(operativos/total*100):0)+'% de la flota';
-  document.getElementById('fpOtros').textContent=conEstado-operativos;
+  document.getElementById('fpDisponibles').textContent=disponibles;
+  document.getElementById('fpDisponiblesSub').textContent=mesActual+' · '+(total?Math.round(disponibles/total*100):0)+'% de la flota';
+  document.getElementById('fpReemplazos').textContent=reemplazos;
+  document.getElementById('fpReemplazosSub').textContent=mesActual+' · '+(total?Math.round(reemplazos/total*100):0)+'% de la flota';
   const clientesReales=(fp.clientes||[]).filter(c=>FP_GRUPOS_INTERNOS_.indexOf(c)<0);
   document.getElementById('fpClientes').textContent=clientesReales.length;
   document.getElementById('fpClientesSub').textContent=total+' oficinas en total';
@@ -1898,7 +1941,7 @@ function renderFlotaGroups(){
   }).join('');
 
   groupsWrap.innerHTML=order.map(function(cliente){
-    const vs=map[cliente];
+    const vs=map[cliente].slice().sort(fpCompararOficinas_);
     const mesesHead=FP_MESES_LETRA_.map(function(l,i){
       return '<th class="fp-mes'+(i===idxActual?' fp-mes-actual':'')+'">'+l+'</th>';
     }).join('');

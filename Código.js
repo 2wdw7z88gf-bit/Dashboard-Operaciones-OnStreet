@@ -361,6 +361,35 @@ function getKilometrosData() {
 // ============================================================================
 var FLOTA_PANEL_MESES_ = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
 var FLOTA_PANEL_COL_ = { cliente:0, om:1, oficina:2, marcaModelo:3, anio:4, patente:5, formato:6, kms:7, mesInicio:8 };
+var FLOTA_PANEL_OFICINA_COORDS_ = [
+  ['iquique', -20.22, -70.14], ['calama', -22.46, -68.93], ['antofagasta', -23.65, -70.40],
+  ['copiapo', -27.37, -70.33], ['la serena', -29.91, -71.25], ['coquimbo', -29.96, -71.34],
+  ['mlp', -31.77, -70.96], ['los pelambres', -31.77, -70.96],
+  ['quinta cordillera', -32.83, -70.60], ['quillota', -32.88, -71.25], ['quilpue', -33.05, -71.44],
+  ['vina del mar', -33.03, -71.55], ['valparaiso', -33.05, -71.63], ['quinta costa', -33.05, -71.63],
+  ['lampa', -33.28, -70.87], ['santiago', -33.45, -70.66], ['merced', -33.44, -70.65], ['rm', -33.45, -70.66],
+  ['maipu', -33.51, -70.76], ['talagante', -33.66, -70.93], ['san bernardo', -33.59, -70.70],
+  ['san antonio', -33.59, -71.61], ['rancagua', -34.17, -70.74], ['o higgins', -34.17, -70.74],
+  ['san fernando', -34.58, -70.99], ['curico', -34.98, -71.24], ['talca', -35.43, -71.66],
+  ['linares', -35.85, -71.60], ['san carlos', -36.42, -71.96], ['nuble', -36.61, -72.10],
+  ['chillan', -36.61, -72.10], ['concepcion', -36.83, -73.05], ['coronel', -37.02, -73.14],
+  ['los angeles', -37.46, -72.35], ['temuco', -38.73, -72.60], ['valdivia', -39.82, -73.24],
+  ['osorno', -40.57, -73.13], ['puerto montt', -41.47, -72.93], ['pto montt', -41.47, -72.93],
+  ['castro', -42.48, -73.76], ['coyhaique', -45.57, -72.07]
+];
+
+function normalizarOficinaFlota_(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ñ/g, 'n').replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function detectarUbicacionOficinaFlota_(oficina, cliente) {
+  var n = normalizarOficinaFlota_((cliente || '') + ' ' + (oficina || ''));
+  for (var i = 0; i < FLOTA_PANEL_OFICINA_COORDS_.length; i++) {
+    var c = FLOTA_PANEL_OFICINA_COORDS_[i];
+    if (n.indexOf(c[0]) >= 0) return { lat: c[1], lng: c[2], match: c[0] };
+  }
+  return null;
+}
 
 // Busca en una fila el inicio de una sección (por texto de marcador) y
 // devuelve su índice de fila, o -1 si no aparece en esa hoja.
@@ -408,16 +437,21 @@ function readFlotaPanel() {
     const meses = {};
     FLOTA_PANEL_MESES_.forEach(function(m, idx) { meses[m] = String(row[C.mesInicio + idx] || '').trim(); });
 
+    const oficina = String(row[C.oficina] || '').trim();
+    const ubicacion = detectarUbicacionOficinaFlota_(oficina, currentClient);
+
     vehiculos.push({
       fila: i + 1,
       cliente: currentClient,
       om: row[C.om],
-      oficina: String(row[C.oficina] || '').trim(),
+      oficina: oficina,
       marcaModelo: String(row[C.marcaModelo] || '').trim(),
       anio: row[C.anio],
       patente: patente,
       formato: String(row[C.formato] || '').trim(),
       kms: parseInt(String(row[C.kms] || '0').replace(/\./g, ''), 10) || 0,
+      ubicacion: ubicacion,
+      ordenNorteSur: ubicacion ? ubicacion.lat : null,
       meses: meses
     });
     clientesSet[currentClient] = true;
