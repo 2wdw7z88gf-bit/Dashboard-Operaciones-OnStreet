@@ -1496,8 +1496,8 @@ th.fp-mes-actual,td.fp-mes-actual{background:var(--info-bg)}
         <h2>Clientes potenciales</h2>
         <div class="tabla-wrap" style="max-height:600px;overflow-x:auto">
           <table>
-            <thead><tr><th>Cliente potencial</th><th>Marca / Modelo</th><th>Formato</th><th>Patente</th><th>Prob.</th><th>Tipo de negocio</th><th></th></tr></thead>
-            <tbody id="fpPotTableBody"><tr><td colspan="7" class="empty-msg">Cargando...</td></tr></tbody>
+            <thead><tr><th>Cliente potencial</th><th>Marca / Modelo</th><th>Año</th><th>Patente</th><th>Formato</th><th class="right">KMs aprox.</th><th>Prob.</th><th>Tipo de negocio</th><th></th></tr></thead>
+            <tbody id="fpPotTableBody"><tr><td colspan="9" class="empty-msg">Cargando...</td></tr></tbody>
           </table>
         </div>
         <div style="display:flex;gap:8px;margin-top:12px">
@@ -1987,13 +1987,18 @@ function renderFlotaPotenciales(){
   const tbody=document.getElementById('fpPotTableBody');
   if(!tbody) return;
   const items=(fp&&fp.items)||[];
-  if(!items.length){ tbody.innerHTML='<tr><td colspan="7" class="empty-msg">Sin clientes potenciales</td></tr>'; return; }
+  if(!items.length){ tbody.innerHTML='<tr><td colspan="9" class="empty-msg">Sin clientes potenciales</td></tr>'; return; }
   const campo=function(fila,nombre,valor){
     return '<input class="fp-pot-input" value="'+escapeHtml(valor||'')+'" onchange="fpGuardarPotencial('+fila+',\''+nombre+'\',this)">';
   };
+  const kmsCampo=function(fila,valor){
+    const kms=fpKmsNormalizado_(valor);
+    return '<input class="fp-pot-input" style="text-align:right" value="'+escapeHtml(kms?kms.toLocaleString('es-CL'):'')+'" onchange="fpGuardarPotencial('+fila+',\'kms\',this)">';
+  };
   tbody.innerHTML=items.map(function(it){
     return '<tr><td>'+campo(it.fila,'nombre',it.nombre)+'</td><td>'+campo(it.fila,'marcaModelo',it.marcaModelo)+'</td>'
-      +'<td>'+campo(it.fila,'formato',it.formato)+'</td><td>'+campo(it.fila,'patente',it.patente)+'</td>'
+      +'<td>'+campo(it.fila,'anio',it.anio)+'</td><td>'+campo(it.fila,'patente',it.patente)+'</td>'
+      +'<td>'+campo(it.fila,'formato',it.formato)+'</td><td class="right">'+kmsCampo(it.fila,it.kms)+'</td>'
       +'<td>'+campo(it.fila,'prob',it.prob)+'</td><td>'+campo(it.fila,'tipoNegocio',it.tipoNegocio)+'</td>'
       +'<td><button type="button" class="planif-del-btn" title="Eliminar" onclick="fpEliminarPotencial('+it.fila+',\''+escapeHtml(it.nombre).replace(/'/g,"\\'")+'\',this)">'+ICONS.trash+'</button></td></tr>';
   }).join('');
@@ -2027,7 +2032,7 @@ function fpAgregarPotencial(){
     if(!d||d.error){ inp.style.outline='2px solid var(--danger-fg)'; setTimeout(()=>{inp.style.outline='';},1500); return; }
     inp.value='';
     if(!allData.flotaPotenciales) allData.flotaPotenciales={items:[]};
-    allData.flotaPotenciales.items.push({fila:d.fila,nombre:d.nombre,marcaModelo:'',formato:'',patente:'',prob:'',tipoNegocio:''});
+    allData.flotaPotenciales.items.push({fila:d.fila,nombre:d.nombre,marcaModelo:'',anio:'',formato:'',patente:'',kms:0,prob:'',tipoNegocio:''});
     renderFlotaPotenciales();
   });
 }

@@ -544,10 +544,12 @@ function encontrarHojaFlotaPotenciales_(ss) {
 function mapearColumnasFlotaPotenciales_(headerRow, colInicio) {
   const colMap = { nombre: colInicio };
   for (let j = colInicio + 1; j < headerRow.length; j++) {
-    const label = String(headerRow[j] || '').trim().toLowerCase();
+    const label = normalizarOficinaFlota_(headerRow[j]);
     if (label === 'marca modelo') colMap.marcaModelo = j;
+    else if (label === 'ano') colMap.anio = j;
     else if (label === 'formato') colMap.formato = j;
     else if (label === 'patente') colMap.patente = j;
+    else if (label.indexOf('kms') === 0 || label.indexOf('km') === 0) colMap.kms = j;
     else if (label.indexOf('prob') === 0) colMap.prob = j;
     else if (label.indexOf('tipo negocio') === 0) colMap.tipoNegocio = j;
   }
@@ -572,8 +574,10 @@ function readFlotaClientesPotenciales() {
       fila: i + 1,
       nombre: nombre,
       marcaModelo: colMap.marcaModelo != null ? String(row[colMap.marcaModelo] || '').trim() : '',
+      anio: colMap.anio != null ? String(row[colMap.anio] || '').trim() : '',
       formato: colMap.formato != null ? String(row[colMap.formato] || '').trim() : '',
       patente: colMap.patente != null ? String(row[colMap.patente] || '').trim() : '',
+      kms: colMap.kms != null ? parseFlotaKms_(row[colMap.kms]) : 0,
       prob: colMap.prob != null ? String(row[colMap.prob] || '').trim() : '',
       tipoNegocio: colMap.tipoNegocio != null ? String(row[colMap.tipoNegocio] || '').trim() : ''
     });
@@ -583,7 +587,7 @@ function readFlotaClientesPotenciales() {
 }
 
 // ── Escritura: editar un campo de un cliente potencial ──────────────────────
-var FLOTA_POTENCIAL_CAMPOS_ = ['nombre','marcaModelo','formato','patente','prob','tipoNegocio'];
+var FLOTA_POTENCIAL_CAMPOS_ = ['nombre','marcaModelo','anio','formato','patente','kms','prob','tipoNegocio'];
 
 function actualizarFlotaPotencial(params) {
   const token = (params && params.token) || null;
