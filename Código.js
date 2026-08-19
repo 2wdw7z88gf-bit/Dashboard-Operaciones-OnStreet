@@ -391,6 +391,28 @@ function detectarUbicacionOficinaFlota_(oficina, cliente) {
   return null;
 }
 
+function parseFlotaKms_(value) {
+  if (value === null || value === undefined || value === '') return 0;
+  if (typeof value === 'number') return Math.round(value);
+
+  var s = String(value).trim().replace(/\s/g, '');
+  if (!s) return 0;
+
+  if (s.indexOf(',') >= 0) {
+    return Math.round(parseFloat(s.replace(/\./g, '').replace(',', '.'))) || 0;
+  }
+
+  var parts = s.split('.');
+  if (parts.length > 1) {
+    var groups = parts.slice(1);
+    var looksLikeThousands = parts[0].length <= 3 && groups.every(function(p) { return p.length === 3; });
+    if (looksLikeThousands) return parseInt(parts.join(''), 10) || 0;
+    return Math.round(parseFloat(s)) || 0;
+  }
+
+  return parseInt(s.replace(/[^\d-]/g, ''), 10) || 0;
+}
+
 // Busca en una fila el inicio de una sección (por texto de marcador) y
 // devuelve su índice de fila, o -1 si no aparece en esa hoja.
 function buscarFilaMarcador_(values, textoMarcador) {
@@ -449,7 +471,7 @@ function readFlotaPanel() {
       anio: row[C.anio],
       patente: patente,
       formato: String(row[C.formato] || '').trim(),
-      kms: parseInt(String(row[C.kms] || '0').replace(/\./g, ''), 10) || 0,
+      kms: parseFlotaKms_(row[C.kms]),
       ubicacion: ubicacion,
       ordenNorteSur: ubicacion ? ubicacion.lat : null,
       meses: meses
