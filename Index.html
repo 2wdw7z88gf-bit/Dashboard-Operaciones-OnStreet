@@ -4068,7 +4068,7 @@ function planifRenderCalendario(rows, splitMovil){
       var texto = sp.cliente ? (sp.cliente + (sp.movil ? ' · ' + sp.movil : '')) : r.movil;
       var supervisores = (r.supervisores || []).filter(Boolean).join(', ') || 'Sin supervisores asignados';
       var tooltip = texto + '\nSupervisor(es): ' + supervisores + '\nEstado: ' + (r.estado || 'Programado');
-      cells += '<div class="planif-cal-chip" title="' + escapeHtml(tooltip) + '" data-tooltip="' + escapeHtml(tooltip) + '" style="background:' + color + '22;color:' + color + '"><span class="dot" style="background:' + color + '"></span><span class="planif-cal-chip-label">' + escapeHtml(texto) + '</span></div>';
+      cells += '<div class="planif-cal-chip" data-tooltip="' + escapeHtml(tooltip) + '" style="background:' + color + '22;color:' + color + '"><span class="dot" style="background:' + color + '"></span><span class="planif-cal-chip-label">' + escapeHtml(texto) + '</span></div>';
     });
     if (validos.length > 3) cells += '<div class="planif-cal-more">+' + (validos.length - 3) + ' más</div>';
     cells += '</div>';
