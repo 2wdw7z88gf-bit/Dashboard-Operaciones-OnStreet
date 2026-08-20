@@ -439,7 +439,7 @@ th.fp-mes-actual,td.fp-mes-actual{background:var(--info-bg)}
 }
 
 /* ─── MODO STANDALONE (instalada como app) ────────────────────── */
-@media (display-mode: standalone){
+@media (display-mode: standalone) and (max-width:768px){
   body{padding-top:env(safe-area-inset-top,0px)}
   .tabs{display:none}
   .container{padding-bottom:calc(62px + env(safe-area-inset-bottom,0px))}
@@ -448,52 +448,6 @@ th.fp-mes-actual,td.fp-mes-actual{background:var(--info-bg)}
 }
 #offline-banner{display:none;align-items:center;gap:10px;padding:12px 14px;margin-bottom:14px;background:var(--danger-bg);color:var(--danger-fg);border:0.5px solid var(--danger-fg);border-radius:10px;font-size:14px}
 
-/* ─── CLASE is-mobile (JS la agrega) — resiste modo escritorio ─── */
-.is-mobile body{padding:12px 10px !important}
-.is-mobile .topbar{flex-direction:column !important;align-items:flex-start !important;gap:8px !important;margin-bottom:12px !important}
-.is-mobile .topbar h1{font-size:18px !important}
-.is-mobile .topbar .meta{font-size:11px !important}
-.is-mobile .status{width:100% !important;justify-content:space-between !important}
-.is-mobile .fg-label{display:none !important}
-.is-mobile .fg-input{flex:1 !important;min-width:0 !important;width:auto !important;font-size:13px !important;padding:6px 8px !important;box-sizing:border-box !important}
-.is-mobile .kpi-grid{grid-template-columns:repeat(2,1fr) !important;gap:6px !important;margin-bottom:10px !important}
-.is-mobile .km-kpi-grid{grid-template-columns:repeat(2,1fr) !important;gap:6px !important;margin-bottom:10px !important}
-.is-mobile .kpi{padding:10px 10px !important;border-radius:8px !important}
-.is-mobile .kpi-split-half{padding:10px 10px !important}
-.is-mobile .kpi-label{font-size:10px !important;letter-spacing:.04em !important}
-.is-mobile .kpi-val{font-size:20px !important;font-weight:600 !important}
-.is-mobile .kpi-sub{display:block !important;font-size:10px !important}
-.is-mobile .km-kpi-val{font-size:20px !important;font-weight:600 !important}
-.is-mobile .km-kpi-sub{display:block !important;font-size:10px !important}
-.is-mobile #opRankingList,.is-mobile #opIniList,.is-mobile #opObsList{max-height:260px !important;overflow-y:auto !important}
-.is-mobile .body-grid{grid-template-columns:1fr !important;gap:10px !important}
-.is-mobile .day-grid{grid-template-columns:1fr !important;gap:10px !important}
-.is-mobile .tend-grid{grid-template-columns:1fr !important;gap:10px !important}
-.is-mobile #mapLeaflet,.is-mobile #gpsMapLeaflet{height:200px !important}
-.is-mobile .panel{padding:12px !important}
-.is-mobile .panel h2{font-size:13px !important}
-.is-mobile .banner-alert{flex-direction:column !important;align-items:flex-start !important;gap:8px !important}
-.is-mobile .tabs{-webkit-overflow-scrolling:touch;scrollbar-width:none !important}
-.is-mobile .tabs::-webkit-scrollbar{display:none}
-.is-mobile .tab{padding:10px 14px !important;font-size:13px !important}
-.is-mobile .filter-row{flex-direction:column !important;gap:6px !important}
-.is-mobile .filter-row select,.is-mobile .filter-row input{width:100% !important;min-width:0 !important;font-size:14px !important;padding:8px 10px !important;box-sizing:border-box !important}
-.is-mobile .heatmap-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.is-mobile .hm-grid{min-width:640px}
-.is-mobile .tabla-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.is-mobile table{min-width:500px}
-.is-mobile .btn-refresh{padding:8px 14px !important;min-height:36px !important}
-.is-mobile .subtab{padding:7px 12px !important;font-size:12px !important}
-.is-mobile .mob-list{max-height:280px !important}
-.is-mobile .mob-name{max-width:160px !important}
-.is-mobile .eventos-list{max-height:400px !important}
-.is-mobile .obs-filters{gap:4px !important}
-.is-mobile .obs-btn{padding:5px 8px !important;font-size:11px !important}
-.is-mobile .footer{font-size:10px !important}
-.is-mobile .tabs{display:none !important}
-.is-mobile .container{padding-bottom:calc(62px + env(safe-area-inset-bottom,0px)) !important}
-.is-mobile .topbar{position:sticky !important;top:0 !important;z-index:50 !important;background:var(--bg) !important}
-.is-mobile #bottom-nav{display:flex !important}
 /* ─── BOTTOM NAV ─────────────────────────────────────────────────────── */
 #bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:0.5px solid var(--border-2);padding-bottom:env(safe-area-inset-bottom,0px);z-index:100;box-shadow:0 -2px 12px rgba(0,0,0,0.06)}
 .bnav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 4px;background:none;border:none;cursor:pointer;color:var(--text-3);font-family:inherit;font-size:11px;font-weight:500;line-height:1.2;min-height:52px;transition:color 0.15s;-webkit-tap-highlight-color:transparent}
@@ -669,13 +623,6 @@ th.fp-mes-actual,td.fp-mes-actual{background:var(--info-bg)}
 .btn-theme:hover{background:var(--surface-2)}</style>
 <script>
 (function(){
-  var ua = navigator.userAgent;
-  var isPhone = /iPhone|iPod|Android|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-  var sw = Math.min(window.screen.width, window.screen.height);
-  var hasTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-  if(isPhone || sw < 768 || (hasTouch && sw < 1024)) {
-    document.documentElement.classList.add('is-mobile');
-  }
   // Restaurar tema guardado (evita flash en dark mode)
   var t = localStorage.getItem('os-theme') || 'light';
   document.documentElement.setAttribute('data-theme', t);
@@ -4515,12 +4462,10 @@ function populateKamSelector(){
 ['planifFiltMes','planifFiltCliente','planifFiltEstado','planifFiltTexto'].forEach(id=>{document.getElementById(id).addEventListener(id==='planifFiltTexto'?'input':'change',renderPlanificacion);});
 
 // ── MOBILE LAYOUT ──────────────────────────────────────────────────────────
-(function applyMobileIfNeeded(){
-  var ua = navigator.userAgent;
-  var isPhone = /iPhone|iPod|Android|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-  var sw = Math.min(window.screen.width, window.screen.height);
-  if(!isPhone && sw >= 768) return;
-  var css = [
+// Se basa en el viewport real: evita clasificar como móvil a notebooks con
+// pantalla táctil, escalado de Windows o una PWA abierta en escritorio.
+(function applyResponsiveMobileStyles(){
+  var css = '@media (max-width:768px){' + [
     /* base */
     'body{padding:16px 14px!important;font-size:16px!important}',
     /* topbar */
@@ -4606,7 +4551,7 @@ function populateKamSelector(){
     '.dormido-meta{font-size:13px!important}',
     /* footer */
     '.footer{font-size:13px!important;padding-top:18px!important}',
-  ].join('');
+  ].join('') + '}';
   var s = document.createElement('style');
   s.id = 'mobile-override';
   s.textContent = css;
