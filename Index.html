@@ -82,6 +82,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .tab-content{display:none}.tab-content.active{display:block}
 .subtab-content{display:none}.subtab-content.active{display:block}
 .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px}
+.fp-kpi-grid{grid-template-columns:repeat(6,minmax(150px,1fr))}
 .kpi{background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:16px 18px}
 .kpi-label{font-size:12px;color:var(--text-2);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.3px}
 .kpi-val{font-size:32px;font-weight:600}
@@ -89,6 +90,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .kpi.ok .kpi-val{color:var(--ok-fg)}.kpi.warn .kpi-val{color:var(--warn-fg)}
 .kpi.danger .kpi-val{color:var(--danger-fg)}.kpi.info .kpi-val{color:var(--info-fg)}
 .kpi.teal .kpi-val{color:var(--teal-fg)}
+.kpi.purple .kpi-val{color:var(--purple-fg)}
 .kpi-split{display:flex;padding:0;overflow:hidden}
 .kpi-split-half{flex:1;padding:16px 18px;display:flex;flex-direction:column;cursor:help;transition:background 0.12s}
 .kpi-split-half:hover{background:rgba(0,0,0,0.03)}
@@ -346,6 +348,7 @@ th.fp-mes-actual,td.fp-mes-actual{background:var(--info-bg)}
 @media (max-width:900px){#opBodyGrid{grid-template-columns:1fr}}
 @media (max-width:900px){.body-grid{grid-template-columns:1fr}.kpi-grid{grid-template-columns:repeat(2,1fr)}.tend-grid{grid-template-columns:1fr}}
 @media (max-width:1100px){.day-grid{grid-template-columns:1fr 1fr}}
+@media (max-width:1100px){.fp-kpi-grid{grid-template-columns:repeat(3,1fr)}}
 @media (max-width:760px){.day-grid{grid-template-columns:1fr}}
 
 /* ─── TABLET ──────────────────────────────────────────────────────── */
@@ -1415,9 +1418,10 @@ th.fp-mes-actual,td.fp-mes-actual{background:var(--info-bg)}
     </div>
 
     <div class="subtab-content active" id="sub-fp-consolidado">
-      <div class="kpi-grid">
+      <div class="kpi-grid fp-kpi-grid">
         <div class="kpi info"><div class="kpi-label">Vehículos totales</div><div class="kpi-val" id="fpTotal">—</div><div class="kpi-sub">en el panel</div></div>
         <div class="kpi ok"><div class="kpi-label">Operativos</div><div class="kpi-val" id="fpOperativos">—</div><div class="kpi-sub" id="fpOperativosSub">—</div></div>
+        <div class="kpi purple"><div class="kpi-label">Ocupación</div><div class="kpi-val" id="fpOcupacion">—</div><div class="kpi-sub" id="fpOcupacionSub">Operativos / flota sin reemplazos</div></div>
         <div class="kpi warn"><div class="kpi-label">Disponibles</div><div class="kpi-val" id="fpDisponibles">—</div><div class="kpi-sub" id="fpDisponiblesSub">mes en curso</div></div>
         <div class="kpi danger"><div class="kpi-label">Reemplazos</div><div class="kpi-val" id="fpReemplazos">—</div><div class="kpi-sub" id="fpReemplazosSub">mes en curso</div></div>
         <div class="kpi teal"><div class="kpi-label">Clientes activos</div><div class="kpi-val" id="fpClientes">—</div><div class="kpi-sub" id="fpClientesSub">con flota asignada</div></div>
@@ -1874,9 +1878,13 @@ function renderFlotaPanel(){
   const operativos=vehiculos.filter(v=>(v.meses&&v.meses[mesActual])==='OP').length;
   const disponibles=vehiculos.filter(v=>(v.meses&&v.meses[mesActual])==='D').length;
   const reemplazos=vehiculos.filter(v=>(v.meses&&v.meses[mesActual])==='R').length;
+  const flotaSinReemplazos=Math.max(total-reemplazos,0);
+  const ocupacion=flotaSinReemplazos?Math.round(operativos/flotaSinReemplazos*100):null;
   document.getElementById('fpTotal').textContent=total;
   document.getElementById('fpOperativos').textContent=operativos;
   document.getElementById('fpOperativosSub').textContent=mesActual+' · '+(total?Math.round(operativos/total*100):0)+'% de la flota';
+  document.getElementById('fpOcupacion').textContent=ocupacion===null?'—':ocupacion+'%';
+  document.getElementById('fpOcupacionSub').textContent=flotaSinReemplazos?operativos+' de '+flotaSinReemplazos+' sin reemplazos':'Sin base ocupable';
   document.getElementById('fpDisponibles').textContent=disponibles;
   document.getElementById('fpDisponiblesSub').textContent=mesActual+' · '+(total?Math.round(disponibles/total*100):0)+'% de la flota';
   document.getElementById('fpReemplazos').textContent=reemplazos;
